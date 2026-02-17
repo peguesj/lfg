@@ -150,6 +150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             case "dtf":       targetPath = lfgDir + "/.lfg_clean.html"
             case "btau":      targetPath = lfgDir + "/.lfg_btau.html"
             case "devdrive":  targetPath = lfgDir + "/.lfg_devdrive.html"
+            case "stfu":      targetPath = lfgDir + "/.lfg_stfu.html"
             case "dashboard": targetPath = lfgDir + "/.lfg_dashboard.html"
             case "splash":    targetPath = lfgDir + "/.lfg_splash.html"
             default:          targetPath = target  // allow direct file paths
@@ -203,6 +204,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         }
     }
 
+    @objc func reloadPage() {
+        webView.reload()
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ application: NSApplication) -> Bool {
         return true
     }
@@ -234,4 +239,45 @@ let delegate = AppDelegate(htmlPath: htmlPath, windowTitle: windowTitle, selecti
 let app = NSApplication.shared
 app.delegate = delegate
 app.setActivationPolicy(.regular)
+
+// Build main menu bar so app shows as "LFG" not "viewer"
+let mainMenu = NSMenu()
+
+// App menu (LFG)
+let appMenuItem = NSMenuItem()
+let appMenu = NSMenu()
+appMenu.addItem(withTitle: "About LFG", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+appMenu.addItem(NSMenuItem.separator())
+appMenu.addItem(withTitle: "Quit LFG", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+appMenuItem.submenu = appMenu
+mainMenu.addItem(appMenuItem)
+
+// File menu
+let fileMenuItem = NSMenuItem()
+let fileMenu = NSMenu(title: "File")
+fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+fileMenuItem.submenu = fileMenu
+mainMenu.addItem(fileMenuItem)
+
+// View menu
+let viewMenuItem = NSMenuItem()
+let viewMenu = NSMenu(title: "View")
+viewMenu.addItem(withTitle: "Reload", action: #selector(AppDelegate.reloadPage), keyEquivalent: "r")
+viewMenu.addItem(withTitle: "Actual Size", action: nil, keyEquivalent: "0")
+viewMenu.addItem(withTitle: "Zoom In", action: nil, keyEquivalent: "+")
+viewMenu.addItem(withTitle: "Zoom Out", action: nil, keyEquivalent: "-")
+viewMenu.addItem(NSMenuItem.separator())
+viewMenu.addItem(withTitle: "Toggle Developer Tools", action: nil, keyEquivalent: "")
+viewMenuItem.submenu = viewMenu
+mainMenu.addItem(viewMenuItem)
+
+// Help menu
+let helpMenuItem = NSMenuItem()
+let helpMenu = NSMenu(title: "Help")
+helpMenu.addItem(withTitle: "LFG Documentation", action: nil, keyEquivalent: "")
+helpMenu.addItem(withTitle: "Report Issue", action: nil, keyEquivalent: "")
+helpMenuItem.submenu = helpMenu
+mainMenu.addItem(helpMenuItem)
+
+app.mainMenu = mainMenu
 app.run()

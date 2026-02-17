@@ -65,6 +65,9 @@ body {
 .mod-btau:hover, .mod-btau.selected { border-color: #06d6a0; box-shadow: 0 0 24px rgba(6,214,160,0.15); }
 .mod-dd .abbr { color: #c084fc; }
 .mod-dd:hover, .mod-dd.selected { border-color: #c084fc; box-shadow: 0 0 24px rgba(192,132,252,0.15); }
+.mod-stfu .abbr { color: #e879f9; }
+.mod-stfu:hover, .mod-stfu.selected { border-color: #e879f9; box-shadow: 0 0 24px rgba(232,121,249,0.15); }
+.module:nth-child(5) { animation-delay: 0.75s; }
 .system-bar { display: flex; gap: 20px; padding: 10px 20px; background: #1c1c22; border-radius: 6px; border: 1px solid #2a2a34; font-size: 11px; color: #6b6b78; animation: lfgFadeIn 0.6s ease-out 0.6s both; }
 .system-bar .val { color: #a0a0b0; font-weight: 600; }
 .links { margin-top: 16px; display: flex; gap: 16px; animation: lfgFadeIn 0.6s ease-out 0.7s both; }
@@ -112,6 +115,13 @@ body {
         <div class=\"desc\">Symlink forest management across external volumes</div>
         <div class=\"kbd-hint\">&#x2318;4</div>
       </div>
+      <div class=\"module mod-stfu\" onclick=\"selectModule('stfu', this)\" data-tip=\"Source tree forensics: find duplicates, shared libraries, coalescence candidates\">
+        <div class=\"icon\">&#x1F50E;</div>
+        <div class=\"name\">STFU</div>
+        <div class=\"abbr\">Source Tree Forensics</div>
+        <div class=\"desc\">Find redundant repos, shared code, and consolidation opportunities</div>
+        <div class=\"kbd-hint\">&#x2318;5</div>
+      </div>
     </div>
 
     <div class=\"system-bar\">
@@ -125,7 +135,7 @@ body {
       <a onclick=\"window.open('http://localhost:3031')\" data-tip=\"CCEM APM performance monitor\">APM Monitor</a>
     </div>
 
-    <div class=\"version\">lfg v1.4.0 - @yj tools</div>
+    <div class=\"version\">lfg v2.0.0 - @yj tools</div>
 
     <div id=\"loading\" class=\"loading-bar\"><div id=\"loading-fill\" class=\"loading-fill\"></div></div>
     <div id=\"loading-label\" class=\"loading-label\">Loading module...</div>
@@ -142,6 +152,7 @@ body {
     if (e.metaKey && e.key === '2') selectModule('dtf', document.querySelector('.mod-dtf'));
     if (e.metaKey && e.key === '3') selectModule('btau', document.querySelector('.mod-btau'));
     if (e.metaKey && e.key === '4') selectModule('devdrive', document.querySelector('.mod-dd'));
+    if (e.metaKey && e.key === '5') selectModule('stfu', document.querySelector('.mod-stfu'));
     if (e.metaKey && e.key === 'd') selectModule('dashboard', null);
   });
 
@@ -149,8 +160,8 @@ body {
     document.querySelectorAll('.module').forEach(function(m) { m.style.opacity = '0.4'; });
     if (el) { el.classList.add('selected'); el.style.opacity = '1'; }
 
-    var colors = { wtfs: '#4a9eff', dtf: '#ff8c42', btau: '#06d6a0', devdrive: '#c084fc', dashboard: '#4a9eff' };
-    var labels = { wtfs: 'Scanning disk...', dtf: 'Scanning caches...', btau: 'Checking backups...', devdrive: 'Loading devdrive...', dashboard: 'Loading dashboard...' };
+    var colors = { wtfs: '#4a9eff', dtf: '#ff8c42', btau: '#06d6a0', devdrive: '#c084fc', stfu: '#e879f9', dashboard: '#4a9eff' };
+    var labels = { wtfs: 'Scanning disk...', dtf: 'Scanning caches...', btau: 'Checking backups...', devdrive: 'Loading devdrive...', stfu: 'Analyzing projects...', dashboard: 'Loading dashboard...' };
     var fill = document.getElementById('loading-fill');
     var bar = document.getElementById('loading');
     var label = document.getElementById('loading-label');
@@ -196,6 +207,7 @@ case "$SELECTION" in
     dtf)       exec "$LFG_DIR/lib/clean.sh" ;;
     btau)      exec "$LFG_DIR/lib/btau.sh" --view ;;
     devdrive)  exec "$LFG_DIR/lib/devdrive.sh" ;;
+    stfu)      exec "$LFG_DIR/lib/stfu.sh" ;;
     dashboard) exec "$LFG_DIR/lib/dashboard.sh" ;;
     *)         exit 0 ;;
 esac
