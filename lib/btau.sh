@@ -130,7 +130,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg btau - Local File Guardian | Back That App Up</div>
   <script>''' + uijs + '''
-  LFG.init({ welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\" });
+  LFG.init({ module: \"btau\", context: \"Back That App Up\", moduleVersion: \"1.0.0\", welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"BTAU Actions\", [
       { label: \"Discover Volumes\", desc: \"Scan for devdrive volumes\", cli: \"lfg btau discover\", module: \"btau\", action: \"run\", args: \"discover\", color: \"#06d6a0\" },

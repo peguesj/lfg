@@ -177,7 +177,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg dtf - Local File Guardian | $FOOTER_MSG</div>
   <script>''' + uijs + '''
-  LFG.init({ welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\" });
+  LFG.init({ module: \"dtf\", context: \"$MODE_TAG\", moduleVersion: \"1.0.0\", welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"DTF Actions\", [
       { label: \"Scan Only\", desc: \"Dry run - show reclaimable\", cli: \"lfg dtf\", module: \"dtf\", action: \"run\", color: \"#4a9eff\" },

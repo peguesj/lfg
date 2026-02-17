@@ -9,11 +9,96 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Mono", Menlo, monospace;
   background: #141418;
   color: #e0e0e6;
-  padding: 24px 28px;
+  padding: 52px 28px 48px 28px;
   -webkit-font-smoothing: antialiased;
 }
 
-/* --- Header --- */
+/* --- Sticky Header --- */
+#lfg-sticky-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 900;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  background: rgba(20,20,24,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid #1e1e28;
+  font-size: 12px;
+  gap: 0;
+}
+#lfg-sticky-header .sh-brand {
+  font-weight: 800;
+  color: #4a9eff;
+  letter-spacing: -0.3px;
+}
+#lfg-sticky-header .sh-module {
+  font-weight: 700;
+  color: #fff;
+}
+#lfg-sticky-header .sh-dot {
+  color: #3a3a44;
+  margin: 0 1px;
+}
+#lfg-sticky-header .sh-context {
+  color: #6b6b78;
+  font-weight: 400;
+  margin-left: 8px;
+}
+#lfg-sticky-header .sh-sep {
+  color: #2a2a34;
+  margin: 0 10px;
+  font-weight: 300;
+}
+#lfg-sticky-header .sh-right {
+  margin-left: auto;
+  font-size: 10px;
+  color: #4a4a56;
+}
+
+/* --- Sticky Footer --- */
+#lfg-sticky-footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 900;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28px;
+  background: rgba(20,20,24,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid #1e1e28;
+  font-size: 10px;
+  color: #4a4a56;
+  gap: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+#lfg-sticky-footer .sf-item {
+  display: inline;
+}
+#lfg-sticky-footer .sf-sep {
+  color: #2a2a34;
+  margin: 0 8px;
+}
+#lfg-sticky-footer .sf-heart {
+  color: #ff4d6a;
+}
+#lfg-sticky-footer a {
+  color: #4a9eff;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+#lfg-sticky-footer a:hover {
+  color: #6db8ff;
+  text-decoration: underline;
+}
+
+/* --- Legacy Header (content area, non-sticky) --- */
 .header {
   display: flex;
   justify-content: space-between;
@@ -165,12 +250,9 @@ td { padding: 7px 8px; vertical-align: middle; }
 .badge-pending { color: #ffd166; background: rgba(255,209,102,0.12); }
 .badge-active { color: #4a9eff; background: rgba(74,158,255,0.12); }
 
-/* --- Footer --- */
+/* --- Legacy Footer (hidden when sticky footer active) --- */
 .footer {
-  margin-top: 16px;
-  font-size: 10px;
-  color: #4a4a56;
-  text-align: center;
+  display: none;
 }
 
 /* --- Empty State --- */

@@ -150,6 +150,7 @@ html = f'''<!DOCTYPE html>
   <div class="footer">lfg v1.0.0 - Local File Guardian | wtfs + dtf + btau</div>
   <script>{uijs}
   LFG.init({{
+    module: "dashboard", context: "All Modules", moduleVersion: "1.0.0",
     welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [
       {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Three modules work together to scan, clean, and protect your files.", color: "#4a9eff" }},

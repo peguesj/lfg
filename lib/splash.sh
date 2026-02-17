@@ -27,7 +27,7 @@ html = '''<!DOCTYPE html>
 ''' + theme_css + '''
 body {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; min-height: 100vh; padding: 0;
+  justify-content: center; min-height: 100vh; padding: 52px 0 48px 0;
   overflow: hidden; user-select: none;
 }
 .splash { text-align: center; animation: lfgFadeIn 0.4s ease-out; }
@@ -124,7 +124,7 @@ body {
   <script>
 ''' + ui_js + '''
 
-  LFG.init({ welcome: \"Select a module to get started\" });
+  LFG.init({ context: \"Select a Module\", moduleVersion: \"1.0.0\", welcome: \"Select a module to get started\" });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {

@@ -93,7 +93,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg wtfs - Local File Guardian | $DIR_DISPLAY</div>
   <script>''' + uijs + '''
-  LFG.init({ welcome: \"Showing $RANK directories in $DIR_DISPLAY\" });
+  LFG.init({ module: \"wtfs\", context: \"$DIR_DISPLAY\", moduleVersion: \"1.0.0\", welcome: \"Showing $RANK directories in $DIR_DISPLAY\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"WTFS Actions\", [
       { label: \"Scan ~/Developer\", desc: \"Default scan target\", cli: \"lfg wtfs ~/Developer\", module: \"wtfs\", action: \"run\", args: \"~/Developer\", color: \"#4a9eff\" },
