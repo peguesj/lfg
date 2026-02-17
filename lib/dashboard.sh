@@ -210,12 +210,16 @@ html = f'''<!DOCTYPE html>
     <div class="stat clickable" onclick="switchTab('devdrive')" data-tip="Click to view devdrive status">
       <span class="label">Devdrive</span><span class="value" style="color:#c084fc">DD_STATUS_PH</span>
     </div>
+    <div class="stat clickable" onclick="switchTab('stfu')" data-tip="Click to view project forensics">
+      <span class="label">STFU</span><span class="value" id="stfu-stat" style="color:#c084fc">...</span>
+    </div>
   </div>
   <div class="nav">
     <a class="active" onclick="switchTab('wtfs')">WTFS <span class="kbd">&#x2318;1</span></a>
     <a onclick="switchTab('dtf')">DTF <span class="kbd">&#x2318;2</span></a>
     <a onclick="switchTab('btau')">BTAU <span class="kbd">&#x2318;3</span></a>
     <a onclick="switchTab('devdrive')">DEVDRIVE <span class="kbd">&#x2318;4</span></a>
+    <a onclick="switchTab('stfu')">STFU <span class="kbd">&#x2318;5</span></a>
   </div>
   <div class="dashboard-layout">
   <div class="main-column">
@@ -238,12 +242,19 @@ html = f'''<!DOCTYPE html>
     ''' + (f'<div class="section-title" style="color:#c084fc">Volumes</div><table><thead><tr><th>Volume</th><th class="r">Free</th><th class="r">Projects</th></tr></thead><tbody>{dd_volume_rows}</tbody></table>' if dd_volume_rows.strip() else '<div class="section-title" style="color:#c084fc">Volumes</div><div class="empty-state">No devdrive volumes detected.</div>') + f'''
     ''' + (f'<div class="section-title" style="color:#c084fc">Symlink Forest</div><table><thead><tr><th>Project</th><th>Volume</th><th>Status</th></tr></thead><tbody>{dd_project_rows}</tbody></table>' if dd_project_rows.strip() else '<div class="section-title" style="color:#c084fc">Symlink Forest</div><div class="empty-state">No projects in symlink forest.</div>') + f'''
   </div>
+  <div id="tab-stfu" class="tab-content">
+    <div class="guidance" style="border-left-color:#c084fc"><strong>STFU</strong> - Source Tree Forensics &amp; Unification. Scans <code>DIR_DISPLAY_PH</code> for project relationships, duplicates, and coalescence candidates.</div>
+    <div id="stfu-main-loading" class="empty-state">Scanning project relationships...</div>
+    <div id="stfu-main-duplicates" style="display:none"></div>
+    <div id="stfu-main-relationships" style="display:none"></div>
+    <div id="stfu-main-clusters" style="display:none"></div>
+  </div>
   </div><!-- /main-column -->
   <div class="side-column">
     <div class="side-tab-nav">
-      <a class="active" data-tab="stfu" onclick="LFG.switchSideTab('stfu')">STFU <span class="kbd">&#x2318;5</span></a>
-      <a data-tab="ai" onclick="LFG.switchSideTab('ai')">AI <span class="kbd">&#x2318;6</span></a>
-      <a data-tab="settings" onclick="LFG.switchSideTab('settings')">Settings <span class="kbd">&#x2318;7</span></a>
+      <a class="active" data-tab="stfu" onclick="LFG.switchSideTab('stfu')">Inspector <span class="kbd">&#x2318;6</span></a>
+      <a data-tab="ai" onclick="LFG.switchSideTab('ai')">AI <span class="kbd">&#x2318;7</span></a>
+      <a data-tab="settings" onclick="LFG.switchSideTab('settings')">Settings <span class="kbd">&#x2318;8</span></a>
     </div>
     <div id="side-stfu" class="side-panel active">
       <div class="section-title">Source Tree Forensics</div>
@@ -269,7 +280,7 @@ html = f'''<!DOCTYPE html>
     </div>
   </div>
   </div><!-- /dashboard-layout -->
-  <div class="footer">lfg v2.0.0 - Local File Guardian | wtfs + dtf + btau + devdrive + stfu + ai</div>
+  <div class="footer">lfg v2.0.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI</div>
   <script>{uijs}
   LFG.init({{
     module: "dashboard", context: "All Modules", moduleVersion: "2.0.0",
@@ -295,6 +306,7 @@ html = f'''<!DOCTYPE html>
     if (e.metaKey && e.key === '2') switchTab('dtf');
     if (e.metaKey && e.key === '3') switchTab('btau');
     if (e.metaKey && e.key === '4') switchTab('devdrive');
+    if (e.metaKey && e.key === '5') switchTab('stfu');
   }});
   // AI status check
   setTimeout(function() {{
@@ -307,13 +319,15 @@ html = f'''<!DOCTYPE html>
       if (el && out.trim()) el.textContent = out.trim();
     }});
   }}, 1000);
-  // STFU scan
+  // STFU scan (populates both main tab and side inspector)
   setTimeout(function() {{
     LFG.exec('~/tools/@yj/lfg/lfg stfu --json 2>/dev/null || echo "{{}}"', function(out) {{
-      var loading = document.getElementById('stfu-loading');
-      var related = document.getElementById('stfu-related');
       try {{
         var data = JSON.parse(out || '{{}}');
+
+        // --- Side panel (inspector) ---
+        var loading = document.getElementById('stfu-loading');
+        var related = document.getElementById('stfu-related');
         if (loading) loading.style.display = 'none';
         if (related && data.relationships && data.relationships.length > 0) {{
           related.style.display = 'block';
@@ -322,7 +336,58 @@ html = f'''<!DOCTYPE html>
               return '<div class="stfu-relationship-card"><span>' + r.a + '</span><div class="stfu-score-bar"><div style="width:' + (r.score * 100) + '%;background:#c084fc"></div></div><span>' + r.b + '</span></div>';
             }}).join('');
         }}
-      }} catch(e) {{ if (loading) loading.textContent = 'No relationships found'; }}
+
+        // --- Main tab ---
+        var mainLoading = document.getElementById('stfu-main-loading');
+        if (mainLoading) mainLoading.style.display = 'none';
+
+        // Duplicates table
+        var dupes = document.getElementById('stfu-main-duplicates');
+        if (dupes && data.duplicates && data.duplicates.length > 0) {{
+          dupes.style.display = 'block';
+          dupes.innerHTML = '<div class="section-title" style="color:#ff4d6a">Possible Duplicates (' + data.duplicates.length + ')</div>' +
+            '<table><thead><tr><th>Project A</th><th>Project B</th><th class="r">Score</th><th>Shared</th></tr></thead><tbody>' +
+            data.duplicates.map(function(d) {{
+              var pct = Math.round(d.score * 100);
+              var color = pct > 80 ? '#ff4d6a' : '#ff8c42';
+              return '<tr data-tip="' + d.shared_deps.slice(0,5).join(', ') + '"><td class="name">' + d.a + '</td><td class="name">' + d.b + '</td><td class="pct" style="color:' + color + '">' + pct + '%</td><td class="meta">' + d.shared_deps.length + ' deps</td></tr>';
+            }}).join('') + '</tbody></table>';
+        }}
+
+        // Relationships table
+        var rels = document.getElementById('stfu-main-relationships');
+        if (rels && data.relationships && data.relationships.length > 0) {{
+          rels.style.display = 'block';
+          rels.innerHTML = '<div class="section-title" style="color:#c084fc">All Relationships (' + data.relationships.length + ')</div>' +
+            '<table><thead><tr><th>Project A</th><th>Project B</th><th>Similarity</th><th>Stack</th></tr></thead><tbody>' +
+            data.relationships.map(function(r) {{
+              var pct = Math.round(r.score * 100);
+              return '<tr data-tip="' + r.shared_deps.slice(0,5).join(', ') + '"><td class="name">' + r.a + '</td><td class="name">' + r.b + '</td><td class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:#c084fc"></div></div></td><td class="meta">' + (r.shared_stack || []).join(', ') + '</td></tr>';
+            }}).join('') + '</tbody></table>';
+        }}
+
+        // Clusters
+        var clusters = document.getElementById('stfu-main-clusters');
+        if (clusters && data.clusters && data.clusters.length > 0) {{
+          clusters.style.display = 'block';
+          clusters.innerHTML = '<div class="section-title" style="color:#06d6a0">Coalescence Clusters (' + data.clusters.length + ')</div>' +
+            data.clusters.map(function(c, i) {{
+              return '<div style="margin-bottom:12px;padding:10px 14px;background:#1c1c22;border:1px solid #2a2a34;border-radius:8px;border-left:3px solid #06d6a0"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#06d6a0;margin-bottom:6px">Cluster ' + (i+1) + ' (' + c.length + ' projects)</div><div style="display:flex;flex-wrap:wrap;gap:6px">' +
+                c.map(function(name) {{ return '<span class="ai-pill" style="background:#06d6a020;color:#06d6a0;border:1px solid #06d6a033">' + name + '</span>'; }}).join('') +
+              '</div></div>';
+            }}).join('');
+        }}
+
+        // Summary stat
+        var statEl = document.getElementById('stfu-stat');
+        if (statEl) statEl.textContent = (data.duplicates||[]).length + ' dupes';
+        LFG.toast('STFU: ' + (data.project_count||0) + ' projects, ' + (data.relationships||[]).length + ' relationships, ' + (data.duplicates||[]).length + ' duplicates', {{type:'info', duration:3000}});
+      }} catch(e) {{
+        var ml = document.getElementById('stfu-main-loading');
+        if (ml) ml.textContent = 'Error loading STFU data';
+        var sl = document.getElementById('stfu-loading');
+        if (sl) sl.textContent = 'Error loading data';
+      }}
     }});
   }}, 1500);
   // Analyze button
