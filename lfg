@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# =============================================================================
+# lfg - Local File Guardian
+# =============================================================================
+# Suite dispatcher with splash screen for disk management tools.
+#
+# Modules:
+#   wtfs   Where's The Free Space - disk usage viewer
+#   dtf    Delete Temp Files - cache cleaner
+#   btau   Back That App Up - backup manager
+#
+# Usage:
+#   lfg                          # Splash screen
+#   lfg wtfs [path]              # Disk usage viewer
+#   lfg dtf [--force] [opts]     # Cache cleaner
+#   lfg btau [cmd] [opts]        # Backup manager
+#   lfg dashboard                # Combined dashboard
+#   lfg --help                   # Show help
+# =============================================================================
+set -euo pipefail
+
+readonly LFG_VERSION="1.0.0"
+SELF="$0"
+[[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
+readonly LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+readonly VIEWER="$LFG_DIR/viewer"
+
+# Compile viewer if needed
+ensure_viewer() {
+    if [[ ! -x "$VIEWER" ]] || [[ "$LFG_DIR/viewer.swift" -nt "$VIEWER" ]]; then
+        echo "Compiling viewer..."
+        swiftc -O -o "$VIEWER" "$LFG_DIR/viewer.swift" \
+            -framework Cocoa -framework WebKit
+    fi
+}
+
+show_help() {
+    cat <<'HELP'
+lfg - Local File Guardian v1.0.0
+
+MODULES:
+    wtfs [path]                  Where's The Free Space (default: ~/Developer)
+    dtf                          Delete Temp Files (dry run)
+    dtf --force                  Execute cache cleanup
+    dtf --force --docker         Also prune Docker
+    btau                         Back That App Up (status view)
+    btau <command> [opts]        Backup CLI (discover, backup, restore, ...)
+
+COMMANDS:
+    lfg                          Splash screen
+    lfg dashboard                Combined dashboard (all modules)
+    lfg --help                   Show this help
+    lfg --version                Show version
+
+OTHER:
+    lfg menubar                  Start persistent menubar status app
+
+ALIASES:
+    wtfs                         lfg wtfs
+    dtf                          lfg dtf
+
+HELP
+}
+
+# Route based on how we were invoked (alias detection)
+INVOKED_AS="$(basename "$0")"
+case "$INVOKED_AS" in
+    wtfs)
+        ensure_viewer
+        exec "$LFG_DIR/lib/scan.sh" "$@"
+        ;;
+    dtf)
+        ensure_viewer
+        exec "$LFG_DIR/lib/clean.sh" "$@"
+        ;;
+    btau)
+        ensure_viewer
+        exec "$LFG_DIR/lib/btau.sh" "$@"
+        ;;
+esac
+
+# Normal dispatch
+case "${1:-}" in
+    wtfs|scan)
+        shift
+        ensure_viewer
+        exec "$LFG_DIR/lib/scan.sh" "$@"
+        ;;
+    dtf|clean)
+        shift
+        ensure_viewer
+        exec "$LFG_DIR/lib/clean.sh" "$@"
+        ;;
+    btau|backup)
+        shift
+        ensure_viewer
+        exec "$LFG_DIR/lib/btau.sh" "$@"
+        ;;
+    dashboard)
+        shift || true
+        ensure_viewer
+        exec "$LFG_DIR/lib/dashboard.sh" "$@"
+        ;;
+    menubar)
+        # Compile menubar if needed
+        if [[ ! -x "$LFG_DIR/lfg-menubar" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$LFG_DIR/lfg-menubar" ]]; then
+            echo "Compiling menubar..."
+            swiftc -O -o "$LFG_DIR/lfg-menubar" "$LFG_DIR/menubar.swift" -framework Cocoa
+        fi
+        "$LFG_DIR/lfg-menubar" &
+        disown
+        echo "LFG menubar started."
+        exit 0
+        ;;
+    --help|-h)
+        show_help
+        ;;
+    --version|-v)
+        echo "lfg v${LFG_VERSION}"
+        ;;
+    "")
+        # No args = splash screen
+        ensure_viewer
+        exec "$LFG_DIR/lib/splash.sh"
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Run 'lfg --help' for usage"
+        exit 1
+        ;;
+esac

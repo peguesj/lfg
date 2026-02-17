@@ -1,0 +1,246 @@
+/* =============================================================================
+   LFG Theme - Local File Guardian v1.0.0
+   Shared CSS for all module views
+   ============================================================================= */
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Mono", Menlo, monospace;
+  background: #141418;
+  color: #e0e0e6;
+  padding: 24px 28px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+h1 { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+h1 .brand { color: #4a9eff; }
+h1 .dim { color: #6b6b78; font-weight: 400; }
+.meta { font-size: 11px; color: #6b6b78; }
+
+/* --- Navigation Tabs --- */
+.nav {
+  display: flex;
+  gap: 2px;
+  margin: 14px 0 18px 0;
+  border-bottom: 1px solid #2a2a34;
+}
+.nav a {
+  display: inline-block;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b6b78;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.nav a:hover { color: #a0a0b0; }
+.nav a.active { color: #4a9eff; border-bottom-color: #4a9eff; }
+.nav .kbd {
+  font-size: 9px;
+  color: #3a3a44;
+  margin-left: 4px;
+  padding: 1px 4px;
+  border: 1px solid #2a2a34;
+  border-radius: 3px;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* --- Summary Cards --- */
+.summary {
+  display: flex;
+  gap: 24px;
+  margin: 12px 0 20px 0;
+  padding: 12px 16px;
+  background: #1c1c22;
+  border-radius: 8px;
+  border: 1px solid #2a2a34;
+}
+.summary .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+.stat .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #6b6b78;
+}
+.stat .value { font-size: 20px; font-weight: 700; color: #fff; }
+.stat .value.accent { color: #4a9eff; }
+.stat .value.warn { color: #ff8c42; }
+.stat .value.good { color: #06d6a0; }
+.stat .value.danger { color: #ff4d6a; }
+
+/* Clickable stat cards */
+.stat.clickable { cursor: pointer; transition: background 0.15s; padding: 4px 8px; margin: -4px -8px; border-radius: 6px; }
+.stat.clickable:hover { background: rgba(74,158,255,0.08); }
+
+/* --- Section Titles --- */
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #4a9eff;
+  margin: 20px 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #1e1e28;
+}
+
+/* --- Tables --- */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #6b6b78;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid #2a2a34;
+}
+thead th.r { text-align: right; }
+tbody tr {
+  border-bottom: 1px solid #1e1e26;
+  transition: background 0.15s;
+}
+tbody tr:hover { background: #1c1c24; }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: #1e1e2a; }
+td { padding: 7px 8px; vertical-align: middle; }
+.rank { color: #6b6b78; width: 32px; text-align: center; font-size: 11px; }
+.name { font-weight: 600; color: #e8e8ee; white-space: nowrap; }
+
+/* --- Category Badges --- */
+.cat {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.cat-dev { color: #4a9eff; background: rgba(74,158,255,0.1); }
+.cat-build { color: #ffd166; background: rgba(255,209,102,0.1); }
+.cat-app { color: #06d6a0; background: rgba(6,214,160,0.1); }
+.cat-sys { color: #ff8c42; background: rgba(255,140,66,0.1); }
+.cat-docker { color: #ff4d6a; background: rgba(255,77,106,0.1); }
+
+/* --- Size & Percentage --- */
+.size { text-align: right; white-space: nowrap; color: #a0a0b0; font-variant-numeric: tabular-nums; }
+.pct { text-align: right; width: 52px; font-variant-numeric: tabular-nums; color: #a0a0b0; }
+
+/* --- Progress Bars --- */
+.bar-cell { width: 35%; }
+.bar-track { height: 8px; background: #1e1e28; border-radius: 4px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- Status Badges --- */
+.status-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.badge-cleaned { color: #06d6a0; background: rgba(6,214,160,0.12); }
+.badge-skipped { color: #6b6b78; background: rgba(107,107,120,0.12); }
+.badge-error { color: #ff4d6a; background: rgba(255,77,106,0.12); }
+.badge-pending { color: #ffd166; background: rgba(255,209,102,0.12); }
+.badge-active { color: #4a9eff; background: rgba(74,158,255,0.12); }
+
+/* --- Footer --- */
+.footer {
+  margin-top: 16px;
+  font-size: 10px;
+  color: #4a4a56;
+  text-align: center;
+}
+
+/* --- Empty State --- */
+.empty-state {
+  text-align: center;
+  padding: 32px;
+  color: #6b6b78;
+  font-size: 13px;
+}
+
+/* --- Action Bar --- */
+.lfg-action-bar {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 12px 14px;
+  background: #1c1c22;
+  border-radius: 8px;
+  border: 1px solid #2a2a34;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* --- Guidance Panel --- */
+.guidance {
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: #1a1a22;
+  border: 1px solid #2a2a34;
+  border-left: 3px solid #4a9eff;
+  border-radius: 0 8px 8px 0;
+  font-size: 12px;
+  color: #a0a0b0;
+  line-height: 1.6;
+}
+.guidance strong { color: #e0e0e6; }
+.guidance code {
+  background: #2a2a34;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #4a9eff;
+}
+
+/* --- Module Cards (splash) --- */
+.module-card {
+  padding: 14px 16px;
+  background: #1c1c22;
+  border: 1px solid #2a2a34;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.module-card:hover {
+  border-color: #4a9eff;
+  background: #1e1e28;
+  transform: translateY(-2px);
+}
+
+/* --- Animated Pulse (for live indicators) --- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.pulse { animation: pulse 2s infinite; }
+
+/* --- Cross-module colored bars --- */
+tr { --bar-color: #4a9eff; }
+tr:has(.cat-dev) { --bar-color: #4a9eff; }
+tr:has(.cat-build) { --bar-color: #ffd166; }
+tr:has(.cat-app) { --bar-color: #06d6a0; }
+tr:has(.cat-sys) { --bar-color: #ff8c42; }
+tr:has(.cat-docker) { --bar-color: #ff4d6a; }
