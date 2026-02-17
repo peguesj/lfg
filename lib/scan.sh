@@ -7,6 +7,10 @@ LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HTML_FILE="$LFG_DIR/.lfg_scan.html"
 VIEWER="$LFG_DIR/viewer"
 
+source "$LFG_DIR/lib/state.sh"
+lfg_state_start wtfs
+lfg_state_update wtfs target "$TARGET"
+
 echo "Scanning $TARGET..."
 TMPFILE=$(mktemp)
 du -d1 -k "$TARGET" 2>/dev/null | sort -rn > "$TMPFILE"
@@ -102,6 +106,8 @@ html = '''<!DOCTYPE html>
 
 open('$HTML_FILE', 'w').write(html)
 "
+
+lfg_state_done wtfs "total_size=$TOTAL_HR" "dir_count=$RANK" "target=$DIR_DISPLAY"
 
 CHAIN_FILE="/tmp/.lfg_chain_$$"
 

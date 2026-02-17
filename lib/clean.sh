@@ -6,6 +6,9 @@ LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HTML_FILE="$LFG_DIR/.lfg_clean.html"
 VIEWER="$LFG_DIR/viewer"
 
+source "$LFG_DIR/lib/state.sh"
+lfg_state_start dtf
+
 FORCE=false
 INCLUDE_DOCKER=false
 USE_SUDO=false
@@ -187,6 +190,12 @@ html = '''<!DOCTYPE html>
 
 open('$HTML_FILE', 'w').write(html)
 "
+
+if [[ "$FORCE" == "true" ]]; then
+    lfg_state_done dtf "freed=$TOTAL_DISPLAY" "cleaned=$CLEANED" "mode=force"
+else
+    lfg_state_done dtf "reclaimable=$TOTAL_DISPLAY" "cleaned=$CLEANED" "skipped=$SKIPPED" "mode=scan"
+fi
 
 CHAIN_FILE="/tmp/.lfg_chain_$$"
 

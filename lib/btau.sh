@@ -7,6 +7,8 @@ BTAU_DIR="$HOME/tools/yj-devdrive"
 HTML_FILE="$LFG_DIR/.lfg_btau.html"
 VIEWER="$LFG_DIR/viewer"
 
+source "$LFG_DIR/lib/state.sh"
+
 # Pass-through to btau CLI if args given
 if [[ $# -gt 0 && "$1" != "--view" ]]; then
     export PYTHONPATH="${BTAU_DIR}:${PYTHONPATH:-}"
@@ -14,6 +16,7 @@ if [[ $# -gt 0 && "$1" != "--view" ]]; then
 fi
 
 # Status view mode -- show backup status in WebKit viewer
+lfg_state_start btau
 echo "Gathering backup status..."
 
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
@@ -140,6 +143,8 @@ $(cat "$LFG_DIR/lib/theme.css")
 </body>
 </html>
 HTMLEOF
+
+lfg_state_done btau "backup_count=$BACKUP_COUNT" "total_size=$TOTAL_HR"
 
 echo "Opening viewer..."
 "$VIEWER" "$HTML_FILE" "LFG BTAU - Backup Status" &
