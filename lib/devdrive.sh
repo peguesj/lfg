@@ -69,6 +69,110 @@ print(json.dumps(result, indent=2))
         lfg_state_done devdrive "action=verify"
         exit 0
         ;;
+    config)
+        shift
+        lfg_state_start devdrive
+        export PYTHONPATH="${DEVDRIVE_DIR}:${PYTHONPATH:-}"
+        case "${1:-show}" in
+            get)
+                shift
+                KEY="${1:-}"
+                if [[ -z "$KEY" ]]; then
+                    echo "Usage: lfg devdrive config get <key>"
+                    echo "  Keys: mount_mode, developer_dir, sparse_mount, auto_move.enabled, ..."
+                    exit 1
+                fi
+                python3 -c "
+from btau.core.config import get_config
+try:
+    val = get_config('$KEY')
+    print(val)
+except KeyError as e:
+    print(f'Error: {e}')
+"
+                ;;
+            set)
+                shift
+                KEY="${1:-}"; VALUE="${2:-}"
+                if [[ -z "$KEY" || -z "$VALUE" ]]; then
+                    echo "Usage: lfg devdrive config set <key> <value>"
+                    exit 1
+                fi
+                python3 -c "
+from btau.core.config import set_config
+cfg = set_config('$KEY', '$VALUE')
+print('Set $KEY = $VALUE')
+"
+                ;;
+            reset)
+                python3 -c "
+from btau.core.config import reset_config
+reset_config()
+print('Config reset to defaults.')
+"
+                ;;
+            show|*)
+                python3 -c "
+from btau.core.config import load_config
+import yaml
+cfg = load_config()
+print(yaml.dump(cfg, default_flow_style=False, sort_keys=False))
+"
+                ;;
+        esac
+        lfg_state_done devdrive "action=config"
+        exit 0
+        ;;
+    auto-move)
+        shift
+        lfg_state_start devdrive
+        export PYTHONPATH="${DEVDRIVE_DIR}:${PYTHONPATH:-}"
+        DRY_RUN="True"
+        FORCE=""
+        for arg in "$@"; do
+            case "$arg" in
+                --force) DRY_RUN="False"; FORCE="yes" ;;
+                --dry-run) DRY_RUN="True" ;;
+            esac
+        done
+        if [[ -n "$FORCE" ]]; then
+            echo "Executing auto-move (LIVE)..."
+        else
+            echo "Evaluating auto-move rules (dry run)..."
+        fi
+        python3 -c "
+import json
+from btau.core.automove import AutoMoveEngine
+
+engine = AutoMoveEngine.from_config()
+proposals = engine.evaluate_rules()
+
+if not proposals:
+    print('No projects match auto-move criteria.')
+else:
+    print(f'{len(proposals)} project(s) eligible for migration:')
+    print()
+    for p in proposals:
+        d = p.to_dict()
+        print(f'  {d[\"project_name\"]:30s} {d[\"size_gb\"]:6.1f} GB  {d[\"days_since_access\"]:5.0f}d  score={d[\"score\"]:.1f}')
+        print(f'    reason: {d[\"reason\"]}')
+        print(f'    {d[\"source\"]} -> {d[\"destination\"]}')
+        print()
+
+    results = engine.execute_plan(proposals, dry_run=$DRY_RUN)
+    for r in results:
+        status = r['status']
+        name = r['project']
+        if status == 'dry_run':
+            print(f'  [DRY RUN] {name}')
+        elif status == 'success':
+            print(f'  [MOVED]   {name}')
+        else:
+            print(f'  [ERROR]   {name}: {r.get(\"error\", \"unknown\")}')
+"
+        lfg_state_done devdrive "action=auto-move" "dry_run=$DRY_RUN"
+        exit 0
+        ;;
     create)
         shift
         PROJECT_NAME="${1:-}"

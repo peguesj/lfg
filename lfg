@@ -48,11 +48,17 @@ MODULES:
     btau                         Back That App Up (status view)
     btau <command> [opts]        Backup CLI (discover, backup, restore, ...)
     devdrive                     Developer Drive (status view)
-    devdrive mount               Mount devdrive sparse image
+    devdrive mount               Mount with configured mode
     devdrive unmount             Unmount devdrive
     devdrive sync                Rebuild symlink forest
     devdrive verify              Audit symlink health
     devdrive create <name>       Create new project on devdrive
+    devdrive config [show]       Show full devdrive config (YAML)
+    devdrive config get <key>    Get config value (e.g. mount_mode)
+    devdrive config set <k> <v>  Set config value
+    devdrive config reset        Reset config to defaults
+    devdrive auto-move           Evaluate auto-move rules (dry run)
+    devdrive auto-move --force   Execute auto-move migrations
 
 COMMANDS:
     lfg                          Splash screen

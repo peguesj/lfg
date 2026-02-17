@@ -131,6 +131,11 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         "devdrive": ModuleState(),
     ]
 
+    // Devdrive config state
+    var devdriveMountMode: String = "..."
+    var devdriveAutoMoveEnabled: Bool = false
+    var devdriveAutoMoveLastCount: Int = 0
+
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -156,6 +161,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         }
 
         refreshStats()
+        refreshDevdriveConfig()
         recordDiskDataPoint()
         sendNotification(title: "LFG Menubar", body: "Monitoring active")
     }
@@ -388,13 +394,20 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(btauItem)
 
         // --- DEVDRIVE Actions Submenu ---
-        let ddItem = NSMenuItem(title: "DEVDRIVE - Developer Drive", action: nil, keyEquivalent: "")
+        let modeLabel = devdriveMountMode == "sparse_to_local" ? "sparse->local" :
+                        devdriveMountMode == "local_to_sparse" ? "local->sparse" : devdriveMountMode
+        let autoLabel = devdriveAutoMoveEnabled ? "ON" : "OFF"
+        let ddItem = NSMenuItem(title: "DEVDRIVE [\(modeLabel)] auto-move:\(autoLabel)", action: nil, keyEquivalent: "")
         let ddMenu = NSMenu()
         addSubItem(ddMenu, "View Status", action: #selector(openDevdrive), key: "4")
-        addSubItem(ddMenu, "Mount", action: #selector(ddMount), key: "")
+        addSubItem(ddMenu, "Mount (\(modeLabel))", action: #selector(ddMount), key: "")
         addSubItem(ddMenu, "Unmount", action: #selector(ddUnmount), key: "")
         addSubItem(ddMenu, "Sync Forest", action: #selector(ddSync), key: "")
         addSubItem(ddMenu, "Verify Links", action: #selector(ddVerify), key: "")
+        ddMenu.addItem(NSMenuItem.separator())
+        addSubItem(ddMenu, "Show Config", action: #selector(ddConfigShow), key: "")
+        addSubItem(ddMenu, "Auto-Move (Dry Run)", action: #selector(ddAutoMoveDry), key: "")
+        addSubItem(ddMenu, "Auto-Move (Execute)", action: #selector(ddAutoMoveForce), key: "")
         ddItem.submenu = ddMenu
         menu.addItem(ddItem)
 
@@ -476,6 +489,30 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
                     self?.diskUsedPct = Double(pctStr) ?? 0
                 }
                 self?.updateTitle()
+                self?.buildMenu()
+            }
+        }
+    }
+
+    // MARK: - Devdrive Config
+
+    func refreshDevdriveConfig() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let devdriveDir = NSHomeDirectory() + "/tools/yj-devdrive"
+            let script = """
+            import sys; sys.path.insert(0, '\(devdriveDir)')
+            from btau.core.config import load_config
+            cfg = load_config()
+            am = cfg.get('auto_move', {})
+            mode = cfg.get('mount_mode', 'unknown')
+            enabled = 'yes' if am.get('enabled') else 'no'
+            print(f'{mode}|{enabled}')
+            """
+            let result = Self.shell("python3 -c \"\(script.replacingOccurrences(of: "\"", with: "\\\""))\"")
+            let parts = result.split(separator: "|")
+            DispatchQueue.main.async {
+                self?.devdriveMountMode = parts.count > 0 ? String(parts[0]) : "unknown"
+                self?.devdriveAutoMoveEnabled = parts.count > 1 && String(parts[1]) == "yes"
                 self?.buildMenu()
             }
         }
@@ -573,6 +610,15 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         sendNotification(title: "LFG DEVDRIVE", body: "Verifying symlinks...")
         launchLFG("devdrive verify")
     }
+    @objc func ddConfigShow() { launchLFG("devdrive config show") }
+    @objc func ddAutoMoveDry() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Evaluating auto-move rules...")
+        launchLFG("devdrive auto-move --dry-run")
+    }
+    @objc func ddAutoMoveForce() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Executing auto-move migrations...")
+        launchLFG("devdrive auto-move --force")
+    }
 
     // Other
     @objc func openDashboard() { launchLFG("dashboard") }
@@ -580,6 +626,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     @objc func openAPM() { NSWorkspace.shared.open(URL(string: "http://localhost:3031")!) }
     @objc func doRefresh() {
         refreshStats()
+        refreshDevdriveConfig()
         recordDiskDataPoint()
         loadState()
         buildMenu()
