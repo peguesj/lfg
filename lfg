@@ -5,15 +5,17 @@
 # Suite dispatcher with splash screen for disk management tools.
 #
 # Modules:
-#   wtfs   Where's The Free Space - disk usage viewer
-#   dtf    Delete Temp Files - cache cleaner
-#   btau   Back That App Up - backup manager
+#   wtfs      Where's The Free Space - disk usage viewer
+#   dtf       Delete Temp Files - cache cleaner
+#   btau      Back That App Up - backup manager
+#   devdrive  Developer Drive - symlink forest manager
 #
 # Usage:
 #   lfg                          # Splash screen
 #   lfg wtfs [path]              # Disk usage viewer
 #   lfg dtf [--force] [opts]     # Cache cleaner
 #   lfg btau [cmd] [opts]        # Backup manager
+#   lfg devdrive [cmd] [opts]    # Developer drive manager
 #   lfg dashboard                # Combined dashboard
 #   lfg --help                   # Show help
 # =============================================================================
@@ -45,6 +47,12 @@ MODULES:
     dtf --force --docker         Also prune Docker
     btau                         Back That App Up (status view)
     btau <command> [opts]        Backup CLI (discover, backup, restore, ...)
+    devdrive                     Developer Drive (status view)
+    devdrive mount               Mount devdrive sparse image
+    devdrive unmount             Unmount devdrive
+    devdrive sync                Rebuild symlink forest
+    devdrive verify              Audit symlink health
+    devdrive create <name>       Create new project on devdrive
 
 COMMANDS:
     lfg                          Splash screen
@@ -95,6 +103,11 @@ case "${1:-}" in
         shift
         ensure_viewer
         exec "$LFG_DIR/lib/btau.sh" "$@"
+        ;;
+    devdrive|dd)
+        shift
+        ensure_viewer
+        exec "$LFG_DIR/lib/devdrive.sh" "$@"
         ;;
     dashboard)
         shift || true

@@ -128,6 +128,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         "wtfs": ModuleState(),
         "dtf": ModuleState(),
         "btau": ModuleState(),
+        "devdrive": ModuleState(),
     ]
 
     // MARK: - Application Lifecycle
@@ -208,6 +209,10 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         case "btau":
             let count = info["backup_count"] as? String ?? "0"
             return "\(count) backups"
+        case "devdrive":
+            let vols = info["volume_count"] as? String ?? "0"
+            let projs = info["project_count"] as? String ?? "0"
+            return "\(projs) projects, \(vols) volumes"
         default:
             return info["status"] as? String ?? "?"
         }
@@ -382,6 +387,17 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         btauItem.submenu = btauMenu
         menu.addItem(btauItem)
 
+        // --- DEVDRIVE Actions Submenu ---
+        let ddItem = NSMenuItem(title: "DEVDRIVE - Developer Drive", action: nil, keyEquivalent: "")
+        let ddMenu = NSMenu()
+        addSubItem(ddMenu, "View Status", action: #selector(openDevdrive), key: "4")
+        addSubItem(ddMenu, "Mount", action: #selector(ddMount), key: "")
+        addSubItem(ddMenu, "Unmount", action: #selector(ddUnmount), key: "")
+        addSubItem(ddMenu, "Sync Forest", action: #selector(ddSync), key: "")
+        addSubItem(ddMenu, "Verify Links", action: #selector(ddVerify), key: "")
+        ddItem.submenu = ddMenu
+        menu.addItem(ddItem)
+
         menu.addItem(NSMenuItem.separator())
 
         // --- Graph Interval Submenu ---
@@ -538,6 +554,25 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     }
     @objc func btauMount() { launchLFG("btau mount") }
     @objc func btauUnmount() { launchLFG("btau unmount") }
+
+    // DEVDRIVE actions
+    @objc func openDevdrive() { launchLFG("devdrive") }
+    @objc func ddMount() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Mounting devdrive...")
+        launchLFG("devdrive mount")
+    }
+    @objc func ddUnmount() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Unmounting devdrive...")
+        launchLFG("devdrive unmount")
+    }
+    @objc func ddSync() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Syncing symlink forest...")
+        launchLFG("devdrive sync")
+    }
+    @objc func ddVerify() {
+        sendNotification(title: "LFG DEVDRIVE", body: "Verifying symlinks...")
+        launchLFG("devdrive verify")
+    }
 
     // Other
     @objc func openDashboard() { launchLFG("dashboard") }

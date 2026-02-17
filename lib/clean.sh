@@ -189,9 +189,10 @@ html = '''<!DOCTYPE html>
   );
   document.getElementById(\"action-bar\").appendChild(
     LFG.createActionBar([
-      { label: \"Disk Usage\", color: \"#4a9eff\", module: \"wtfs\", tip: \"Open WTFS to see disk breakdown\" },
-      { label: \"View Backups\", color: \"#06d6a0\", module: \"btau\", tip: \"Open BTAU backup status\" },
-      { label: \"Full Dashboard\", color: \"#4a9eff\", module: \"dashboard\", tip: \"Open the combined dashboard\" },
+      { label: \"Disk Usage\", color: \"#4a9eff\", onclick: function(){ LFG._postNav('navigate', {target:'wtfs'}); }, tip: \"Navigate to WTFS\" },
+      { label: \"View Backups\", color: \"#06d6a0\", onclick: function(){ LFG._postNav('navigate', {target:'btau'}); }, tip: \"Navigate to BTAU\" },
+      { label: \"Devdrive\", color: \"#c084fc\", onclick: function(){ LFG._postNav('navigate', {target:'devdrive'}); }, tip: \"Navigate to DEVDRIVE\" },
+      { label: \"Full Dashboard\", color: \"#4a9eff\", onclick: function(){ LFG._postNav('navigate', {target:'dashboard'}); }, tip: \"Navigate to Dashboard\" },
     ])
   );
   </script>
@@ -217,7 +218,7 @@ disown
     if [[ -s "$CHAIN_FILE" ]]; then
       SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
       case "$SEL" in
-        wtfs) "$LFG_DIR/lib/scan.sh" ;; btau) "$LFG_DIR/lib/btau.sh" --view ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
+        wtfs) "$LFG_DIR/lib/scan.sh" ;; btau) "$LFG_DIR/lib/btau.sh" --view ;; devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
       esac; break
     fi; sleep 0.3
   done; rm -f "$CHAIN_FILE"

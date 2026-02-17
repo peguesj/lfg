@@ -71,6 +71,70 @@ if (( CACHE_TOTAL >= 1048576 )); then CACHE_HR=$(awk "BEGIN{printf \"%.1f GB\", 
 elif (( CACHE_TOTAL >= 1024 )); then CACHE_HR=$(awk "BEGIN{printf \"%.1f MB\", $CACHE_TOTAL/1024}")
 else CACHE_HR="${CACHE_TOTAL} KB"; fi
 
+# --- DEVDRIVE: Symlink forest status ---
+echo "Checking devdrive..."
+DEVDRIVE_DIR_PY="$HOME/tools/yj-devdrive"
+DD_MOUNT_POINT="/Volumes/900DEVELOPER"
+DD_MOUNTED="false"
+DD_VOLUME_COUNT=0
+DD_PROJECT_COUNT=0
+DD_HEALTHY_COUNT=0
+DD_BROKEN_COUNT=0
+DD_VOLUME_ROWS=""
+DD_PROJECT_ROWS=""
+
+if [[ -d "$DD_MOUNT_POINT" ]]; then
+    DD_MOUNTED="true"
+fi
+
+export PYTHONPATH="${DEVDRIVE_DIR_PY}:${PYTHONPATH:-}"
+DD_DATA=$(python3 -c "
+import json, sys
+sys.path.insert(0, '$DEVDRIVE_DIR_PY')
+try:
+    from btau.core.volumes import find_devdrive_volumes
+    from btau.core.devdrive import check_forest_health, list_projects
+    from pathlib import Path
+    volumes = find_devdrive_volumes()
+    health = check_forest_health(Path('$DD_MOUNT_POINT'))
+    projects = list_projects(Path('$DD_MOUNT_POINT'))
+    print(json.dumps({
+        'volumes': [{'name':v['name'],'free_gb':round(v.get('free_bytes',0)/(1024**3),1),'projects':len(v.get('projects',[]))} for v in volumes],
+        'health': health,
+        'projects': projects[:10],
+    }))
+except Exception as e:
+    print(json.dumps({'error':str(e),'volumes':[],'health':{'healthy':[],'broken':[],'not_symlink':[],'total':0},'projects':[]}))
+" 2>/dev/null || echo '{"volumes":[],"health":{"healthy":[],"broken":[],"not_symlink":[],"total":0},"projects":[]}')
+
+# Parse devdrive volume rows
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    dd_vol_name=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name','?'))" 2>/dev/null || echo "?")
+    dd_vol_free=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d.get('free_gb',0):.1f} GB\")" 2>/dev/null || echo "?")
+    dd_vol_projs=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('projects',0))" 2>/dev/null || echo "0")
+    DD_VOLUME_COUNT=$((DD_VOLUME_COUNT + 1))
+    DD_VOLUME_ROWS+="<tr data-tip=\"${dd_vol_name}: ${dd_vol_free} free, ${dd_vol_projs} projects\"><td class=\"name\">${dd_vol_name}</td><td class=\"size\">${dd_vol_free}</td><td class=\"rank\">${dd_vol_projs}</td></tr>"
+done < <(echo "$DD_DATA" | python3 -c "import json,sys; [print(json.dumps(v)) for v in json.load(sys.stdin).get('volumes',[])]" 2>/dev/null)
+
+# Parse devdrive project rows
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    dd_proj_name=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name','?'))" 2>/dev/null || echo "?")
+    dd_proj_alive=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('alive') else 'false')" 2>/dev/null || echo "false")
+    dd_proj_vol=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_volume','') or '-')" 2>/dev/null || echo "-")
+    DD_PROJECT_COUNT=$((DD_PROJECT_COUNT + 1))
+    if [[ "$dd_proj_alive" == "true" ]]; then
+        dd_status_class="badge-cleaned"; dd_status_text="OK"; DD_HEALTHY_COUNT=$((DD_HEALTHY_COUNT + 1))
+    else
+        dd_status_class="badge-error"; dd_status_text="BROKEN"; DD_BROKEN_COUNT=$((DD_BROKEN_COUNT + 1))
+    fi
+    DD_PROJECT_ROWS+="<tr><td class=\"name\">${dd_proj_name}</td><td>${dd_proj_vol}</td><td><span class=\"status-badge ${dd_status_class}\">${dd_status_text}</span></td></tr>"
+done < <(echo "$DD_DATA" | python3 -c "import json,sys; [print(json.dumps(p)) for p in json.load(sys.stdin).get('projects',[])]" 2>/dev/null)
+
+DD_STATUS="Not Mounted"
+[[ "$DD_MOUNTED" == "true" ]] && DD_STATUS="Mounted"
+
 # --- BTAU: Backup status ---
 echo "Checking backups..."
 MANIFEST="$HOME/.config/btau/manifest.json"
@@ -105,6 +169,8 @@ uijs = open(f"{lfg_dir}/lib/ui.js").read()
 scan_rows = r"""SCAN_ROWS_PLACEHOLDER"""
 cache_rows = r"""CACHE_ROWS_PLACEHOLDER"""
 backup_rows = r"""BACKUP_ROWS_PLACEHOLDER"""
+dd_volume_rows = r"""DD_VOLUME_ROWS_PLACEHOLDER"""
+dd_project_rows = r"""DD_PROJECT_ROWS_PLACEHOLDER"""
 
 html = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -127,11 +193,15 @@ html = f'''<!DOCTYPE html>
     <div class="stat clickable" onclick="switchTab('btau')" data-tip="Click to view backup history">
       <span class="label">Backups</span><span class="value good">BACKUP_COUNT_PH</span>
     </div>
+    <div class="stat clickable" onclick="switchTab('devdrive')" data-tip="Click to view devdrive status">
+      <span class="label">Devdrive</span><span class="value" style="color:#c084fc">DD_STATUS_PH</span>
+    </div>
   </div>
   <div class="nav">
     <a class="active" onclick="switchTab('wtfs')">WTFS <span class="kbd">&#x2318;1</span></a>
     <a onclick="switchTab('dtf')">DTF <span class="kbd">&#x2318;2</span></a>
     <a onclick="switchTab('btau')">BTAU <span class="kbd">&#x2318;3</span></a>
+    <a onclick="switchTab('devdrive')">DEVDRIVE <span class="kbd">&#x2318;4</span></a>
   </div>
   <div id="tab-wtfs" class="tab-content active">
     <div class="guidance"><strong>WTFS</strong> - Top directories in <code>DIR_DISPLAY_PH</code> by size. Hover rows for details.</div>
@@ -147,16 +217,22 @@ html = f'''<!DOCTYPE html>
     <div class="guidance"><strong>BTAU</strong> - Last backup: <strong>LAST_BACKUP_PH</strong>. Run <code>lfg btau discover</code> to scan volumes.</div>
     ''' + (f'<table><thead><tr><th>Volume</th><th>Type</th><th>Timestamp</th></tr></thead><tbody>{backup_rows}</tbody></table>' if backup_rows.strip() else '<div class="empty-state">No backups found. Run: lfg btau backup VOLUME</div>') + f'''
   </div>
-  <div class="footer">lfg v1.0.0 - Local File Guardian | wtfs + dtf + btau</div>
+  <div id="tab-devdrive" class="tab-content">
+    <div class="guidance" style="border-left-color:#c084fc"><strong>DEVDRIVE</strong> - DD_PROJECT_COUNT_PH projects across DD_VOLUME_COUNT_PH volumes. Run <code>lfg devdrive</code> for full view.</div>
+    ''' + (f'<div class="section-title" style="color:#c084fc">Volumes</div><table><thead><tr><th>Volume</th><th class="r">Free</th><th class="r">Projects</th></tr></thead><tbody>{dd_volume_rows}</tbody></table>' if dd_volume_rows.strip() else '<div class="section-title" style="color:#c084fc">Volumes</div><div class="empty-state">No devdrive volumes detected.</div>') + f'''
+    ''' + (f'<div class="section-title" style="color:#c084fc">Symlink Forest</div><table><thead><tr><th>Project</th><th>Volume</th><th>Status</th></tr></thead><tbody>{dd_project_rows}</tbody></table>' if dd_project_rows.strip() else '<div class="section-title" style="color:#c084fc">Symlink Forest</div><div class="empty-state">No projects in symlink forest.</div>') + f'''
+  </div>
+  <div class="footer">lfg v1.0.0 - Local File Guardian | wtfs + dtf + btau + devdrive</div>
   <script>{uijs}
   LFG.init({{
     module: "dashboard", context: "All Modules", moduleVersion: "1.0.0",
-    welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups",
+    welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups, DD_PROJECT_COUNT_PH devdrive projects",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [
-      {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Three modules work together to scan, clean, and protect your files.", color: "#4a9eff" }},
+      {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Four modules work together to scan, clean, protect, and organize your files.", color: "#4a9eff" }},
       {{ icon: "\\uD83D\\uDD0D", title: "WTFS - Disk Usage", desc: "See where your disk space is going. Scans ~/Developer by default, showing the biggest directories first.", color: "#4a9eff" }},
       {{ icon: "\\uD83D\\uDDD1", title: "DTF - Cache Cleanup", desc: "Finds reclaimable caches across dev tools, browsers, and system. Dry run by default -- use --force to clean.", color: "#ff8c42" }},
       {{ icon: "\\uD83D\\uDCE6", title: "BTAU - Backup Manager", desc: "Manages backups with sparse images, incremental sync, and integrity verification. Bridges to yj-devdrive.", color: "#06d6a0" }},
+      {{ icon: "\\uD83D\\uDCBE", title: "DEVDRIVE - Developer Drive", desc: "Manages symlink forests across external volumes. Mount, sync, and verify projects from a unified /Volumes/900DEVELOPER view.", color: "#c084fc" }},
     ],
     keyHandlers: {{}}
   }});
@@ -171,6 +247,7 @@ html = f'''<!DOCTYPE html>
     if (e.metaKey && e.key === '1') switchTab('wtfs');
     if (e.metaKey && e.key === '2') switchTab('dtf');
     if (e.metaKey && e.key === '3') switchTab('btau');
+    if (e.metaKey && e.key === '4') switchTab('devdrive');
   }});
   </script>
 </body></html>'''
@@ -193,17 +270,22 @@ replacements = {
     'CACHE_COUNT_PH': '$CACHE_COUNT',
     'LAST_BACKUP_PH': '$LAST_BACKUP',
     'RANK_PH': '$RANK',
+    'DD_STATUS_PH': '$DD_STATUS',
+    'DD_VOLUME_COUNT_PH': '$DD_VOLUME_COUNT',
+    'DD_PROJECT_COUNT_PH': '$DD_PROJECT_COUNT',
 }
 for k, v in replacements.items():
     html = html.replace(k, v)
 open('$HTML_FILE', 'w').write(html)
 " <<< "$SCAN_ROWS"
 
-# Also inject cache and backup rows
+# Also inject cache, backup, and devdrive rows
 python3 -c "
 html = open('$HTML_FILE').read()
 html = html.replace('CACHE_ROWS_PLACEHOLDER', '''$CACHE_ROWS''')
 html = html.replace('BACKUP_ROWS_PLACEHOLDER', '''$BACKUP_ROWS''')
+html = html.replace('DD_VOLUME_ROWS_PLACEHOLDER', '''$DD_VOLUME_ROWS''')
+html = html.replace('DD_PROJECT_ROWS_PLACEHOLDER', '''$DD_PROJECT_ROWS''')
 open('$HTML_FILE', 'w').write(html)
 "
 

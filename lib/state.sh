@@ -50,6 +50,17 @@ os.replace(tmp, path)
 " 2>/dev/null
 }
 
+# Send notification to CCEM APM (non-blocking, best-effort)
+# Uses --connect-timeout and --max-time so we never block if APM is down
+lfg_notify_apm() {
+    local title="$1" body="$2" category="${3:-info}" agent_id="${4:-lfg}"
+    curl -s --connect-timeout 2 --max-time 5 \
+        -X POST "http://localhost:3031/api/notifications/add" \
+        -H "Content-Type: application/json" \
+        -d "{\"title\":\"$title\",\"body\":\"$body\",\"category\":\"$category\",\"agent_id\":\"$agent_id\"}" \
+        >/dev/null 2>&1 &
+}
+
 # Set module as running
 lfg_state_start() {
     local module="$1"
@@ -71,6 +82,7 @@ lfg_state_done() {
         lfg_state_update "$module" "$k" "$v"
     done
     lfg_log "$module: completed $*"
+    lfg_notify_apm "LFG $module" "Completed: $*" "success" "lfg-$module"
 }
 
 # Set module as errored
@@ -79,6 +91,7 @@ lfg_state_error() {
     lfg_state_update "$module" "status" "error"
     lfg_state_update "$module" "error" "$msg"
     lfg_log "$module: ERROR $msg"
+    lfg_notify_apm "LFG $module ERROR" "$msg" "error" "lfg-$module"
 }
 
 # Read a state value

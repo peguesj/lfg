@@ -47,6 +47,7 @@ body {
 .module:nth-child(1) { animation-delay: 0.15s; }
 .module:nth-child(2) { animation-delay: 0.30s; }
 .module:nth-child(3) { animation-delay: 0.45s; }
+.module:nth-child(4) { animation-delay: 0.60s; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .module:hover { border-color: #4a9eff; background: #1e1e28; transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
 .module:active { transform: translateY(-1px); }
@@ -62,6 +63,8 @@ body {
 .mod-dtf:hover, .mod-dtf.selected { border-color: #ff8c42; box-shadow: 0 0 24px rgba(255,140,66,0.15); }
 .mod-btau .abbr { color: #06d6a0; }
 .mod-btau:hover, .mod-btau.selected { border-color: #06d6a0; box-shadow: 0 0 24px rgba(6,214,160,0.15); }
+.mod-dd .abbr { color: #c084fc; }
+.mod-dd:hover, .mod-dd.selected { border-color: #c084fc; box-shadow: 0 0 24px rgba(192,132,252,0.15); }
 .system-bar { display: flex; gap: 20px; padding: 10px 20px; background: #1c1c22; border-radius: 6px; border: 1px solid #2a2a34; font-size: 11px; color: #6b6b78; animation: lfgFadeIn 0.6s ease-out 0.6s both; }
 .system-bar .val { color: #a0a0b0; font-weight: 600; }
 .links { margin-top: 16px; display: flex; gap: 16px; animation: lfgFadeIn 0.6s ease-out 0.7s both; }
@@ -102,6 +105,13 @@ body {
         <div class=\"desc\">Backup, transfer, and archive with sparse image management</div>
         <div class=\"kbd-hint\">&#x2318;3</div>
       </div>
+      <div class=\"module mod-dd\" onclick=\"selectModule('devdrive', this)\" data-tip=\"Manage symlink forest and developer drive volumes\">
+        <div class=\"icon\">&#x1F4BE;</div>
+        <div class=\"name\">DEVDRIVE</div>
+        <div class=\"abbr\">Developer Drive</div>
+        <div class=\"desc\">Symlink forest management across external volumes</div>
+        <div class=\"kbd-hint\">&#x2318;4</div>
+      </div>
     </div>
 
     <div class=\"system-bar\">
@@ -131,6 +141,7 @@ body {
     if (e.metaKey && e.key === '1') selectModule('wtfs', document.querySelector('.mod-wtfs'));
     if (e.metaKey && e.key === '2') selectModule('dtf', document.querySelector('.mod-dtf'));
     if (e.metaKey && e.key === '3') selectModule('btau', document.querySelector('.mod-btau'));
+    if (e.metaKey && e.key === '4') selectModule('devdrive', document.querySelector('.mod-dd'));
     if (e.metaKey && e.key === 'd') selectModule('dashboard', null);
   });
 
@@ -138,8 +149,8 @@ body {
     document.querySelectorAll('.module').forEach(function(m) { m.style.opacity = '0.4'; });
     if (el) { el.classList.add('selected'); el.style.opacity = '1'; }
 
-    var colors = { wtfs: '#4a9eff', dtf: '#ff8c42', btau: '#06d6a0', dashboard: '#4a9eff' };
-    var labels = { wtfs: 'Scanning disk...', dtf: 'Scanning caches...', btau: 'Checking backups...', dashboard: 'Loading dashboard...' };
+    var colors = { wtfs: '#4a9eff', dtf: '#ff8c42', btau: '#06d6a0', devdrive: '#c084fc', dashboard: '#4a9eff' };
+    var labels = { wtfs: 'Scanning disk...', dtf: 'Scanning caches...', btau: 'Checking backups...', devdrive: 'Loading devdrive...', dashboard: 'Loading dashboard...' };
     var fill = document.getElementById('loading-fill');
     var bar = document.getElementById('loading');
     var label = document.getElementById('loading-label');
@@ -184,6 +195,7 @@ case "$SELECTION" in
     wtfs)      exec "$LFG_DIR/lib/scan.sh" ;;
     dtf)       exec "$LFG_DIR/lib/clean.sh" ;;
     btau)      exec "$LFG_DIR/lib/btau.sh" --view ;;
+    devdrive)  exec "$LFG_DIR/lib/devdrive.sh" ;;
     dashboard) exec "$LFG_DIR/lib/dashboard.sh" ;;
     *)         exit 0 ;;
 esac

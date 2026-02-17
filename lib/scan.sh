@@ -103,9 +103,10 @@ html = '''<!DOCTYPE html>
   );
   document.getElementById(\"action-bar\").appendChild(
     LFG.createActionBar([
-      { label: \"Clean Caches\", color: \"#ff8c42\", module: \"dtf\", tip: \"Open DTF to scan and clean caches\" },
-      { label: \"View Backups\", color: \"#06d6a0\", module: \"btau\", tip: \"Open BTAU backup status\" },
-      { label: \"Full Dashboard\", color: \"#4a9eff\", module: \"dashboard\", tip: \"Open the combined dashboard\" },
+      { label: \"Clean Caches\", color: \"#ff8c42\", onclick: function(){ LFG._postNav('navigate', {target:'dtf'}); }, tip: \"Navigate to DTF\" },
+      { label: \"View Backups\", color: \"#06d6a0\", onclick: function(){ LFG._postNav('navigate', {target:'btau'}); }, tip: \"Navigate to BTAU\" },
+      { label: \"Devdrive\", color: \"#c084fc\", onclick: function(){ LFG._postNav('navigate', {target:'devdrive'}); }, tip: \"Navigate to DEVDRIVE\" },
+      { label: \"Full Dashboard\", color: \"#4a9eff\", onclick: function(){ LFG._postNav('navigate', {target:'dashboard'}); }, tip: \"Navigate to Dashboard\" },
     ])
   );
   </script>
@@ -132,6 +133,7 @@ disown
       case "$SEL" in
         dtf) "$LFG_DIR/lib/clean.sh" ;;
         btau) "$LFG_DIR/lib/btau.sh" --view ;;
+        devdrive) "$LFG_DIR/lib/devdrive.sh" ;;
         dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
       esac
       break

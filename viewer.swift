@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
     let htmlPath: String
     let windowTitle: String
     let selectionFile: String?
+    var navigationStack: [URL] = []
 
     init(htmlPath: String, windowTitle: String, selectionFile: String?) {
         self.htmlPath = htmlPath
@@ -65,6 +66,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 NSApp.terminate(nil)
             }
+        } else if action == "navigate", let target = body["target"] {
+            // In-place navigation: push current URL and load new HTML
+            let lfgDir = NSHomeDirectory() + "/tools/@yj/lfg"
+            let targetPath: String
+            switch target {
+            case "wtfs":      targetPath = lfgDir + "/.lfg_scan.html"
+            case "dtf":       targetPath = lfgDir + "/.lfg_clean.html"
+            case "btau":      targetPath = lfgDir + "/.lfg_btau.html"
+            case "devdrive":  targetPath = lfgDir + "/.lfg_devdrive.html"
+            case "dashboard": targetPath = lfgDir + "/.lfg_dashboard.html"
+            case "splash":    targetPath = lfgDir + "/.lfg_splash.html"
+            default:          targetPath = target  // allow direct file paths
+            }
+            // Generate the target HTML if it doesn't exist yet (run the module)
+            if !FileManager.default.fileExists(atPath: targetPath) {
+                let modName = target
+                let cmd = "\(lfgDir)/lfg \(modName) 2>/dev/null; true"
+                let task = Process()
+                task.launchPath = "/bin/bash"
+                task.arguments = ["-c", cmd]
+                try? task.run()
+                task.waitUntilExit()
+            }
+            if let currentURL = webView.url {
+                navigationStack.append(currentURL)
+            }
+            let targetURL = URL(fileURLWithPath: targetPath)
+            webView.loadFileURL(targetURL, allowingReadAccessTo: targetURL.deletingLastPathComponent())
+            syncNavDepth()
+        } else if action == "back" {
+            if let prev = navigationStack.popLast() {
+                webView.loadFileURL(prev, allowingReadAccessTo: prev.deletingLastPathComponent())
+                syncNavDepth()
+            }
+        } else if action == "home" {
+            let splashPath = NSHomeDirectory() + "/tools/@yj/lfg/.lfg_splash.html"
+            navigationStack.removeAll()
+            let splashURL = URL(fileURLWithPath: splashPath)
+            webView.loadFileURL(splashURL, allowingReadAccessTo: splashURL.deletingLastPathComponent())
+            syncNavDepth()
         } else if action == "run", let module = body["module"] {
             // Run a module command without closing the viewer
             let lfgPath = NSHomeDirectory() + "/tools/@yj/lfg/lfg"
@@ -78,6 +119,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             }
         } else if action == "quit" {
             NSApp.terminate(nil)
+        }
+    }
+
+    /// Sync navigation stack depth to JS so back button visibility can update
+    func syncNavDepth() {
+        webView.evaluateJavaScript("window.__lfgNavDepth = \(navigationStack.count)") { _, _ in
+            self.webView.evaluateJavaScript("if(typeof LFG !== 'undefined' && LFG._updateNavButtons) LFG._updateNavButtons()", completionHandler: nil)
         }
     }
 
