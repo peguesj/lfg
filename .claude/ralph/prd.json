@@ -1,266 +1,130 @@
 {
-  "project": "LFG",
-  "branchName": "ralph/lfg-v1.4.0",
-  "description": "LFG v1.4.0 - Navigation system, Devdrive module, CCEM APM bridge fix, agent squadron, Claude Code skill, and PRD integration. Brings mobile-app-like navigation, a 4th module (devdrive), Claude Code agent/skill ecosystem, and APM telemetry to LFG.",
+  "project": "lfg",
+  "branchName": "ralph/v2.0-actionable-ai-stfu",
+  "description": "LFG v2.0 - Actionable modules, WTFs composition, STFU integration, AI analysis, two-column dashboard",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Viewer navigation stack (viewer.swift)",
-      "description": "As a user, I want the native viewer to maintain a navigation stack so that I can navigate between modules with back/home support.",
+      "title": "Action Bridge - WebKit exec/confirm handler",
+      "description": "As a user, I want to execute shell commands from the LFG UI so that modules become actionable.",
       "acceptanceCriteria": [
-        "viewer.swift has a navigationStack: [URL] property",
-        "navigate action handler pushes current URL to stack and loads new URL via webView.loadFileURL()",
-        "back action handler pops stack and loads previous URL (no-op if empty)",
-        "home action handler clears stack and loads splash HTML ($LFG_DIR/.lfg_splash.html)",
-        "Stack depth exposed to JS via evaluateJavaScript setting window.__lfgNavDepth",
-        "Compiles without errors: swiftc viewer.swift -framework WebKit -framework Cocoa"
+        "viewer.swift handles exec action: runs Process, captures stdout/stderr, calls LFG._onExecResult",
+        "viewer.swift handles confirm action: shows native NSAlert before executing",
+        "ui.js LFG.exec(cmd, callback) with request ID and callback map",
+        "ui.js LFG.confirm(msg, cmd, callback) for destructive actions",
+        "ui.js LFG.actionButton(label, opts) with loading state and toast",
+        "Viewer compiles with swiftc"
       ],
       "priority": 1,
       "passes": false,
-      "notes": "Phase 1.1 - touches only viewer.swift"
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Header nav buttons (ui.js)",
-      "description": "As a user, I want home and back buttons in the sticky header so that I can navigate without keyboard shortcuts.",
+      "title": "Two-column dashboard layout with side panels",
+      "description": "As a user, I want a right-column sidebar for STFU, AI, and Settings panels.",
       "acceptanceCriteria": [
-        "Home icon (house glyph) and back arrow added before brand span in _injectHeader",
-        "Home button posts { action: 'home' } via webkit messageHandler",
-        "Back button posts { action: 'back' } via webkit messageHandler",
-        "Back button visibility toggles based on window.__lfgNavDepth > 0",
-        "Buttons use .sh-nav-btn class",
-        "No JS syntax errors when loaded in viewer"
+        "theme.css .dashboard-layout CSS grid (1fr 320px) with responsive collapse at 780px",
+        "dashboard.sh has main-column and side-column with #side-stfu, #side-ai, #side-settings",
+        "ui.js LFG.switchSideTab(name) with Cmd+5/6/7 shortcuts",
+        "Existing tab functionality unchanged",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
       "passes": false,
-      "notes": "Phase 1.2 - touches only lib/ui.js"
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Header nav button styles (theme.css)",
-      "description": "As a user, I want nav buttons styled consistently with the existing header aesthetic so that the UI feels cohesive.",
+      "title": "WTFs composition breakdown with segmented bars",
+      "description": "As a user, I want project disk usage broken down into deps, cache, source, other.",
       "acceptanceCriteria": [
-        ".sh-nav-btn base styles added (12px icon, opacity transitions, padding)",
-        ".sh-nav-btn:hover has glow effect matching module color",
-        ".sh-nav-btn.disabled style for greyed-out back when stack empty",
-        "No CSS parse errors"
+        "scan.sh runs du -sk on dep paths and cache paths per project",
+        "Segmented bars: deps=#4a9eff, cache=#ffd166, source=#06d6a0, other=#6b6b78",
+        "Each segment has data-tip tooltip",
+        "theme.css .bar-seg and .composition-legend",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
       "passes": false,
-      "notes": "Phase 1.3 - touches only lib/theme.css"
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Module scripts use navigate action",
-      "description": "As a user, I want cross-module links to use in-place page transitions instead of spawning new processes.",
+      "title": "Actionable DEVDRIVE and DTF modules",
+      "description": "As a user, I want to unmount drives, move projects, clean caches from the UI.",
       "acceptanceCriteria": [
-        "lib/scan.sh command panel uses action: 'navigate' for cross-module links",
-        "lib/clean.sh command panel uses action: 'navigate' for cross-module links",
-        "lib/btau.sh command panel uses action: 'navigate' for cross-module links",
-        "lib/dashboard.sh command panel uses action: 'navigate' for cross-module links",
-        "All 4 scripts pass shellcheck or bash -n syntax check"
+        "devdrive.sh move subcommand (rsync + verify + symlink)",
+        "Unmount and Move buttons in HTML via LFG.confirm/exec",
+        "clean.sh --only flag and per-cache Clean buttons",
+        "ui.js LFG.refreshView() post-action refresh",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
       "passes": false,
-      "notes": "Phase 1.4 - touches scan.sh, clean.sh, btau.sh, dashboard.sh"
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Create devdrive.sh shell script",
-      "description": "As a user, I want a devdrive module that bridges to yj-devdrive Python scripts so that I can manage developer drives from LFG.",
+      "title": "AI integration layer",
+      "description": "As a user, I want AI project analysis with configurable model settings.",
       "acceptanceCriteria": [
-        "lib/devdrive.sh created with bridges to devdrive.py, volumes.py, sparse.py",
-        "Views: volume list, symlink status, mount status, sparse image info",
-        "Command panel with: Create Devdrive, Mount, Unmount, Sync, Verify Links",
-        "LFG.init called with module: 'devdrive', context: 'Developer Drive', moduleVersion: '1.0.0'",
-        "Script passes bash -n syntax check"
+        "New lib/ai.sh with config show/get/set/reset and analyze/compare/suggest subcommands",
+        "New lib/ai_helper.py calling LiteLLM proxy with graceful fallback",
+        "system_override flag forces system model over user preference",
+        "ui.js LFG.ai namespace with analyze/compare/suggest/isAvailable",
+        "lfg ai config show prints config",
+        "lfg ai analyze returns purpose JSON"
       ],
       "priority": 5,
       "passes": false,
-      "notes": "Phase 2.1 - creates lib/devdrive.sh (new file)"
+      "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Splash screen 4th card for devdrive",
-      "description": "As a user, I want a devdrive card on the splash screen so that I can launch the devdrive module from the home page.",
+      "title": "STFU integration panel with relationship badges",
+      "description": "As a user, I want project relationships and coalescence candidates in the sidebar.",
       "acceptanceCriteria": [
-        ".mod-dd card added with purple (#c084fc) color scheme",
-        "Card has package/drive icon, name 'DEVDRIVE', abbr 'Developer Drive'",
-        "Kbd hint shows Cmd+4",
-        "onclick calls selectModule('devdrive', this)",
-        "Keyboard handler added for metaKey && key === '4'",
-        "Script passes bash -n syntax check"
+        "New lib/stfu.sh with similarity scoring and AI-enhanced comparison",
+        "#side-stfu shows Related Projects, Duplicates, Coalescence Candidates",
+        "WTFs rows have .stfu-badge on related projects",
+        "DTF shows shared cleanup suggestions for related projects",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
       "passes": false,
-      "notes": "Phase 2.2 - touches only lib/splash.sh"
+      "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Dashboard 4th tab for devdrive",
-      "description": "As a user, I want a devdrive tab on the dashboard so that I can see volume status alongside other modules.",
+      "title": "AI Settings panel and smart suggestions",
+      "description": "As a user, I want to configure AI from the dashboard and see purpose tags on projects.",
       "acceptanceCriteria": [
-        "DEVDRIVE tab added to dashboard with volume status table",
-        "Tab nav responds to Cmd+4",
-        "Guidance text references 'lfg devdrive' CLI",
-        "Script passes bash -n syntax check"
+        "#side-settings has model/endpoint/temperature/override controls",
+        "#side-ai shows status and Analyze Selected button",
+        "WTFs rows show AI purpose pills when available",
+        "Batch analysis of top 10 projects on load",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
       "passes": false,
-      "notes": "Phase 2.3 - touches only lib/dashboard.sh"
+      "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Dispatcher routing for devdrive",
-      "description": "As a user, I want to run 'lfg devdrive' or 'lfg dd' from the CLI so that the devdrive module launches correctly.",
+      "title": "Polish, shortcuts, v2.0.0 integration",
+      "description": "Final wiring: shortcuts, onboarding, version bump, APM, live testing.",
       "acceptanceCriteria": [
-        "lfg dispatcher has devdrive|dd) case routing to lib/devdrive.sh",
-        "LFG_VERSION bumped to '1.4.0'",
-        "Script passes bash -n syntax check"
+        "Cmd+Shift+A/S shortcuts for AI/STFU",
+        "Version 2.0.0, updated help and onboarding",
+        "state.sh tracks stfu and ai modules",
+        "menubar.swift shows STFU and AI status",
+        "APM notifications for all operations",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
       "passes": false,
-      "notes": "Phase 2.4 - touches only the lfg dispatcher script"
-    },
-    {
-      "id": "US-009",
-      "title": "Menubar devdrive submenu (menubar.swift)",
-      "description": "As a user, I want devdrive actions in the macOS menubar so that I can mount/unmount/sync without opening the viewer.",
-      "acceptanceCriteria": [
-        "DEVDRIVE submenu added with Mount, Unmount, Sync, Status items",
-        "Methods implemented: openDevdrive(), ddMount(), ddUnmount(), ddSync()",
-        "Compiles without errors: swiftc menubar.swift -framework Cocoa"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": "Phase 2.5 - touches only menubar.swift"
-    },
-    {
-      "id": "US-010",
-      "title": "Fix APM bridge orchestrator endpoint",
-      "description": "As a developer, I want the CCEM APM bridge orchestrator to use the correct endpoint and field names so that LFG notifications reach the APM dashboard.",
-      "acceptanceCriteria": [
-        "orchestrator.sh endpoint changed from POST /api/notify to POST /api/notifications/add",
-        "Field 'message' renamed to 'body'",
-        "Field 'severity' renamed to 'category'",
-        "Script passes bash -n syntax check"
-      ],
-      "priority": 10,
-      "passes": false,
-      "notes": "Phase 3.1 - touches only ~/Developer/ccem/apm/bridges/orchestrator.sh"
-    },
-    {
-      "id": "US-011",
-      "title": "APM notification hooks in state.sh",
-      "description": "As a developer, I want LFG module completions and errors to automatically notify APM so that the dashboard reflects real-time LFG activity.",
-      "acceptanceCriteria": [
-        "lfg_notify_apm() function added to state.sh",
-        "Function POSTs to localhost:3031/api/notifications/add",
-        "Called from lfg_state_done and lfg_state_error",
-        "Payload includes title, body, category: 'lfg', agent_id: 'lfg-$module'",
-        "Script passes bash -n syntax check"
-      ],
-      "priority": 11,
-      "passes": false,
-      "notes": "Phase 3.2 - touches only lib/state.sh"
-    },
-    {
-      "id": "US-012",
-      "title": "Create agent spec files (scan, clean, backup)",
-      "description": "As a Claude Code user, I want agent specs for scan, clean, and backup so that specialized agents can run LFG modules autonomously.",
-      "acceptanceCriteria": [
-        "~/.claude/agents/lfg/ directory created",
-        "scan-agent.md created with YAML frontmatter (name, description, tools, triggers)",
-        "clean-agent.md created with YAML frontmatter and progressive escalation docs",
-        "backup-agent.md created with YAML frontmatter and sparse image lifecycle docs",
-        "All 3 files follow the agent spec format with proper frontmatter"
-      ],
-      "priority": 12,
-      "passes": false,
-      "notes": "Phase 4.1 - creates 3 new markdown files in ~/.claude/agents/lfg/"
-    },
-    {
-      "id": "US-013",
-      "title": "Create agent spec files (devdrive, monitor)",
-      "description": "As a Claude Code user, I want agent specs for devdrive and monitor so that the full LFG agent squadron is available.",
-      "acceptanceCriteria": [
-        "devdrive-agent.md created with YAML frontmatter and yj-devdrive bridge docs",
-        "monitor-agent.md created with YAML frontmatter and state.json watching docs",
-        "Both files follow the agent spec format with proper frontmatter"
-      ],
-      "priority": 13,
-      "passes": false,
-      "notes": "Phase 4.2 - creates 2 new markdown files in ~/.claude/agents/lfg/"
-    },
-    {
-      "id": "US-014",
-      "title": "Create /lfg skill definition",
-      "description": "As a Claude Code user, I want a /lfg slash command so that I can invoke LFG modules directly from Claude Code.",
-      "acceptanceCriteria": [
-        "~/.claude/commands/lfg.md created with YAML frontmatter (name, description, allowed-tools)",
-        "Subcommands defined: scan [path], clean [--force], backup [volume], devdrive [cmd], status",
-        "Each subcommand maps to ~/tools/@yj/lfg/lfg <module> <args>"
-      ],
-      "priority": 14,
-      "passes": false,
-      "notes": "Phase 5.1 - creates ~/.claude/commands/lfg.md (new file)"
-    },
-    {
-      "id": "US-015",
-      "title": "Register /lfg in slash-commands.json",
-      "description": "As a Claude Code user, I want /lfg registered in the slash command system so that it appears in command discovery.",
-      "acceptanceCriteria": [
-        "/lfg entry added to ~/.claude/config/slash-commands.json",
-        "Subcommands and descriptions included",
-        "JSON is valid (passes python3 -m json.tool)"
-      ],
-      "priority": 15,
-      "passes": false,
-      "notes": "Phase 5.2 - edits ~/.claude/config/slash-commands.json"
-    },
-    {
-      "id": "US-016",
-      "title": "Register LFG triggers in reference-registry.json",
-      "description": "As a Claude Code user, I want LFG-related keywords to auto-load the LFG module so that context loads intelligently.",
-      "acceptanceCriteria": [
-        "LFG triggers added: lfg, disk, cache, cleanup, backup, devdrive",
-        "Points to ~/.claude/commands/lfg.md and agent specs",
-        "JSON is valid (passes python3 -m json.tool)"
-      ],
-      "priority": 16,
-      "passes": false,
-      "notes": "Phase 5.3 - edits ~/.claude/config/reference-registry.json"
-    },
-    {
-      "id": "US-017",
-      "title": "Update LFG project CLAUDE.md",
-      "description": "As a developer, I want the LFG CLAUDE.md to document the agent squadron, skill commands, and devdrive module so that future sessions have full context.",
-      "acceptanceCriteria": [
-        "Agent squadron section added to ~/tools/@yj/lfg/.claude/CLAUDE.md",
-        "Skill command reference section added",
-        "Devdrive module documented",
-        "File is valid markdown"
-      ],
-      "priority": 17,
-      "passes": false,
-      "notes": "Phase 5.4 - edits ~/tools/@yj/lfg/.claude/CLAUDE.md"
-    },
-    {
-      "id": "US-018",
-      "title": "Live integration testing and v1.4.0 tag",
-      "description": "As a developer, I want all modules tested end-to-end so that v1.4.0 is a verified release.",
-      "acceptanceCriteria": [
-        "Navigation flow tested: Splash -> WTFS -> Back -> DTF -> Home -> Splash",
-        "Devdrive module launches from splash and command panel works",
-        "Menubar submenus trigger correctly",
-        "APM receives LFG notifications (curl localhost:3031/api/notifications returns LFG events)",
-        "state.json updates propagate to menubar and APM",
-        "viewer.swift and menubar.swift compile without errors",
-        "All shell scripts pass bash -n syntax check"
-      ],
-      "priority": 18,
-      "passes": false,
-      "notes": "Phase 8 - integration testing across all files, then git tag v1.4.0"
+      "notes": ""
     }
   ]
 }

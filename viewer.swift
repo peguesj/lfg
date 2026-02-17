@@ -56,17 +56,92 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         guard message.name == "lfg",
-              let body = message.body as? [String: String],
-              let action = body["action"] else { return }
+              let body = message.body as? [String: Any],
+              let action = body["action"] as? String else { return }
 
-        if action == "select", let module = body["module"], let path = selectionFile {
-            // Write selection to file so the shell script can pick it up
+        // Helper to read string values from body
+        func str(_ key: String) -> String? { body[key] as? String }
+
+        if action == "exec", let cmd = str("cmd"), let reqId = str("id") {
+            // Execute a shell command and return results to JS
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let task = Process()
+                task.launchPath = "/bin/bash"
+                task.arguments = ["-c", cmd]
+                let outPipe = Pipe()
+                let errPipe = Pipe()
+                task.standardOutput = outPipe
+                task.standardError = errPipe
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                } catch {
+                    DispatchQueue.main.async {
+                        let js = "LFG._onExecResult('\(reqId)', '', 'Process launch failed: \(error.localizedDescription)', 1)"
+                        self?.webView.evaluateJavaScript(js, completionHandler: nil)
+                    }
+                    return
+                }
+                let stdout = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let code = task.terminationStatus
+                DispatchQueue.main.async {
+                    // Escape for JS string literal
+                    func esc(_ s: String) -> String {
+                        s.replacingOccurrences(of: "\\", with: "\\\\")
+                         .replacingOccurrences(of: "'", with: "\\'")
+                         .replacingOccurrences(of: "\n", with: "\\n")
+                         .replacingOccurrences(of: "\r", with: "\\r")
+                    }
+                    let js = "LFG._onExecResult('\(reqId)', '\(esc(stdout))', '\(esc(stderr))', \(code))"
+                    self?.webView.evaluateJavaScript(js, completionHandler: nil)
+                }
+            }
+        } else if action == "confirm", let msg = str("message"), let cmd = str("cmd"), let reqId = str("id") {
+            // Show native confirm dialog, then execute if approved
+            let alert = NSAlert()
+            alert.messageText = "Confirm Action"
+            alert.informativeText = msg
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Execute")
+            alert.addButton(withTitle: "Cancel")
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Repost as exec
+                // Execute the confirmed command
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    let task = Process()
+                    task.launchPath = "/bin/bash"
+                    task.arguments = ["-c", cmd]
+                    let outPipe = Pipe()
+                    let errPipe = Pipe()
+                    task.standardOutput = outPipe
+                    task.standardError = errPipe
+                    do { try task.run(); task.waitUntilExit() } catch { return }
+                    let stdout = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                    let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                    let code = task.terminationStatus
+                    DispatchQueue.main.async {
+                        func esc(_ s: String) -> String {
+                            s.replacingOccurrences(of: "\\", with: "\\\\")
+                             .replacingOccurrences(of: "'", with: "\\'")
+                             .replacingOccurrences(of: "\n", with: "\\n")
+                             .replacingOccurrences(of: "\r", with: "\\r")
+                        }
+                        let js = "LFG._onExecResult('\(reqId)', '\(esc(stdout))', '\(esc(stderr))', \(code))"
+                        self?.webView.evaluateJavaScript(js, completionHandler: nil)
+                    }
+                }
+            } else {
+                let js = "LFG._onExecResult('\(reqId)', '', 'User cancelled', -1)"
+                webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        } else if action == "select", let module = str("module"), let path = selectionFile {
             try? module.write(toFile: path, atomically: true, encoding: .utf8)
-            // Close after brief delay for the loading animation
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 NSApp.terminate(nil)
             }
-        } else if action == "navigate", let target = body["target"] {
+        } else if action == "navigate", let target = str("target") {
             // In-place navigation: push current URL and load new HTML
             let lfgDir = NSHomeDirectory() + "/tools/@yj/lfg"
             let targetPath: String
@@ -106,10 +181,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             let splashURL = URL(fileURLWithPath: splashPath)
             webView.loadFileURL(splashURL, allowingReadAccessTo: splashURL.deletingLastPathComponent())
             syncNavDepth()
-        } else if action == "run", let module = body["module"] {
-            // Run a module command without closing the viewer
+        } else if action == "run", let module = str("module") {
             let lfgPath = NSHomeDirectory() + "/tools/@yj/lfg/lfg"
-            let args = body["args"] ?? ""
+            let args = str("args") ?? ""
             let cmd = args.isEmpty ? "\(lfgPath) \(module)" : "\(lfgPath) \(module) \(args)"
             DispatchQueue.global(qos: .userInitiated).async {
                 let task = Process()
