@@ -65,6 +65,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 NSApp.terminate(nil)
             }
+        } else if action == "run", let module = body["module"] {
+            // Run a module command without closing the viewer
+            let lfgPath = NSHomeDirectory() + "/tools/@yj/lfg/lfg"
+            let args = body["args"] ?? ""
+            let cmd = args.isEmpty ? "\(lfgPath) \(module)" : "\(lfgPath) \(module) \(args)"
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.launchPath = "/bin/bash"
+                task.arguments = ["-c", cmd]
+                try? task.run()
+            }
         } else if action == "quit" {
             NSApp.terminate(nil)
         }

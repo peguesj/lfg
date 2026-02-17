@@ -95,6 +95,13 @@ html = '''<!DOCTYPE html>
   <script>''' + uijs + '''
   LFG.init({ welcome: \"Showing $RANK directories in $DIR_DISPLAY\" });
   document.getElementById(\"action-bar\").appendChild(
+    LFG.createCommandPanel(\"WTFS Actions\", [
+      { label: \"Scan ~/Developer\", desc: \"Default scan target\", cli: \"lfg wtfs ~/Developer\", module: \"wtfs\", action: \"run\", args: \"~/Developer\", color: \"#4a9eff\" },
+      { label: \"Scan Home (~)\", desc: \"Full home directory\", cli: \"lfg wtfs ~\", module: \"wtfs\", action: \"run\", args: \"~\", color: \"#4a9eff\" },
+      { label: \"Scan Root (/)\", desc: \"Entire filesystem\", cli: \"lfg wtfs /\", module: \"wtfs\", action: \"run\", args: \"/\", color: \"#ffd166\" },
+    ])
+  );
+  document.getElementById(\"action-bar\").appendChild(
     LFG.createActionBar([
       { label: \"Clean Caches\", color: \"#ff8c42\", module: \"dtf\", tip: \"Open DTF to scan and clean caches\" },
       { label: \"View Backups\", color: \"#06d6a0\", module: \"btau\", tip: \"Open BTAU backup status\" },

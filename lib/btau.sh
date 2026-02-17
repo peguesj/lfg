@@ -96,57 +96,80 @@ else
     TOTAL_HR="${TOTAL_SIZE_KB} KB"
 fi
 
-cat > "$HTML_FILE" <<HTMLEOF
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-$(cat "$LFG_DIR/lib/theme.css")
-</style>
-</head>
-<body>
-  <div class="header">
-    <h1><span class="brand">lfg</span> btau <span class="dim">Back That App Up</span></h1>
-    <span class="meta">${TIMESTAMP}</span>
+python3 -c "
+theme = open('$LFG_DIR/lib/theme.css').read()
+uijs = open('$LFG_DIR/lib/ui.js').read()
+volume_rows = '''$VOLUME_ROWS'''
+backup_rows = '''$BACKUP_ROWS'''
+
+volumes_html = ''
+if volume_rows.strip():
+    volumes_html = '<div class=\"section-title\">Devdrive Volumes</div><table><thead><tr><th>Volume</th><th class=\"r\">Size</th></tr></thead><tbody>' + volume_rows + '</tbody></table>'
+
+history_html = ''
+if backup_rows.strip():
+    history_html = '<table><thead><tr><th>Volume</th><th class=\"r\">Size</th><th>Type</th><th>Timestamp</th></tr></thead><tbody>' + backup_rows + '</tbody></table>'
+else:
+    history_html = '<div class=\"empty-state\">No backups found. Run: lfg btau backup VOLUME</div>'
+
+html = '''<!DOCTYPE html>
+<html><head><meta charset=\"utf-8\">
+<style>''' + theme + '''</style>
+</head><body>
+  <div class=\"header\">
+    <h1><span class=\"brand\">lfg</span> btau <span class=\"dim\">Back That App Up</span></h1>
+    <span class=\"meta\">$TIMESTAMP</span>
   </div>
-  <div class="summary">
-    <div class="stat"><span class="label">Backups</span><span class="value">${BACKUP_COUNT}</span></div>
-    <div class="stat"><span class="label">Total Size</span><span class="value accent">${TOTAL_HR}</span></div>
+  <div class=\"summary\">
+    <div class=\"stat\"><span class=\"label\">Backups</span><span class=\"value\">$BACKUP_COUNT</span></div>
+    <div class=\"stat\"><span class=\"label\">Total Size</span><span class=\"value accent\">$TOTAL_HR</span></div>
   </div>
+  ''' + volumes_html + '''
+  <div class=\"section-title\">Backup History</div>
+  ''' + history_html + '''
+  <div id=\"action-bar\"></div>
+  <div class=\"footer\">lfg btau - Local File Guardian | Back That App Up</div>
+  <script>''' + uijs + '''
+  LFG.init({ welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\" });
+  document.getElementById(\"action-bar\").appendChild(
+    LFG.createCommandPanel(\"BTAU Actions\", [
+      { label: \"Discover Volumes\", desc: \"Scan for devdrive volumes\", cli: \"lfg btau discover\", module: \"btau\", action: \"run\", args: \"discover\", color: \"#06d6a0\" },
+      { label: \"Show Status\", desc: \"Backup manifest status\", cli: \"lfg btau status\", module: \"btau\", action: \"run\", args: \"status\", color: \"#06d6a0\" },
+      { label: \"Mount Devdrive\", desc: \"Attach sparse image\", cli: \"lfg btau mount\", module: \"btau\", action: \"run\", args: \"mount\", color: \"#4a9eff\" },
+      { label: \"Unmount Devdrive\", desc: \"Safely eject volume\", cli: \"lfg btau unmount\", module: \"btau\", action: \"run\", args: \"unmount\", color: \"#ffd166\" },
+    ])
+  );
+  document.getElementById(\"action-bar\").appendChild(
+    LFG.createActionBar([
+      { label: \"Disk Usage\", color: \"#4a9eff\", module: \"wtfs\", tip: \"Open WTFS to see disk breakdown\" },
+      { label: \"Clean Caches\", color: \"#ff8c42\", module: \"dtf\", tip: \"Open DTF to scan and clean caches\" },
+      { label: \"Full Dashboard\", color: \"#4a9eff\", module: \"dashboard\", tip: \"Open the combined dashboard\" },
+    ])
+  );
+  </script>
+</body></html>'''
 
-  $(if [[ -n "$VOLUME_ROWS" ]]; then
-    echo '<div class="section-title">Devdrive Volumes</div>'
-    echo '<table><thead><tr><th>Volume</th><th class="r">Size</th></tr></thead>'
-    echo "<tbody>${VOLUME_ROWS}</tbody></table>"
-  fi)
-
-  <div class="section-title">Backup History</div>
-  $(if [[ -n "$BACKUP_ROWS" ]]; then
-    echo '<table><thead><tr><th>Volume</th><th class="r">Size</th><th>Type</th><th>Timestamp</th></tr></thead>'
-    echo "<tbody>${BACKUP_ROWS}</tbody></table>"
-  else
-    echo '<div class="empty-state">No backups found. Run: lfg btau backup VOLUME</div>'
-  fi)
-
-  <div style="margin-top:16px;padding:10px 14px;background:#1c1c22;border-radius:6px;border:1px solid #2a2a34;font-size:12px;color:#6b6b78;">
-    <span style="color:#06d6a0;font-weight:600">lfg btau</span> commands:
-    <span style="color:#a0a0b0">discover</span> |
-    <span style="color:#a0a0b0">backup VOLUME</span> |
-    <span style="color:#a0a0b0">status</span> |
-    <span style="color:#a0a0b0">restore ID</span> |
-    <span style="color:#a0a0b0">mount</span> |
-    <span style="color:#a0a0b0">unmount</span>
-  </div>
-
-  <div class="footer">lfg btau - Local File Guardian | Back That App Up</div>
-</body>
-</html>
-HTMLEOF
+open('$HTML_FILE', 'w').write(html)
+"
 
 lfg_state_done btau "backup_count=$BACKUP_COUNT" "total_size=$TOTAL_HR"
 
+CHAIN_FILE="/tmp/.lfg_chain_$$"
+
 echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG BTAU - Backup Status" &
+"$VIEWER" "$HTML_FILE" "LFG BTAU - Backup Status" --select "$CHAIN_FILE" &
+VPID=$!
 disown
+(
+  while kill -0 "$VPID" 2>/dev/null; do
+    if [[ -s "$CHAIN_FILE" ]]; then
+      SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
+      case "$SEL" in
+        wtfs) "$LFG_DIR/lib/scan.sh" ;; dtf) "$LFG_DIR/lib/clean.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
+      esac; break
+    fi; sleep 0.3
+  done; rm -f "$CHAIN_FILE"
+) &
+disown
+
 echo "Done."

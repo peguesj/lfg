@@ -179,6 +179,15 @@ html = '''<!DOCTYPE html>
   <script>''' + uijs + '''
   LFG.init({ welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\" });
   document.getElementById(\"action-bar\").appendChild(
+    LFG.createCommandPanel(\"DTF Actions\", [
+      { label: \"Scan Only\", desc: \"Dry run - show reclaimable\", cli: \"lfg dtf\", module: \"dtf\", action: \"run\", color: \"#4a9eff\" },
+      { label: \"Clean All\", desc: \"Delete all scanned caches\", cli: \"lfg dtf --force\", module: \"dtf\", action: \"run\", args: \"--force\", color: \"#ff8c42\" },
+      { label: \"Clean + Docker\", desc: \"Caches + Docker prune\", cli: \"lfg dtf --force --docker\", module: \"dtf\", action: \"run\", args: \"--force --docker\", color: \"#ff4d6a\" },
+      { label: \"Clean + Sudo\", desc: \"Caches + privileged cleanup\", cli: \"lfg dtf --force --sudo\", module: \"dtf\", action: \"run\", args: \"--force --sudo\", color: \"#ff4d6a\" },
+      { label: \"Nuclear\", desc: \"Everything: caches + Docker + sudo\", cli: \"lfg dtf --force --docker --sudo\", module: \"dtf\", action: \"run\", args: \"--force --docker --sudo\", color: \"#ff4d6a\" },
+    ])
+  );
+  document.getElementById(\"action-bar\").appendChild(
     LFG.createActionBar([
       { label: \"Disk Usage\", color: \"#4a9eff\", module: \"wtfs\", tip: \"Open WTFS to see disk breakdown\" },
       { label: \"View Backups\", color: \"#06d6a0\", module: \"btau\", tip: \"Open BTAU backup status\" },
