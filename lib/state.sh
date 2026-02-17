@@ -54,10 +54,18 @@ os.replace(tmp, path)
 # Uses --connect-timeout and --max-time so we never block if APM is down
 lfg_notify_apm() {
     local title="$1" body="$2" category="${3:-info}" agent_id="${4:-lfg}"
+    local payload="{\"title\":\"$title\",\"body\":\"$body\",\"category\":\"$category\",\"agent_id\":\"$agent_id\"}"
+    # Notify v3 Python server (port 3031)
     curl -s --connect-timeout 2 --max-time 5 \
         -X POST "http://localhost:3031/api/notifications/add" \
         -H "Content-Type: application/json" \
-        -d "{\"title\":\"$title\",\"body\":\"$body\",\"category\":\"$category\",\"agent_id\":\"$agent_id\"}" \
+        -d "$payload" \
+        >/dev/null 2>&1 &
+    # Also notify v4 Phoenix (port 3032) if running
+    curl -s --connect-timeout 2 --max-time 5 \
+        -X POST "http://localhost:3032/api/notifications/add" \
+        -H "Content-Type: application/json" \
+        -d "$payload" \
         >/dev/null 2>&1 &
 }
 

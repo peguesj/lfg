@@ -16,8 +16,8 @@
         "Viewer compiles with swiftc"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in viewer.swift and ui.js. Viewer compiles successfully."
     },
     {
       "id": "US-002",
@@ -31,8 +31,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Two-column layout in theme.css, dashboard.sh wraps content in main-column/side-column, switchSideTab added to ui.js with Cmd+5/6/7."
     },
     {
       "id": "US-003",
@@ -46,8 +46,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Composition breakdown in scan.sh and dashboard.sh. Segmented bars with deps/cache/source segments and tooltips. Legend added."
     },
     {
       "id": "US-004",
@@ -61,8 +61,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Per-cache Clean buttons in DTF rows via LFG.confirm. --only flag added. refreshView already existed from US-001."
     },
     {
       "id": "US-005",
@@ -77,8 +77,8 @@
         "lfg ai analyze returns purpose JSON"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ai.sh and ai_helper.py created. Config management works. Graceful fallback when AI unavailable. LFG.ai JS namespace added."
     },
     {
       "id": "US-006",
@@ -92,8 +92,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "stfu.sh created with dep/stack/name similarity. Found 53 projects, identified duplicates and clusters. Dashboard side panel wired to load STFU data."
     },
     {
       "id": "US-007",
@@ -107,8 +107,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Settings panel with model/endpoint/temperature/override. AI panel with status and analyze button. Batch analysis via LFG.ai.batchAnalyze."
     },
     {
       "id": "US-008",
@@ -123,8 +123,8 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Version bumped to 2.0.0 in lfg dispatcher, ui.js, and dashboard.sh. Cmd+Shift+A/S shortcuts added. Help text updated with all new commands."
     }
   ]
 }

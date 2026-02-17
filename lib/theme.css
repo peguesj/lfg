@@ -342,6 +342,199 @@ td { padding: 7px 8px; vertical-align: middle; }
 }
 .pulse { animation: pulse 2s infinite; }
 
+/* --- Two-Column Dashboard Layout --- */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  min-height: calc(100vh - 140px);
+}
+.main-column { min-width: 0; }
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 780px) {
+  .dashboard-layout { grid-template-columns: 1fr; }
+  .side-column { order: -1; }
+}
+
+/* --- Side Panel --- */
+.side-panel {
+  background: #1c1c22;
+  border: 1px solid #2a2a34;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: none;
+}
+.side-panel.active { display: block; }
+.side-panel-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #6b6b78;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a2a34;
+}
+
+/* --- Side Tab Navigation --- */
+.side-tab-nav {
+  display: flex;
+  gap: 2px;
+  background: #1c1c22;
+  border: 1px solid #2a2a34;
+  border-radius: 8px;
+  padding: 3px;
+}
+.side-tab-nav a {
+  flex: 1;
+  text-align: center;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b6b78;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+.side-tab-nav a:hover { color: #a0a0b0; background: #2a2a34; }
+.side-tab-nav a.active { color: #4a9eff; background: rgba(74,158,255,0.12); }
+
+/* --- Segmented Composition Bars --- */
+.bar-track.segmented { display: flex; gap: 0; }
+.bar-seg {
+  height: 100%;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 1px;
+}
+.bar-seg:first-child { border-radius: 4px 0 0 4px; }
+.bar-seg:last-child { border-radius: 0 4px 4px 0; }
+.bar-seg:only-child { border-radius: 4px; }
+.composition-legend {
+  display: flex;
+  gap: 14px;
+  margin: 8px 0 4px 0;
+  font-size: 10px;
+  color: #6b6b78;
+}
+.composition-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.legend-deps::before { background: #4a9eff; }
+.legend-cache::before { background: #ffd166; }
+.legend-source::before { background: #06d6a0; }
+.legend-other::before { background: #6b6b78; }
+
+/* --- STFU Badges --- */
+.stfu-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: #c084fc;
+  background: rgba(192,132,252,0.12);
+  margin-left: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.stfu-badge:hover { background: rgba(192,132,252,0.25); }
+.stfu-relationship-card {
+  padding: 8px 10px;
+  background: #1a1a22;
+  border: 1px solid #2a2a34;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.stfu-relationship-card:hover { border-color: #c084fc; }
+.stfu-score-bar {
+  height: 4px;
+  background: #2a2a34;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.stfu-score-fill {
+  height: 100%;
+  background: #c084fc;
+  border-radius: 2px;
+}
+
+/* --- AI Purpose Pills --- */
+.ai-pill {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: #06d6a0;
+  background: rgba(6,214,160,0.12);
+  margin-left: 4px;
+}
+
+/* --- Settings Controls --- */
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #1e1e28;
+  font-size: 11px;
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label { color: #a0a0b0; }
+.setting-value {
+  color: #e0e0e6;
+  font-weight: 600;
+}
+.setting-input {
+  background: #2a2a34;
+  border: 1px solid #3a3a44;
+  border-radius: 4px;
+  color: #e0e0e6;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  width: 140px;
+}
+.setting-input:focus { border-color: #4a9eff; }
+.setting-toggle {
+  width: 36px;
+  height: 20px;
+  background: #2a2a34;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+}
+.setting-toggle.on { background: #4a9eff; }
+.setting-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.setting-toggle.on::after { transform: translateX(16px); }
+
 /* --- Cross-module colored bars --- */
 tr { --bar-color: #4a9eff; }
 tr:has(.cat-dev) { --bar-color: #4a9eff; }

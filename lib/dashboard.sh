@@ -29,7 +29,21 @@ while IFS=$'\t' read -r size_kb path; do
     elif (( $(echo "$pct > 5" | bc -l) )); then color="#ffd166"
     elif (( $(echo "$pct > 2" | bc -l) )); then color="#06d6a0"
     else color="#4a9eff"; fi
-    SCAN_ROWS+="<tr data-tip=\"${name}: ${size} (${pct}%)\"><td class=\"rank\">${RANK}</td><td class=\"name\">${name}</td><td class=\"size\">${size}</td><td class=\"bar-cell\"><div class=\"bar-track\"><div class=\"bar-fill\" style=\"width:${pct}%;background:${color}\"></div></div></td><td class=\"pct\">${pct}%</td></tr>"
+    # Composition breakdown
+    deps_kb=0; cache_kb=0
+    for dp in node_modules deps vendor Pods .gradle/caches .cargo/registry venv .venv; do
+        [[ -d "$path/$dp" ]] && deps_kb=$((deps_kb + $(du -sk "$path/$dp" 2>/dev/null | awk '{print $1}')))
+    done
+    for cp in .next dist _build target __pycache__ .turbo .cache .parcel-cache; do
+        [[ -d "$path/$cp" ]] && cache_kb=$((cache_kb + $(du -sk "$path/$cp" 2>/dev/null | awk '{print $1}')))
+    done
+    source_kb=$((size_kb - deps_kb - cache_kb)); (( source_kb < 0 )) && source_kb=0
+    if (( size_kb > 0 )); then
+        d_pct=$(awk "BEGIN{printf \"%.1f\", ($deps_kb/$size_kb)*100}")
+        c_pct=$(awk "BEGIN{printf \"%.1f\", ($cache_kb/$size_kb)*100}")
+        s_pct=$(awk "BEGIN{printf \"%.1f\", ($source_kb/$size_kb)*100}")
+    else d_pct="0"; c_pct="0"; s_pct="0"; fi
+    SCAN_ROWS+="<tr data-tip=\"${name}: ${size} (${pct}%)\"><td class=\"rank\">${RANK}</td><td class=\"name\">${name}</td><td class=\"size\">${size}</td><td class=\"bar-cell\"><div class=\"bar-track segmented\" style=\"display:flex\"><div class=\"bar-seg\" style=\"width:${d_pct}%;background:#4a9eff\" data-tip=\"Deps\"></div><div class=\"bar-seg\" style=\"width:${c_pct}%;background:#ffd166\" data-tip=\"Cache\"></div><div class=\"bar-seg\" style=\"width:${s_pct}%;background:#06d6a0\" data-tip=\"Source\"></div></div></td><td class=\"pct\">${pct}%</td></tr>"
 done < "$TMPFILE"
 rm -f "$TMPFILE"
 
@@ -203,6 +217,8 @@ html = f'''<!DOCTYPE html>
     <a onclick="switchTab('btau')">BTAU <span class="kbd">&#x2318;3</span></a>
     <a onclick="switchTab('devdrive')">DEVDRIVE <span class="kbd">&#x2318;4</span></a>
   </div>
+  <div class="dashboard-layout">
+  <div class="main-column">
   <div id="tab-wtfs" class="tab-content active">
     <div class="guidance"><strong>WTFS</strong> - Top directories in <code>DIR_DISPLAY_PH</code> by size. Hover rows for details.</div>
     <table><thead><tr><th>#</th><th>Directory</th><th class="r">Size</th><th>Usage</th><th class="r">%</th></tr></thead>
@@ -222,10 +238,41 @@ html = f'''<!DOCTYPE html>
     ''' + (f'<div class="section-title" style="color:#c084fc">Volumes</div><table><thead><tr><th>Volume</th><th class="r">Free</th><th class="r">Projects</th></tr></thead><tbody>{dd_volume_rows}</tbody></table>' if dd_volume_rows.strip() else '<div class="section-title" style="color:#c084fc">Volumes</div><div class="empty-state">No devdrive volumes detected.</div>') + f'''
     ''' + (f'<div class="section-title" style="color:#c084fc">Symlink Forest</div><table><thead><tr><th>Project</th><th>Volume</th><th>Status</th></tr></thead><tbody>{dd_project_rows}</tbody></table>' if dd_project_rows.strip() else '<div class="section-title" style="color:#c084fc">Symlink Forest</div><div class="empty-state">No projects in symlink forest.</div>') + f'''
   </div>
-  <div class="footer">lfg v1.0.0 - Local File Guardian | wtfs + dtf + btau + devdrive</div>
+  </div><!-- /main-column -->
+  <div class="side-column">
+    <div class="side-tab-nav">
+      <a class="active" data-tab="stfu" onclick="LFG.switchSideTab('stfu')">STFU <span class="kbd">&#x2318;5</span></a>
+      <a data-tab="ai" onclick="LFG.switchSideTab('ai')">AI <span class="kbd">&#x2318;6</span></a>
+      <a data-tab="settings" onclick="LFG.switchSideTab('settings')">Settings <span class="kbd">&#x2318;7</span></a>
+    </div>
+    <div id="side-stfu" class="side-panel active">
+      <div class="section-title">Source Tree Forensics</div>
+      <div class="empty-state" id="stfu-loading">Scanning relationships...</div>
+      <div id="stfu-related" style="display:none"></div>
+      <div id="stfu-duplicates" style="display:none"></div>
+      <div id="stfu-clusters" style="display:none"></div>
+    </div>
+    <div id="side-ai" class="side-panel">
+      <div class="section-title">AI Analysis</div>
+      <div class="setting-row"><span class="setting-label">Status</span><span id="ai-status" class="ai-pill" style="background:#6b6b78">Checking...</span></div>
+      <div class="setting-row"><span class="setting-label">Model</span><span id="ai-model">--</span></div>
+      <button id="ai-analyze-btn" style="margin-top:12px;width:100%" class="action-btn">Analyze Selected</button>
+      <div id="ai-results" style="margin-top:12px"></div>
+    </div>
+    <div id="side-settings" class="side-panel">
+      <div class="section-title">AI Settings</div>
+      <div class="setting-row"><span class="setting-label">Model</span><select id="set-model" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set model '+this.value,function(){{}})"><option>gpt-4o-mini</option><option>gpt-4o</option><option>claude-sonnet-4-5-20250929</option><option>ollama/llama3</option></select></div>
+      <div class="setting-row"><span class="setting-label">Endpoint</span><input id="set-endpoint" class="setting-input" value="http://localhost:4000" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set endpoint '+this.value,function(){{}})"></div>
+      <div class="setting-row"><span class="setting-label">Temperature</span><input id="set-temp" type="range" min="0" max="1" step="0.1" value="0.3" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set temperature '+this.value,function(){{}})"></div>
+      <div class="setting-row"><span class="setting-label">System Override</span><label class="setting-toggle"><input type="checkbox" id="set-override" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set system_override '+(this.checked?'true':'false'),function(){{}})"><span class="toggle-slider"></span></label></div>
+      <button onclick="LFG.exec('~/tools/@yj/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:12px;width:100%" class="action-btn">Test Connection</button>
+    </div>
+  </div>
+  </div><!-- /dashboard-layout -->
+  <div class="footer">lfg v2.0.0 - Local File Guardian | wtfs + dtf + btau + devdrive + stfu + ai</div>
   <script>{uijs}
   LFG.init({{
-    module: "dashboard", context: "All Modules", moduleVersion: "1.0.0",
+    module: "dashboard", context: "All Modules", moduleVersion: "2.0.0",
     welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups, DD_PROJECT_COUNT_PH devdrive projects",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [
       {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Four modules work together to scan, clean, protect, and organize your files.", color: "#4a9eff" }},
@@ -249,6 +296,46 @@ html = f'''<!DOCTYPE html>
     if (e.metaKey && e.key === '3') switchTab('btau');
     if (e.metaKey && e.key === '4') switchTab('devdrive');
   }});
+  // AI status check
+  setTimeout(function() {{
+    LFG.ai.isAvailable(function(ok) {{
+      var el = document.getElementById('ai-status');
+      if (el) {{ el.textContent = ok ? 'Connected' : 'Offline'; el.style.background = ok ? '#06d6a0' : '#ff4d6a'; }}
+    }});
+    LFG.exec('~/tools/@yj/lfg/lfg ai config get model', function(out) {{
+      var el = document.getElementById('ai-model');
+      if (el && out.trim()) el.textContent = out.trim();
+    }});
+  }}, 1000);
+  // STFU scan
+  setTimeout(function() {{
+    LFG.exec('~/tools/@yj/lfg/lfg stfu --json 2>/dev/null || echo "{{}}"', function(out) {{
+      var loading = document.getElementById('stfu-loading');
+      var related = document.getElementById('stfu-related');
+      try {{
+        var data = JSON.parse(out || '{{}}');
+        if (loading) loading.style.display = 'none';
+        if (related && data.relationships && data.relationships.length > 0) {{
+          related.style.display = 'block';
+          related.innerHTML = '<div class="section-title" style="font-size:11px;margin-top:8px">Related Projects</div>' +
+            data.relationships.slice(0, 8).map(function(r) {{
+              return '<div class="stfu-relationship-card"><span>' + r.a + '</span><div class="stfu-score-bar"><div style="width:' + (r.score * 100) + '%;background:#c084fc"></div></div><span>' + r.b + '</span></div>';
+            }}).join('');
+        }}
+      }} catch(e) {{ if (loading) loading.textContent = 'No relationships found'; }}
+    }});
+  }}, 1500);
+  // Analyze button
+  var abtn = document.getElementById('ai-analyze-btn');
+  if (abtn) abtn.onclick = function() {{
+    var active = document.querySelector('#tab-wtfs tr.selected .name, #tab-wtfs tr:first-child .name');
+    var name = active ? active.textContent : '';
+    if (!name) {{ LFG.toast('Select a project first', {{type:'warning'}}); return; }}
+    LFG.ai.analyze(name, function(result) {{
+      var el = document.getElementById('ai-results');
+      if (el) el.innerHTML = '<div class="ai-pill">' + (result.purpose || result.error || 'Unknown') + '</div>';
+    }});
+  }};
   </script>
 </body></html>'''
 

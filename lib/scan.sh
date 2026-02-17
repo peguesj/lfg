@@ -42,11 +42,32 @@ while IFS=$'\t' read -r size_kb path; do
     else color="#4a9eff"
     fi
 
+    # Composition breakdown
+    deps_kb=0; cache_kb=0
+    for dp in node_modules deps vendor Pods .gradle/caches .cargo/registry venv .venv __pypackages__; do
+        [[ -d "$path/$dp" ]] && deps_kb=$((deps_kb + $(du -sk "$path/$dp" 2>/dev/null | awk '{print $1}')))
+    done
+    for cp in .next dist _build target __pycache__ .turbo .cache .parcel-cache .nuxt .output; do
+        [[ -d "$path/$cp" ]] && cache_kb=$((cache_kb + $(du -sk "$path/$cp" 2>/dev/null | awk '{print $1}')))
+    done
+    source_kb=$((size_kb - deps_kb - cache_kb))
+    (( source_kb < 0 )) && source_kb=0
+    # Segment widths as percentages of this project
+    if (( size_kb > 0 )); then
+        deps_pct=$(awk "BEGIN{printf \"%.1f\", ($deps_kb/$size_kb)*100}")
+        cache_pct=$(awk "BEGIN{printf \"%.1f\", ($cache_kb/$size_kb)*100}")
+        source_pct=$(awk "BEGIN{printf \"%.1f\", ($source_kb/$size_kb)*100}")
+    else deps_pct="0"; cache_pct="0"; source_pct="0"; fi
+    deps_hr=""; cache_hr=""; source_hr=""
+    (( deps_kb >= 1024 )) && deps_hr=$(awk "BEGIN{printf \"%.1f MB\", $deps_kb/1024}") || deps_hr="${deps_kb} KB"
+    (( cache_kb >= 1024 )) && cache_hr=$(awk "BEGIN{printf \"%.1f MB\", $cache_kb/1024}") || cache_hr="${cache_kb} KB"
+    (( source_kb >= 1024 )) && source_hr=$(awk "BEGIN{printf \"%.1f MB\", $source_kb/1024}") || source_hr="${source_kb} KB"
+
     ROWS+="<tr class=\"clickable\" data-tip=\"${name}: ${size} (${pct}% of total)\">
       <td class=\"rank\">${RANK}</td>
       <td class=\"name\">${name}</td>
       <td class=\"size\">${size}</td>
-      <td class=\"bar-cell\"><div class=\"bar-track\"><div class=\"bar-fill\" style=\"width:${bar_w}%;background:${color}\"></div></div></td>
+      <td class=\"bar-cell\"><div class=\"bar-track segmented\" style=\"display:flex\"><div class=\"bar-seg\" style=\"width:${deps_pct}%;background:#4a9eff\" data-tip=\"Deps: ${deps_hr}\"></div><div class=\"bar-seg\" style=\"width:${cache_pct}%;background:#ffd166\" data-tip=\"Cache: ${cache_hr}\"></div><div class=\"bar-seg\" style=\"width:${source_pct}%;background:#06d6a0\" data-tip=\"Source: ${source_hr}\"></div></div></td>
       <td class=\"pct\">${pct}%</td>
     </tr>"
 done < "$TMPFILE"
@@ -86,8 +107,9 @@ html = '''<!DOCTYPE html>
     Hover rows for details. Largest directories are at the top.
     Run <code>lfg dtf</code> to find reclaimable caches, or <code>lfg btau</code> for backups.
   </div>
+  <div class=\"composition-legend\"><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#4a9eff\"></span>Dependencies</span><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#ffd166\"></span>Cache/Build</span><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#06d6a0\"></span>Source</span></div>
   <table>
-    <thead><tr><th>#</th><th>Directory</th><th class=\"r\">Size</th><th>Usage</th><th class=\"r\">%</th></tr></thead>
+    <thead><tr><th>#</th><th>Directory</th><th class=\"r\">Size</th><th>Composition</th><th class=\"r\">%</th></tr></thead>
     <tbody>''' + rows + '''</tbody>
   </table>
   <div id=\"action-bar\"></div>

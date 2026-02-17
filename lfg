@@ -21,7 +21,7 @@
 # =============================================================================
 set -euo pipefail
 
-readonly LFG_VERSION="1.4.0"
+readonly LFG_VERSION="2.0.0"
 SELF="$0"
 [[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
 readonly LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
@@ -38,13 +38,14 @@ ensure_viewer() {
 
 show_help() {
     cat <<'HELP'
-lfg - Local File Guardian v1.4.0
+lfg - Local File Guardian v2.0.0
 
 MODULES:
     wtfs [path]                  Where's The Free Space (default: ~/Developer)
     dtf                          Delete Temp Files (dry run)
     dtf --force                  Execute cache cleanup
     dtf --force --docker         Also prune Docker
+    dtf --only <name>            Clean single cache by name
     btau                         Back That App Up (status view)
     btau <command> [opts]        Backup CLI (discover, backup, restore, ...)
     devdrive                     Developer Drive (status view)
@@ -53,18 +54,25 @@ MODULES:
     devdrive sync                Rebuild symlink forest
     devdrive verify              Audit symlink health
     devdrive create <name>       Create new project on devdrive
-    devdrive config [show]       Show full devdrive config (YAML)
-    devdrive config get <key>    Get config value (e.g. mount_mode)
-    devdrive config set <k> <v>  Set config value
-    devdrive config reset        Reset config to defaults
-    devdrive auto-move           Evaluate auto-move rules (dry run)
-    devdrive auto-move --force   Execute auto-move migrations
+    devdrive config [show|get|set|reset]
+    devdrive auto-move [--force] Evaluate/execute auto-move rules
+    ai config [show|get|set|reset]  AI model configuration
+    ai analyze <path>            Analyze project purpose/stack
+    ai compare <a> <b>           Compare two projects
+    ai suggest <path>            Get cleanup suggestions
+    stfu [--json] [path]         Source Tree Forensics & Unification
 
 COMMANDS:
     lfg                          Splash screen
     lfg dashboard                Combined dashboard (all modules)
     lfg --help                   Show this help
     lfg --version                Show version
+
+SHORTCUTS:
+    Cmd+1-4                      Switch main tabs (WTFS/DTF/BTAU/DEVDRIVE)
+    Cmd+5-7                      Switch side tabs (STFU/AI/Settings)
+    Cmd+Shift+A                  AI analyze selected
+    Cmd+Shift+S                  Toggle STFU badges
 
 OTHER:
     lfg menubar                  Start persistent menubar status app
@@ -119,6 +127,14 @@ case "${1:-}" in
         shift || true
         ensure_viewer
         exec "$LFG_DIR/lib/dashboard.sh" "$@"
+        ;;
+    ai)
+        shift
+        exec bash "$LFG_DIR/lib/ai.sh" "$@"
+        ;;
+    stfu)
+        shift || true
+        exec bash "$LFG_DIR/lib/stfu.sh" "$@"
         ;;
     menubar)
         # Compile menubar if needed

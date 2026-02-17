@@ -18,6 +18,8 @@ while [[ $# -gt 0 ]]; do
         --force)    FORCE=true ;;
         --docker)   INCLUDE_DOCKER=true ;;
         --sudo)     USE_SUDO=true ;;
+        --only)     ONLY_NAME="$2"; shift ;;
+        --only=*)   ONLY_NAME="${1#--only=}" ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
     shift
@@ -86,8 +88,13 @@ ROWS=""
 
 echo "Scanning caches..."
 
+ONLY_NAME="${ONLY_NAME:-}"
+
 for entry in "${CACHES[@]}"; do
     IFS='|' read -r cat name path cmd <<< "$entry"
+
+    # --only filter
+    [[ -n "$ONLY_NAME" ]] && [[ "$name" != "$ONLY_NAME" ]] && continue
 
     if [[ -z "$path" ]]; then
         size_kb=0; status="badge-skipped"; status_text="CMD"
@@ -126,13 +133,26 @@ for entry in "${CACHES[@]}"; do
         bar_w=$(awk "BEGIN{printf \"%.1f\", ($size_kb/$TOTAL_RECLAIMABLE)*100}")
     else bar_w="0"; fi
 
+    # Escape path for JS
+    path_esc=$(echo "$path" | sed "s/'/\\\\'/g")
+    clean_cmd=""
+    if [[ -n "$path" ]] && (( size_kb > 0 )); then
+        clean_cmd="rm -rf '${path_esc}'"
+    elif [[ -n "$cmd" ]]; then
+        clean_cmd="$cmd"
+    fi
+
     ROWS+="<tr data-tip=\"${name}: ${size_display} [${cat}]\">
       <td><span class=\"cat ${cat_class}\">${cat}</span></td>
       <td class=\"name\">${name}</td>
       <td class=\"size\">${size_display}</td>
       <td class=\"bar-cell\"><div class=\"bar-track\"><div class=\"bar-fill\" style=\"width:${bar_w}%;background:var(--bar-color,#4a9eff)\"></div></div></td>
       <td><span class=\"status-badge ${status}\">${status_text}</span></td>
-    </tr>"
+      <td class=\"action-cell\">"
+    if [[ -n "$clean_cmd" ]] && (( size_kb > 0 )) && [[ "$FORCE" != "true" ]]; then
+        ROWS+="<button class=\"action-btn-sm\" onclick=\"LFG.confirm('Clean ${name}? (${size_display})', '${clean_cmd}', function(o,e,c){ if(c===0) LFG.toast('Cleaned ${name}',{type:'success'}); else LFG.toast('Failed: '+e,{type:'error'}); })\">Clean</button>"
+    fi
+    ROWS+="</td></tr>"
 done
 
 DISK_FREE=$(df -h / | awk 'NR==2{print $4}')
@@ -171,7 +191,7 @@ html = '''<!DOCTYPE html>
     ''' + ('Run <code>lfg dtf --force</code> to actually clean these caches.' if '$FORCE' == 'false' else 'Cleanup complete. Run <code>lfg wtfs</code> to see updated disk usage.') + '''
   </div>
   <table>
-    <thead><tr><th>Cat</th><th>Cache</th><th class=\"r\">Size</th><th>Share</th><th>Status</th></tr></thead>
+    <thead><tr><th>Cat</th><th>Cache</th><th class=\"r\">Size</th><th>Share</th><th>Status</th><th></th></tr></thead>
     <tbody>''' + rows + '''</tbody>
   </table>
   <div id=\"action-bar\"></div>
