@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!--
+    WTFS Brandmark — "Where's The Free Space"
+    Concept: A magnifying glass with a segmented disk inside it.
+    The disk is pie-sliced (like a storage breakdown), with one
+    slice "missing" (empty/free). The magnifying glass handle
+    points SE, giving a scanning/searching posture.
+  -->
+  <defs>
+    <clipPath id="wtfs-lens-clip">
+      <!-- clip disk art to circle lens area, radius 17 centered at 25,25 -->
+      <circle cx="25" cy="25" r="17"/>
+    </clipPath>
+  </defs>
+
+  <!-- Magnifying glass handle -->
+  <line x1="38" y1="38" x2="55" y2="55"
+        stroke="#4a9eff" stroke-width="4"
+        stroke-linecap="round"/>
+
+  <!-- Lens rim -->
+  <circle cx="25" cy="25" r="19"
+          stroke="#4a9eff" stroke-width="2"
+          fill="#0d1117"/>
+
+  <!-- Inner disk ring (thin) -->
+  <circle cx="25" cy="25" r="11"
+          stroke="#4a9eff" stroke-width="1.5"
+          stroke-dasharray="2 3"
+          fill="none"
+          opacity="0.45"/>
+
+  <!--
+    Pie segments clipped to lens
+    Disk center: 25,25   outer-r: 16
+    Segments (approximate angles):
+      0°–90°   used  (filled)
+      90°–180° used  (filled, lighter)
+      180°–270° used (filled, faint)
+      270°–360° FREE (hollow / empty)
+  -->
+  <!-- Segment A: 0° → 90° (top-right quadrant) -->
+  <path d="M25,25 L41,25 A16,16 0 0,0 25,9 Z"
+        fill="#4a9eff" opacity="0.85"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!-- Segment B: 90° → 180° (bottom-right) -->
+  <path d="M25,25 L25,41 A16,16 0 0,0 41,25 Z"
+        fill="#4a9eff" opacity="0.50"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!-- Segment C: 180° → 270° (bottom-left) -->
+  <path d="M25,25 L9,25 A16,16 0 0,0 25,41 Z"
+        fill="#4a9eff" opacity="0.25"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!--
+    Segment D: 270° → 360° (top-left) — FREE space
+    Rendered as stroke-only to show "empty" slice
+  -->
+  <path d="M25,25 L25,9 A16,16 0 0,0 9,25 Z"
+        fill="none"
+        stroke="#4a9eff" stroke-width="1.5"
+        stroke-dasharray="2 2"
+        opacity="0.70"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!-- Radial divider lines (segment borders) -->
+  <line x1="25" y1="25" x2="25" y2="9"
+        stroke="#4a9eff" stroke-width="1"
+        opacity="0.6"
+        clip-path="url(#wtfs-lens-clip)"/>
+  <line x1="25" y1="25" x2="41" y2="25"
+        stroke="#4a9eff" stroke-width="1"
+        opacity="0.6"
+        clip-path="url(#wtfs-lens-clip)"/>
+  <line x1="25" y1="25" x2="25" y2="41"
+        stroke="#4a9eff" stroke-width="1"
+        opacity="0.6"
+        clip-path="url(#wtfs-lens-clip)"/>
+  <line x1="25" y1="25" x2="9" y2="25"
+        stroke="#4a9eff" stroke-width="1"
+        opacity="0.6"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!-- Center dot -->
+  <circle cx="25" cy="25" r="2"
+          fill="#4a9eff" opacity="0.9"/>
+
+  <!-- Sweep arc — radar line showing "scan in progress" -->
+  <line x1="25" y1="25" x2="35" y2="15"
+        stroke="#4a9eff" stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.9"
+        clip-path="url(#wtfs-lens-clip)"/>
+
+  <!-- Lens foreground rim (drawn on top so clip edges are clean) -->
+  <circle cx="25" cy="25" r="19"
+          stroke="#4a9eff" stroke-width="2"
+          fill="none"/>
+</svg>

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64" fill="none">
+  <!--
+    AI Wordmark — AI Analysis Engine
+    Color: #22d3ee (cyan)
+    Letterform concepts:
+      A — a triangular prism/peak with a crossbar that doubles as a
+          circuit trace: the apex node emits connection lines, and the
+          crossbar has a node in the center, evoking a neural layer.
+      I — a vertical spine with horizontal terminals, overlaid with
+          orbital arc segments suggesting a scanning / analysis beam.
+    Centered pair in 200px viewBox.
+    A center: ~72px, I center: ~128px
+  -->
+
+  <!-- ===== A — prism peak + neural crossbar ===== -->
+
+  <!-- Left leg of A -->
+  <line x1="50" y1="50" x2="72" y2="14" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  <!-- Right leg of A -->
+  <line x1="94" y1="50" x2="72" y2="14" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Crossbar (at ~58% height: y≈35) -->
+  <line x1="59" y1="35" x2="85" y2="35" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Crossbar center node (neural layer midpoint) -->
+  <circle cx="72" cy="35" r="2.5" fill="#22d3ee"/>
+
+  <!-- Apex node (processing peak) -->
+  <circle cx="72" cy="14" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="72" cy="14" r="1.5" fill="#22d3ee"/>
+
+  <!-- Neural connection rays from apex — data refraction -->
+  <!-- Ray left-up -->
+  <line x1="69.5" y1="11.5" x2="62" y2="6" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="62" cy="6" r="1.5" fill="#22d3ee" opacity="0.45"/>
+  <!-- Ray right-up -->
+  <line x1="74.5" y1="11.5" x2="82" y2="6" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.45"/>
+  <circle cx="82" cy="6" r="1.5" fill="#22d3ee" opacity="0.45"/>
+
+  <!-- Crossbar end nodes -->
+  <circle cx="59" cy="35" r="1.75" fill="#22d3ee" opacity="0.7"/>
+  <circle cx="85" cy="35" r="1.75" fill="#22d3ee" opacity="0.7"/>
+
+  <!-- Connection from crossbar ends to lower nodes (lower neural layer) -->
+  <line x1="59" y1="35" x2="54" y2="44" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.35"/>
+  <circle cx="54" cy="44" r="1.5" fill="#22d3ee" opacity="0.35"/>
+  <line x1="85" y1="35" x2="90" y2="44" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.35"/>
+  <circle cx="90" cy="44" r="1.5" fill="#22d3ee" opacity="0.35"/>
+
+  <!-- Cross-connection between base nodes (bottom layer inference link) -->
+  <line x1="50" y1="50" x2="94" y2="50" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.18"/>
+
+  <!-- ===== I — vertical spine + orbital scan arcs ===== -->
+
+  <!-- Top terminal bar -->
+  <line x1="118" y1="14" x2="138" y2="14" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  <!-- Vertical spine -->
+  <line x1="128" y1="14" x2="128" y2="50" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+  <!-- Bottom terminal bar -->
+  <line x1="118" y1="50" x2="138" y2="50" stroke="#22d3ee" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Orbital scan arc — left, upper half (analysis sweep) -->
+  <path d="M118 24 A12 12 0 0 0 118 40" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/>
+  <!-- Orbital scan arc — right, lower half (counter-sweep) -->
+  <path d="M138 40 A12 12 0 0 0 138 24" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.6"/>
+
+  <!-- Center node on spine (active analysis point) -->
+  <circle cx="128" cy="32" r="3.5" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="128" cy="32" r="1.5" fill="#22d3ee"/>
+
+  <!-- Scan beam: horizontal tick at center -->
+  <line x1="112" y1="32" x2="116" y2="32" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="140" y1="32" x2="144" y2="32" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- ===== Shared baseline rule ===== -->
+  <line x1="46" y1="56" x2="148" y2="56" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.2"/>
+</svg>

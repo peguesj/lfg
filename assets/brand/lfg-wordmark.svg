@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64" fill="none" aria-label="LFG Local File Guardian wordmark">
+  <!--
+    LFG Wordmark — Geometric monospace-feel letterforms
+    Canvas: 200×64
+    Letter layout (left-padded 12px, 3px gap between letters):
+      L: x 12–38   (26px wide)
+      F: x 41–67   (26px wide)   [gap 3px]
+      G: x 70–106  (36px wide)   [gap 3px; G is wider to hold the bracket gap]
+
+    Cap height: y8–y56  (48px tall)
+    Stroke weight: 4px, square linecap/linejoin — geometric / technical
+    White (#ffffff) base strokes; #4a9eff on selected accent strokes.
+
+    Design intent:
+      L — right-angle bracket form: vertical stem + horizontal foot.
+          The foot has a small upward return (serif tick) to echo a
+          shelf/rack-mount ear.
+      F — vertical stem + two horizontal bars. The top-right corner
+          of the cap has a file-corner notch cut: the top bar is
+          truncated and a diagonal cut connects it to a vertical drop,
+          creating the classic folded-page file corner.
+      G — wide. Outer profile is a C/bracket shape with a squared
+          notch at the top-right opening (shield gap). The interior
+          crossbar (the "G shelf") extends inward from the right,
+          stopping at center — accent blue.
+  -->
+
+  <!-- ═══════════════ L ═══════════════ -->
+  <!-- Vertical stem: (14,8) → (14,56) -->
+  <line
+    x1="14" y1="8"
+    x2="14" y2="56"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- Horizontal foot: (14,56) → (38,56) -->
+  <line
+    x1="14" y1="56"
+    x2="38" y2="56"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- Bracket ear — upward return at foot right end (accent) -->
+  <line
+    x1="38" y1="56"
+    x2="38" y2="48"
+    stroke="#4a9eff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- Top cap tick on L stem — small horizontal bar at top (accent) -->
+  <line
+    x1="14" y1="8"
+    x2="22" y2="8"
+    stroke="#4a9eff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+
+  <!-- ═══════════════ F ═══════════════ -->
+  <!--
+    File-corner notch geometry:
+      Normal top bar would be (43,8)→(67,8).
+      Instead: top bar goes (43,8)→(60,8),
+      then diagonal notch cut: (60,8)→(67,16),
+      then small vertical drop: (67,16)→(67,20) — the folded flap edge.
+      This creates the classic file-corner fold at top-right.
+  -->
+
+  <!-- Vertical stem: (43,8)→(43,56) -->
+  <line
+    x1="43" y1="8"
+    x2="43" y2="56"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- Top bar (shortened for notch): (43,8)→(60,8) -->
+  <line
+    x1="43" y1="8"
+    x2="60" y2="8"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- File notch diagonal: (60,8)→(67,16) — accent blue -->
+  <line
+    x1="60" y1="8"
+    x2="67" y2="16"
+    stroke="#4a9eff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+  <!-- Flap right edge drop: (67,16)→(67,20) -->
+  <line
+    x1="67" y1="16"
+    x2="67" y2="20"
+    stroke="#4a9eff"
+    stroke-width="3"
+    stroke-linecap="square"
+  />
+  <!-- Flap fold hypotenuse: (60,8)→(60,16)→(67,16) — the folded corner triangle outline -->
+  <polyline
+    points="60,8 60,16 67,16"
+    stroke="#ffffff"
+    stroke-width="1.5"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
+    stroke-dasharray="2 2"
+    opacity="0.4"
+  />
+  <!-- Middle bar (F crossbar): (43,32)→(63,32) -->
+  <line
+    x1="43" y1="32"
+    x2="63" y2="32"
+    stroke="#ffffff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+
+  <!-- ═══════════════ G ═══════════════ -->
+  <!--
+    G outer bracket:
+      The G is rendered as a set of stroked line segments — not a curve —
+      to maintain the geometric / technical monospace character.
+
+      Outer boundary (clockwise from top-left opening):
+        Top opening gap goes from (72,8) leaving a gap at top-right.
+        The gap represents the shield-bracket notch — the opening does
+        not have a top-right corner, mimicking the shield top notch.
+
+      Path (all square corners):
+        Start at (94, 8)  ← top-right of opening
+        → left to (72, 8)
+        ↓ down to (72, 56)
+        → right to (104, 56)
+        ↑ up to (104, 38)
+        ← left to (86, 38)   ← interior crossbar endpoint (G shelf)
+        (stop — open on right side at cap height midpoint)
+
+      The top-right notch is a step-down:
+        (94, 8) → no line going right (open gap = shield notch)
+        The right side starts at y=20 (below the gap):
+        (104, 20) ↑ implied — but we draw just the segments we need.
+
+      Let me use a polyline for the outer C-bracket shape and
+      add the right-side partial walls separately.
+  -->
+
+  <!-- G outer C shape: left/bottom/right partial walls -->
+  <!-- Left wall -->
+  <line x1="72" y1="8"  x2="72" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+  <!-- Bottom foot -->
+  <line x1="72" y1="56" x2="104" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+  <!-- Right wall lower: (104,56) → (104,38) -->
+  <line x1="104" y1="56" x2="104" y2="38" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+  <!-- Top bar (G top): (72,8) → (94,8) — stops before the bracket gap -->
+  <line x1="72" y1="8"  x2="94" y2="8"  stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+
+  <!-- Shield-bracket notch at G top-right:
+       Instead of a closed top-right corner, we draw a step:
+       (94,8) drops to (94,20) [short right wall of notch],
+       then (94,20) → (104,20) [notch shelf],
+       then (104,20) → (104,38) is the right wall (already drawn above from 56 up to 38).
+       So we add the notch step: -->
+  <line x1="94"  y1="8"  x2="94"  y2="20" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+  <line x1="94"  y1="20" x2="104" y2="20" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+  <!-- Right wall upper: (104,20) → (104,38) already covered; extend to connect -->
+  <line x1="104" y1="20" x2="104" y2="38" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+
+  <!-- G interior crossbar (the "shelf") — accent blue -->
+  <!-- Runs from right inner wall inward to center: (104,38) leftward to (86,38) -->
+  <line
+    x1="86" y1="38"
+    x2="104" y2="38"
+    stroke="#4a9eff"
+    stroke-width="4"
+    stroke-linecap="square"
+  />
+</svg>

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!--
+    AI Brandmark — AI Analysis Engine
+    Color: #22d3ee (cyan)
+    Concept: Neural node constellation — a central processing node surrounded
+    by orbiting satellite nodes, connected by weighted edges. The geometry
+    forms a hexagonal constellation suggesting both a circuit board and a
+    neural network graph. The "prism" hint comes from the triangular clustering
+    of edges at center, refracting outward.
+  -->
+
+  <!-- === OUTER RING — orbit boundary (subtle) === -->
+  <circle cx="32" cy="32" r="27" stroke="#22d3ee" stroke-width="0.75" stroke-dasharray="3 4" fill="none" opacity="0.25"/>
+
+  <!-- === CONSTELLATION EDGES (neural connections) === -->
+  <!-- Node positions (hex constellation):
+       Center: C(32,32)
+       N:  N1(32,8)
+       NE: N2(52,20)
+       SE: N3(52,44)
+       S:  N4(32,56)
+       SW: N5(12,44)
+       NW: N6(12,20)
+  -->
+
+  <!-- Spoke edges: center to each outer node -->
+  <line x1="32" y1="32" x2="32" y2="10" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="32" y1="32" x2="51" y2="21" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="32" y1="32" x2="51" y2="43" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="32" y1="32" x2="32" y2="54" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="32" y1="32" x2="13" y2="43" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="32" y1="32" x2="13" y2="21" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Outer ring edges (hexagon perimeter — weighted, partial) -->
+  <line x1="32" y1="10" x2="51" y2="21" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <line x1="51" y1="21" x2="51" y2="43" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <line x1="51" y1="43" x2="32" y2="54" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <line x1="32" y1="54" x2="13" y2="43" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <line x1="13" y1="43" x2="13" y2="21" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+  <line x1="13" y1="21" x2="32" y2="10" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Cross-edges (non-adjacent, higher-weight connections — "intelligent" links) -->
+  <line x1="32" y1="10" x2="51" y2="43" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.25"/>
+  <line x1="51" y1="21" x2="13" y2="43" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.25"/>
+  <line x1="51" y1="21" x2="32" y2="54" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.2"/>
+  <line x1="13" y1="21" x2="51" y2="43" stroke="#22d3ee" stroke-width="0.75" stroke-linecap="round" opacity="0.2"/>
+
+  <!-- === OUTER NODES — satellite processors === -->
+  <!-- N (top) -->
+  <circle cx="32" cy="10" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="32" cy="10" r="1.25" fill="#22d3ee"/>
+  <!-- NE -->
+  <circle cx="51" cy="21" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="51" cy="21" r="1.25" fill="#22d3ee"/>
+  <!-- SE -->
+  <circle cx="51" cy="43" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="51" cy="43" r="1.25" fill="#22d3ee"/>
+  <!-- S (bottom) -->
+  <circle cx="32" cy="54" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="32" cy="54" r="1.25" fill="#22d3ee"/>
+  <!-- SW -->
+  <circle cx="13" cy="43" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="13" cy="43" r="1.25" fill="#22d3ee"/>
+  <!-- NW -->
+  <circle cx="13" cy="21" r="3" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <circle cx="13" cy="21" r="1.25" fill="#22d3ee"/>
+
+  <!-- === CENTRAL PROCESSING NODE — main brain === -->
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="7" stroke="#22d3ee" stroke-width="1.5" fill="none"/>
+  <!-- Inner prism triangle (data refraction) -->
+  <path d="M32 27 L36.3 34.5 L27.7 34.5 Z" stroke="#22d3ee" stroke-width="1.25" stroke-linejoin="round" fill="none"/>
+  <!-- Center point -->
+  <circle cx="32" cy="32" r="1.75" fill="#22d3ee"/>
+</svg>

@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" aria-label="LFG Local File Guardian brandmark">
+  <!--
+    LFG Brandmark — Guardian Shield + Hard Drive Platter
+    Palette:
+      #ffffff  — primary (monochrome layer)
+      #4a9eff  — accent blue (highlight layer; swap to currentColor for single-color use)
+    All strokes are round-capped / round-joined for Lucide consistency.
+    stroke-width=2 throughout so the mark scales cleanly.
+  -->
+
+  <!-- ═══════════════════════════════════════════
+       SHIELD OUTLINE
+       Polygon path: flat top-left/top-right corners,
+       straight sides, then converges to a bottom point.
+       Top edge has a shallow inward notch at the center
+       to echo a drive bay / mounting bracket feel.
+       ═══════════════════════════════════════════ -->
+  <path
+    d="M 32 4
+       L 10 12
+       L 10 36
+       C 10 48 20 56 32 60
+       C 44 56 54 48 54 36
+       L 54 12
+       Z"
+    stroke="#ffffff"
+    stroke-width="2.5"
+    stroke-linejoin="miter"
+    stroke-linecap="square"
+    fill="none"
+  />
+
+  <!-- ═══════════════════════════════════════════
+       HARD DRIVE PLATTER — outer ring
+       Centered at (32, 33); radius 14
+       ═══════════════════════════════════════════ -->
+  <circle
+    cx="32" cy="33" r="14"
+    stroke="#ffffff"
+    stroke-width="2"
+    fill="none"
+  />
+
+  <!-- ═══════════════════════════════════════════
+       HARD DRIVE PLATTER — middle ring (accent)
+       radius 8 — accent blue, suggests data track
+       ═══════════════════════════════════════════ -->
+  <circle
+    cx="32" cy="33" r="8"
+    stroke="#4a9eff"
+    stroke-width="2"
+    fill="none"
+  />
+
+  <!-- ═══════════════════════════════════════════
+       HARD DRIVE PLATTER — spindle hole
+       radius 3, white fill gives solid center hub
+       ═══════════════════════════════════════════ -->
+  <circle
+    cx="32" cy="33" r="3"
+    stroke="#ffffff"
+    stroke-width="1.5"
+    fill="#ffffff"
+    fill-opacity="0.15"
+  />
+
+  <!-- ═══════════════════════════════════════════
+       READ/WRITE ARM
+       Diagonal line from spindle toward upper-right,
+       terminating just inside the outer platter ring.
+       Accent blue on the arm; white dot at head tip.
+       ═══════════════════════════════════════════ -->
+  <!-- Arm shaft: from spindle center outward at ~45° -->
+  <line
+    x1="34" y1="31"
+    x2="43" y2="22"
+    stroke="#4a9eff"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+  <!-- Arm pivot base — small square at spindle -->
+  <rect
+    x="30.5" y="31.5"
+    width="3" height="3"
+    rx="0.5"
+    fill="#4a9eff"
+  />
+  <!-- Read head tip — white square at outer end -->
+  <rect
+    x="41.5" y="20.5"
+    width="3" height="3"
+    rx="0.5"
+    fill="#ffffff"
+  />
+
+  <!-- ═══════════════════════════════════════════
+       SHIELD TOP BRACKET TICKS
+       Two small tick marks on the upper-left and
+       upper-right sides of the shield — suggest
+       mounting bracket / rack ears for server-disk feel
+       ═══════════════════════════════════════════ -->
+  <line x1="10" y1="16" x2="14" y2="16" stroke="#ffffff" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="54" y1="16" x2="50" y2="16" stroke="#ffffff" stroke-width="1.5" stroke-linecap="square"/>
+</svg>
