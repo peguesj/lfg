@@ -135,7 +135,7 @@ body {
       <a onclick=\"window.open('http://localhost:3031')\" data-tip=\"CCEM APM performance monitor\">APM Monitor</a>
     </div>
 
-    <div class=\"version\">lfg v2.0.0 - @yj tools</div>
+    <div class=\"version\">lfg v2.1.0 - @yj tools</div>
 
     <div id=\"loading\" class=\"loading-bar\"><div id=\"loading-fill\" class=\"loading-fill\"></div></div>
     <div id=\"loading-label\" class=\"loading-label\">Loading module...</div>

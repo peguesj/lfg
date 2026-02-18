@@ -2,25 +2,44 @@
 # lfg wtfs - Where's The Free Space (disk usage viewer with cross-module integration)
 set -euo pipefail
 
-TARGET="${1:-$HOME/Developer}"
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HTML_FILE="$LFG_DIR/.lfg_scan.html"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start wtfs
+
+# Use explicit arg, or configured scan paths
+if [[ -n "${1:-}" ]]; then
+    SCAN_PATHS=("$1")
+else
+    mapfile -t SCAN_PATHS < <(lfg_module_paths wtfs 2>/dev/null)
+    [[ ${#SCAN_PATHS[@]} -eq 0 ]] && SCAN_PATHS=("$HOME/Developer")
+fi
+
+TARGET="${SCAN_PATHS[0]}"
 lfg_state_update wtfs target "$TARGET"
 
-echo "Scanning $TARGET..."
+echo "Scanning ${#SCAN_PATHS[@]} path(s)..."
 TMPFILE=$(mktemp)
-du -d1 -k "$TARGET" 2>/dev/null | sort -rn > "$TMPFILE"
+for _sp in "${SCAN_PATHS[@]}"; do
+    du -d1 -k "$_sp" 2>/dev/null
+done | sort -rn > "$TMPFILE"
 
-TOTAL_KB=$(head -1 "$TMPFILE" | awk '{print $1}')
+# Calculate total from all scan path root entries
+TOTAL_KB=$(awk '{s+=$1} END{print s+0}' "$TMPFILE")
+
+# Build set of scan path roots to skip in output
+declare -A SCAN_ROOT_SET
+for _sp in "${SCAN_PATHS[@]}"; do
+    SCAN_ROOT_SET["$_sp"]=1
+done
 
 ROWS=""
 RANK=0
 while IFS=$'\t' read -r size_kb path; do
-    [[ "$path" == "$TARGET" ]] && continue
+    [[ -n "${SCAN_ROOT_SET[$path]+x}" ]] && continue
     RANK=$((RANK + 1))
     name=$(basename "$path")
 

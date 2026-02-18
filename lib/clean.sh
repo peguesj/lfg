@@ -7,6 +7,7 @@ HTML_FILE="$LFG_DIR/.lfg_clean.html"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start dtf
 
 FORCE=false

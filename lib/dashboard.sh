@@ -271,19 +271,36 @@ html = f'''<!DOCTYPE html>
       <div id="ai-results" style="margin-top:12px"></div>
     </div>
     <div id="side-settings" class="side-panel">
+      <div class="section-title">Scan Paths</div>
+      <div id="scan-paths-list" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px;margin-bottom:16px">
+        <input id="new-path-input" class="setting-input" placeholder="/path/to/projects" style="flex:1">
+        <button class="action-btn" style="padding:4px 10px;font-size:10px" onclick="var p=document.getElementById('new-path-input').value;if(p)LFG.exec('~/tools/@yj/lfg/lfg settings paths add '+p,function(o){{LFG.toast(o,{{type:'info'}});loadSettings()}})">Add</button>
+      </div>
+
+      <div class="section-title">Library Namespace</div>
+      <div class="setting-row" style="margin-bottom:16px">
+        <input id="set-namespace" class="setting-input" value="@jeremiah" style="width:100%" onchange="LFG.exec('~/tools/@yj/lfg/lfg settings set library_namespace '+this.value,function(){{LFG.toast('Namespace updated',{{type:'success'}})}})">
+      </div>
+
       <div class="section-title">AI Settings</div>
       <div class="setting-row"><span class="setting-label">Model</span><select id="set-model" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set model '+this.value,function(){{}})"><option>gpt-4o-mini</option><option>gpt-4o</option><option>claude-sonnet-4-5-20250929</option><option>ollama/llama3</option></select></div>
       <div class="setting-row"><span class="setting-label">Endpoint</span><input id="set-endpoint" class="setting-input" value="http://localhost:4000" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set endpoint '+this.value,function(){{}})"></div>
       <div class="setting-row"><span class="setting-label">Temperature</span><input id="set-temp" type="range" min="0" max="1" step="0.1" value="0.3" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set temperature '+this.value,function(){{}})"></div>
       <div class="setting-row"><span class="setting-label">System Override</span><label class="setting-toggle"><input type="checkbox" id="set-override" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set system_override '+(this.checked?'true':'false'),function(){{}})"><span class="toggle-slider"></span></label></div>
-      <button onclick="LFG.exec('~/tools/@yj/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:12px;width:100%" class="action-btn">Test Connection</button>
+      <button onclick="LFG.exec('~/tools/@yj/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:8px;width:100%" class="action-btn">Test Connection</button>
+
+      <div class="section-title" style="margin-top:16px">Module Access</div>
+      <div id="module-access-grid" style="font-size:10px;color:#6b6b78"></div>
+
+      <button onclick="LFG.confirm('Reset all settings to defaults?','~/tools/@yj/lfg/lfg settings reset',function(){{LFG.toast('Settings reset',{{type:'info'}});loadSettings()}})" style="margin-top:16px;width:100%" class="action-btn" style="border-color:#ff4d6a;color:#ff4d6a">Reset Defaults</button>
     </div>
   </div>
   </div><!-- /dashboard-layout -->
-  <div class="footer">lfg v2.0.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI</div>
+  <div class="footer">lfg v2.1.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI + Settings</div>
   <script>{uijs}
   LFG.init({{
-    module: "dashboard", context: "All Modules", moduleVersion: "2.0.0",
+    module: "dashboard", context: "All Modules", moduleVersion: "2.1.0",
     welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups, DD_PROJECT_COUNT_PH devdrive projects",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [
       {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Four modules work together to scan, clean, protect, and organize your files.", color: "#4a9eff" }},
@@ -401,6 +418,38 @@ html = f'''<!DOCTYPE html>
       if (el) el.innerHTML = '<div class="ai-pill">' + (result.purpose || result.error || 'Unknown') + '</div>';
     }});
   }};
+
+  // Settings panel: load and render scan paths + module access
+  function loadSettings() {{
+    LFG.exec('~/tools/@yj/lfg/lfg settings show --json', function(out) {{
+      try {{
+        var s = JSON.parse(out);
+        // Scan paths
+        var pathsEl = document.getElementById('scan-paths-list');
+        if (pathsEl && s.scan_paths) {{
+          pathsEl.innerHTML = s.scan_paths.map(function(p) {{
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;margin-bottom:4px;background:#1c1c22;border:1px solid #2a2a34;border-radius:4px"><span style="font-size:11px;color:#d0d0d8;font-family:monospace">' + p + '</span><button class="action-btn-sm" style="padding:2px 6px;font-size:9px;border-color:#ff4d6a;color:#ff4d6a" onclick="LFG.confirm(\\'Remove ' + p + '?\\',\\'~/tools/@yj/lfg/lfg settings paths remove ' + p + '\\',function(){{loadSettings()}})">x</button></div>';
+          }}).join('');
+        }}
+        // Namespace
+        var nsEl = document.getElementById('set-namespace');
+        if (nsEl && s.library_namespace) nsEl.value = s.library_namespace;
+        // Module access
+        var accessEl = document.getElementById('module-access-grid');
+        if (accessEl && s.module_access) {{
+          var modules = Object.keys(s.module_access);
+          accessEl.innerHTML = modules.map(function(m) {{
+            var val = s.module_access[m];
+            return '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>' + m + '</span><span style="color:#06d6a0">' + val + '</span></div>';
+          }}).join('');
+        }}
+      }} catch(e) {{}}
+    }});
+  }}
+  // Auto-load settings when Settings tab is shown
+  document.querySelectorAll('.side-tab-nav a').forEach(function(a) {{
+    a.addEventListener('click', function() {{ if (this.textContent.indexOf('Settings') !== -1) loadSettings(); }});
+  }});
   </script>
 </body></html>'''
 

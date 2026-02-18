@@ -6,7 +6,7 @@ import os
 import sys
 
 
-def generate_html(data: dict, lfg_dir: str) -> str:
+def generate_html(data: dict, lfg_dir: str, execute_mode: bool = False) -> str:
     theme = open(f"{lfg_dir}/lib/theme.css").read()
     uijs = open(f"{lfg_dir}/lib/ui.js").read()
 
@@ -23,22 +23,60 @@ def generate_html(data: dict, lfg_dir: str) -> str:
     env_groups = data.get("environment_groups", [])
     ai_analysis = data.get("ai_analysis", {})
 
-    # Executive summary
     savings = summary.get("estimated_savings_mb", 0)
+    mode_label = "EXECUTE MODE" if execute_mode else "DRY RUN"
+    mode_color = "#ff4d6a" if execute_mode else "#06d6a0"
 
-    # Build duplicate rows
+    # Build duplicate rows with action cards
     dupe_rows = ""
     for d in duplicates[:20]:
         score = round(d.get("jaccard_similarity", 0) * 100)
         color = "#ff4d6a" if score > 80 else "#ff8c42"
         shared = len(d.get("shared_deps", []))
-        dupe_rows += f'''<tr data-tip="{', '.join(d.get('shared_deps', [])[:8])}">
-            <td class="name">{d["project_a"]}</td>
-            <td class="name">{d["project_b"]}</td>
+        pa, pb = d["project_a"], d["project_b"]
+        shared_preview = ", ".join(d.get("shared_deps", [])[:8])
+
+        # Action card
+        risk_class = "high" if score > 85 else "medium"
+        archive_btn = ""
+        if execute_mode:
+            sq = "'"
+            archive_btn = (
+                '<button class="action-btn-exec" onclick="LFG.confirm('
+                + sq + 'Archive ' + pa + '?' + sq + ','
+                + sq + '$HOME/tools/@yj/lfg/lfg stfu archive ' + pa + sq + ','
+                + "function(o){LFG.toast(o,{type:" + sq + "success" + sq + "}); refreshReport()})"
+                + '">Archive ' + pa + '</button>'
+            )
+        action_html = f'''<div class="action-card">
+            <div class="action-header">
+                <span class="action-type">Merge Candidate</span>
+                <span class="risk-dot risk-{risk_class}"></span>
+                <span class="mode-badge" style="color:{mode_color}">{mode_label}</span>
+            </div>
+            <div class="action-detail">
+                <div class="action-what">Merge <strong>{pa}</strong> into <strong>{pb}</strong> (or archive {pa})</div>
+                <div class="action-meta">{shared} shared deps | {score}% overlap | {shared_preview}</div>
+            </div>
+            <div class="action-buttons">
+                <button class="action-btn-sm" onclick="togglePreview(this, '{pa}', '{pb}')">Preview</button>
+                <button class="action-btn-sm" onclick="LFG.exec('$HOME/tools/@yj/lfg/lfg stfu merge-check {pa} {pb}', function(o){{showResult(o)}})">Check</button>
+                {archive_btn}
+            </div>
+            <div class="action-preview" style="display:none">
+                <div class="preview-cmd">lfg stfu merge-check {pa} {pb}</div>
+                <div class="preview-cmd">lfg stfu archive {pa}</div>
+                <div class="preview-note">Restore: mv ~/Developer/.archive/{pa}_* ~/Developer/{pa}</div>
+            </div>
+        </div>'''
+
+        dupe_rows += f'''<tr data-tip="{shared_preview}">
+            <td class="name">{pa}</td>
+            <td class="name">{pb}</td>
             <td class="pct" style="color:{color}">{score}%</td>
             <td class="meta">{shared} deps</td>
-            <td class="action-cell"><button class="action-btn-sm" onclick="LFG.exec('~/tools/@yj/lfg/lfg stfu merge-check {d["project_a"]} {d["project_b"]}', function(o){{LFG.toast(o.substring(0,200),{{type:\\'info\\',duration:5000}})}})">Check</button></td>
         </tr>'''
+        dupe_rows += f'<tr class="action-row"><td colspan="4">{action_html}</td></tr>'
 
     # Relationship rows
     rel_rows = ""
@@ -73,7 +111,6 @@ def generate_html(data: dict, lfg_dir: str) -> str:
         cat = cd.get("pattern_category", "custom")
         cat_colors = {"auth": "#ff4d6a", "error_handling": "#ff8c42", "cors": "#ffd166", "validation": "#4a9eff", "custom": "#6b6b78"}
         cc = cat_colors.get(cat, "#6b6b78")
-        # Shorten paths
         fa = cd["file_a"].replace(os.path.expanduser("~/Developer/"), "")
         fb = cd["file_b"].replace(os.path.expanduser("~/Developer/"), "")
         code_dupe_rows += f'''<tr data-tip="{fa} vs {fb}">
@@ -84,7 +121,7 @@ def generate_html(data: dict, lfg_dir: str) -> str:
             <td class="meta">{cd.get("line_count", 0)} lines</td>
         </tr>'''
 
-    # Library candidate cards
+    # Library candidate cards with action buttons
     lib_html = ""
     type_colors = {
         "ui-components": "#4a9eff", "auth": "#ff4d6a", "api-client": "#ffd166",
@@ -93,10 +130,25 @@ def generate_html(data: dict, lfg_dir: str) -> str:
     for lc in lib_candidates:
         lc_color = type_colors.get(lc["lib_type"], "#6b6b78")
         projs = ", ".join(lc["source_projects"][:6])
+        lib_short = lc["name"].rsplit("/", 1)[-1]
+        if execute_mode:
+            sq = "'"
+            scaffold_btn = (
+                '<button class="action-btn-exec" onclick="LFG.confirm('
+                + sq + "Create scaffold for " + lc["name"] + "?" + sq + ","
+                + sq + "$HOME/tools/@yj/lfg/lfg stfu scaffold " + lib_short + sq + ","
+                + "function(o){LFG.toast(o,{type:" + sq + "success" + sq + "})})\">"
+                + "Scaffold</button>"
+            )
+        else:
+            scaffold_btn = f'<button class="action-btn-sm" onclick="showScaffoldPreview(this, \'lfg stfu scaffold {lib_short}\')">Preview</button>'
         lib_html += f'''<div style="margin-bottom:10px;padding:12px 14px;background:#1c1c22;border:1px solid #2a2a34;border-radius:8px;border-left:3px solid {lc_color}">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <span style="font-weight:700;color:#fff;font-size:13px">{lc["name"]}</span>
-                <span class="ai-pill" style="background:{lc_color}20;color:{lc_color};border:1px solid {lc_color}33">{lc["lib_type"]}</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span class="ai-pill" style="background:{lc_color}20;color:{lc_color};border:1px solid {lc_color}33">{lc["lib_type"]}</span>
+                    {scaffold_btn}
+                </div>
             </div>
             <div style="font-size:11px;color:#6b6b78;margin-bottom:4px">Sources: {projs}</div>
             <div style="display:flex;gap:16px;font-size:10px;color:#4a4a56">
@@ -106,7 +158,7 @@ def generate_html(data: dict, lfg_dir: str) -> str:
             </div>
         </div>'''
 
-    # Environment group cards
+    # Environment group cards with action buttons
     env_html = ""
     for eg in env_groups:
         compat = round(eg["compatibility_score"] * 100)
@@ -147,21 +199,53 @@ def generate_html(data: dict, lfg_dir: str) -> str:
             <td style="color:{risk_color};font-size:11px">{risk}</td>
         </tr>'''
 
+    # Project search/filter
+    project_count = len(projects)
+
     html = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>{theme}
 .stfu-nav {{ display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }}
-.stfu-nav a {{ padding:6px 14px; border:1px solid #2a2a34; border-radius:6px; font-size:11px; color:#6b6b78; cursor:pointer; transition:all 0.15s; }}
+.stfu-nav a {{ padding:6px 14px; border:1px solid #2a2a34; border-radius:6px; font-size:11px; color:#6b6b78; cursor:pointer; transition:all 0.15s; text-decoration:none; }}
 .stfu-nav a:hover, .stfu-nav a.active {{ border-color:#e879f9; color:#e879f9; background:#e879f910; }}
 .stfu-section {{ display:none; }}
 .stfu-section.active {{ display:block; }}
-.action-btn-sm {{ padding:4px 10px; border:1px solid #c084fc; border-radius:4px; background:transparent; color:#c084fc; font-size:10px; cursor:pointer; font-family:inherit; }}
+.action-btn-sm {{ padding:4px 10px; border:1px solid #c084fc; border-radius:4px; background:transparent; color:#c084fc; font-size:10px; cursor:pointer; font-family:inherit; transition:all 0.15s; }}
 .action-btn-sm:hover {{ background:#c084fc15; }}
+.action-btn-exec {{ padding:4px 10px; border:1px solid #ff4d6a; border-radius:4px; background:#ff4d6a15; color:#ff4d6a; font-size:10px; cursor:pointer; font-family:inherit; transition:all 0.15s; }}
+.action-btn-exec:hover {{ background:#ff4d6a30; }}
+.action-card {{ margin:6px 0 10px; padding:10px 14px; background:#16161b; border:1px solid #2a2a34; border-radius:8px; }}
+.action-header {{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }}
+.action-type {{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#c084fc; }}
+.mode-badge {{ font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin-left:auto; }}
+.risk-dot {{ width:8px; height:8px; border-radius:50%; display:inline-block; }}
+.risk-dot.risk-high {{ background:#ff4d6a; }}
+.risk-dot.risk-medium {{ background:#ffd166; }}
+.risk-dot.risk-low {{ background:#06d6a0; }}
+.action-detail {{ margin-bottom:8px; }}
+.action-what {{ font-size:12px; color:#d0d0d8; margin-bottom:4px; }}
+.action-meta {{ font-size:10px; color:#4a4a56; }}
+.action-buttons {{ display:flex; gap:8px; margin-bottom:4px; }}
+.action-preview {{ margin-top:8px; padding:8px 12px; background:#12121a; border:1px solid #1e1e28; border-radius:4px; }}
+.preview-cmd {{ font-size:10px; color:#06d6a0; font-family:monospace; margin-bottom:2px; }}
+.preview-cmd::before {{ content:"$ "; color:#4a4a56; }}
+.preview-note {{ font-size:10px; color:#4a4a56; margin-top:4px; font-style:italic; }}
+.action-row td {{ padding:0 !important; border:none !important; }}
+.filter-bar {{ display:flex; gap:12px; align-items:center; margin:8px 0; }}
+.filter-input {{ background:#1c1c22; border:1px solid #2a2a34; border-radius:6px; padding:6px 12px; font-size:11px; color:#d0d0d8; outline:none; font-family:inherit; width:200px; }}
+.filter-input:focus {{ border-color:#e879f9; }}
+.filter-input::placeholder {{ color:#4a4a56; }}
+table th {{ cursor:pointer; user-select:none; }}
+table th:hover {{ color:#e879f9; }}
+@media print {{ body {{ background:#fff !important; color:#000 !important; }} .header,.footer,.stfu-nav,.action-buttons,.filter-bar {{ display:none !important; }} table {{ border:1px solid #ccc; }} td,th {{ color:#000 !important; border-color:#ccc !important; }} }}
 </style>
 </head><body>
   <div class="header">
     <h1><span class="brand">lfg</span> stfu <span class="dim">Source Tree Forensics & Unification</span></h1>
-    <span class="meta">{meta.get('timestamp', '')}</span>
+    <div style="display:flex;align-items:center;gap:12px">
+        <span class="mode-badge" style="color:{mode_color};font-size:10px;font-weight:600;letter-spacing:1px">{mode_label}</span>
+        <span class="meta">{meta.get('timestamp', '')}</span>
+    </div>
   </div>
   <div class="summary">
     <div class="stat" data-tip="Total projects analyzed"><span class="label">Projects</span><span class="value">{summary.get('total_projects', 0)}</span></div>
@@ -173,20 +257,24 @@ def generate_html(data: dict, lfg_dir: str) -> str:
     <div class="stat" data-tip="Estimated disk savings"><span class="label">Savings</span><span class="value good">{savings:.0f} MB</span></div>
   </div>
 
+  <div class="filter-bar">
+    <input class="filter-input" id="projectFilter" placeholder="Filter projects..." oninput="filterTables(this.value)">
+  </div>
+
   <div class="stfu-nav">
-    <a class="active" onclick="showSection('dupes', this)">Duplicates</a>
+    <a class="active" onclick="showSection('dupes', this)">Duplicates ({summary.get('duplicate_pairs', 0)})</a>
     <a onclick="showSection('rels', this)">Relationships</a>
-    <a onclick="showSection('clusters', this)">Clusters</a>
-    <a onclick="showSection('codedupes', this)">Code Patterns</a>
-    <a onclick="showSection('libs', this)">Libraries</a>
-    <a onclick="showSection('envs', this)">Environments</a>
+    <a onclick="showSection('clusters', this)">Clusters ({summary.get('cluster_count', 0)})</a>
+    <a onclick="showSection('codedupes', this)">Code Patterns ({summary.get('code_duplicate_files', 0)})</a>
+    <a onclick="showSection('libs', this)">Libraries ({summary.get('library_candidates', 0)})</a>
+    <a onclick="showSection('envs', this)">Environments ({summary.get('env_groups', 0)})</a>
     <a onclick="showSection('templates', this)">Templates</a>
-    {'<a onclick="showSection(\\\'ai\\\', this)">AI Insights</a>' if ai_analysis else ''}
+    {'<a onclick="showSection(\'ai\', this)">AI Insights</a>' if ai_analysis else ''}
   </div>
 
   <div id="sec-dupes" class="stfu-section active">
-    <div class="guidance" style="border-left-color:#ff4d6a"><strong>Duplicates</strong> - Project pairs with &gt;70% dependency overlap. Strong candidates for merging or archival.</div>
-    {'<table><thead><tr><th>Project A</th><th>Project B</th><th class="r">Overlap</th><th>Shared</th><th></th></tr></thead><tbody>' + dupe_rows + '</tbody></table>' if dupe_rows else '<div class="empty-state">No duplicates found (>70% overlap threshold)</div>'}
+    <div class="guidance" style="border-left-color:#ff4d6a"><strong>Duplicates</strong> - Project pairs with &gt;70% dependency overlap. {'Actions enabled - click Execute to proceed.' if execute_mode else 'Click Preview to see recommended actions. Use --execute to enable actions.'}</div>
+    {'<table><thead><tr><th>Project A</th><th>Project B</th><th class="r">Overlap</th><th>Shared</th></tr></thead><tbody>' + dupe_rows + '</tbody></table>' if dupe_rows else '<div class="empty-state">No duplicates found (>70% overlap threshold)</div>'}
   </div>
 
   <div id="sec-rels" class="stfu-section">
@@ -205,7 +293,7 @@ def generate_html(data: dict, lfg_dir: str) -> str:
   </div>
 
   <div id="sec-libs" class="stfu-section">
-    <div class="guidance" style="border-left-color:#4a9eff"><strong>Library Candidates</strong> - Recommended shared packages to extract from duplicate code and dep overlap.</div>
+    <div class="guidance" style="border-left-color:#4a9eff"><strong>Library Candidates</strong> - Recommended shared packages to extract from duplicate code and dep overlap. {'Scaffold enabled.' if execute_mode else 'Use --execute to enable scaffold creation.'}</div>
     {lib_html or '<div class="empty-state">No library candidates identified</div>'}
   </div>
 
@@ -224,12 +312,12 @@ def generate_html(data: dict, lfg_dir: str) -> str:
     {'<table><thead><tr><th>Project</th><th>Purpose</th><th>Category</th><th>Merge Risk</th></tr></thead><tbody>' + ai_html + '</tbody></table>' if ai_html else '<div class="empty-state">AI analysis not available. Check: lfg ai config show</div>'}
   </div>
 
-  <div class="footer">lfg stfu v2.0.0 - Source Tree Forensics & Unification | {summary.get('total_projects', 0)} projects analyzed</div>
+  <div class="footer">lfg stfu v2.1.0 | {summary.get('total_projects', 0)} projects | {mode_label}</div>
 
   <script>{uijs}
   LFG.init({{
     module: "stfu", context: "Source Tree Forensics",
-    moduleVersion: "2.0.0",
+    moduleVersion: "2.1.0",
     welcome: "{summary.get('total_projects', 0)} projects, {summary.get('duplicate_pairs', 0)} duplicates, ~{savings:.0f} MB savings"
   }});
   function showSection(id, el) {{
@@ -238,6 +326,56 @@ def generate_html(data: dict, lfg_dir: str) -> str:
     document.getElementById('sec-' + id).classList.add('active');
     if (el) el.classList.add('active');
   }}
+  function togglePreview(btn, pa, pb) {{
+    var card = btn.closest('.action-card');
+    var preview = card.querySelector('.action-preview');
+    preview.style.display = preview.style.display === 'none' ? 'block' : 'none';
+    btn.textContent = preview.style.display === 'none' ? 'Preview' : 'Hide';
+  }}
+  function showResult(output) {{
+    LFG.toast(output.substring(0, 300), {{type: 'info', duration: 8000}});
+  }}
+  function showScaffoldPreview(sectionId, cmd) {{
+    LFG.toast('Preview: ' + cmd, {{type: 'info', duration: 5000}});
+  }}
+  function refreshReport() {{
+    LFG.toast('Refreshing report...', {{type: 'info'}});
+    LFG.exec('$HOME/tools/@yj/lfg/lfg stfu --json --no-ai', function(o) {{ location.reload(); }});
+  }}
+  function filterTables(query) {{
+    var q = query.toLowerCase();
+    document.querySelectorAll('table tbody tr:not(.action-row)').forEach(function(row) {{
+      var text = row.textContent.toLowerCase();
+      var show = !q || text.indexOf(q) !== -1;
+      row.style.display = show ? '' : 'none';
+      var next = row.nextElementSibling;
+      if (next && next.classList.contains('action-row')) {{
+        next.style.display = show ? '' : 'none';
+      }}
+    }});
+  }}
+  // Sortable columns
+  document.querySelectorAll('table th').forEach(function(th, idx) {{
+    th.addEventListener('click', function() {{
+      var table = th.closest('table');
+      var tbody = table.querySelector('tbody');
+      var rows = Array.from(tbody.querySelectorAll('tr:not(.action-row)'));
+      var asc = th.dataset.sort !== 'asc';
+      th.dataset.sort = asc ? 'asc' : 'desc';
+      rows.sort(function(a, b) {{
+        var va = a.children[idx] ? a.children[idx].textContent.trim() : '';
+        var vb = b.children[idx] ? b.children[idx].textContent.trim() : '';
+        var na = parseFloat(va), nb = parseFloat(vb);
+        if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+        return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }});
+      rows.forEach(function(row) {{
+        var actionRow = row.nextElementSibling;
+        tbody.appendChild(row);
+        if (actionRow && actionRow.classList.contains('action-row')) tbody.appendChild(actionRow);
+      }});
+    }});
+  }});
   </script>
 </body></html>'''
     return html
@@ -245,9 +383,10 @@ def generate_html(data: dict, lfg_dir: str) -> str:
 
 if __name__ == "__main__":
     output_path = sys.argv[1] if len(sys.argv) > 1 else ""
+    execute_mode = "--execute" in sys.argv
     data = json.load(sys.stdin)
     lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("~/tools/@yj/lfg"))
-    html = generate_html(data, lfg_dir)
+    html = generate_html(data, lfg_dir, execute_mode=execute_mode)
     if output_path:
         with open(output_path, "w") as f:
             f.write(html)

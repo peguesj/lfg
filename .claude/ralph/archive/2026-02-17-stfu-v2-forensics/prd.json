@@ -1,0 +1,199 @@
+{
+  "project": "lfg",
+  "branchName": "ralph/stfu-v2-comprehensive-forensics",
+  "description": "STFU v2.0 - Source Tree Forensics & Unification: comprehensive code forensics engine with depcruise-level dependency analysis, semantic AI comparison, middleware/handler detection, shared library identification, environment consolidation, and merge wizard",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Deep Dependency Analysis Engine",
+      "description": "As a developer, I want per-project dependency analysis that extracts and cross-references all dependencies from package.json (deps + devDeps), mix.exs, requirements.txt, pyproject.toml, Cargo.toml, go.mod so STFU can compute precise overlap matrices.",
+      "acceptanceCriteria": [
+        "New lib/stfu_core.py with DependencyAnalyzer class",
+        "Extracts deps from: package.json (dependencies + devDependencies), mix.exs ({:dep, vsn}), requirements.txt, pyproject.toml [project.dependencies], Cargo.toml [dependencies], go.mod (require block)",
+        "Builds per-project dep manifest: {name, version, category(prod/dev), ecosystem(npm/hex/pip/cargo/go)}",
+        "Computes pairwise dependency overlap matrix: shared_deps, jaccard_similarity, unique_to_a, unique_to_b",
+        "Identifies dependency clusters: groups of 3+ projects sharing >60% deps",
+        "Detects version conflicts: same dep at different versions across projects",
+        "Outputs JSON: {projects[], overlap_matrix[], clusters[], version_conflicts[]}",
+        "lfg stfu deps runs standalone dependency analysis",
+        "Typecheck passes (mypy --ignore-missing-imports lib/stfu_core.py)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Foundation for all other STFU analyses. Must handle missing files gracefully."
+    },
+    {
+      "id": "US-002",
+      "title": "File Pattern Fingerprinting",
+      "description": "As a developer, I want STFU to detect projects built from the same template/boilerplate by fingerprinting directory structure and config patterns, so I can identify clones that should be consolidated.",
+      "acceptanceCriteria": [
+        "Add FileFingerprinter class to stfu_core.py",
+        "Generates structural fingerprint per project: sorted list of relative paths (excluding node_modules, .git, dist, _build, target, __pycache__, venv)",
+        "Computes structural similarity using jaccard index on file path sets",
+        "Detects boilerplate markers: package.json 'name' field matching known templates (vite_react_shadcn_ts, next-supabase-saas-kit-turbo-lite, etc.)",
+        "Extracts config fingerprint: tsconfig.json compilerOptions hash, tailwind.config content hash, .eslintrc hash",
+        "Groups projects by template origin with confidence score",
+        "Adds 'template_groups' and 'structural_similarity' to STFU JSON output",
+        "Tests: 3+ unit tests for fingerprinting"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Key insight from analysis: 4 projects share vite_react_shadcn_ts template name."
+    },
+    {
+      "id": "US-003",
+      "title": "Middleware and Handler Duplicate Detection",
+      "description": "As a developer, I want STFU to find duplicate middleware, route handlers, and utility implementations across projects so I can extract shared libraries.",
+      "acceptanceCriteria": [
+        "Add CodePatternDetector class to stfu_core.py",
+        "Scans for middleware files: **/middleware.ts, **/middleware.js, lib/**/plug*.ex, **/middleware.py",
+        "Scans for handler/route files: **/route.ts, **/routes/*.ts, lib/**/*_controller.ex, **/router.ex, **/views.py, **/routes.py",
+        "Computes file content similarity using SequenceMatcher (difflib) on normalized source (strip comments, normalize whitespace)",
+        "Flags pairs with >70% content similarity as 'duplicate implementations'",
+        "Extracts shared patterns: auth middleware, error handlers, CORS config, validation schemas",
+        "Categorizes findings: {auth[], error_handling[], cors[], validation[], custom[]}",
+        "Adds 'code_duplicates' section to STFU JSON output with file paths, similarity score, pattern category",
+        "Tests: 2+ unit tests"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Analysis found lcc/middleware.ts and lcc-major-changes/middleware.ts are 100% identical (165 LOC)."
+    },
+    {
+      "id": "US-004",
+      "title": "Shared Library Candidate Identification",
+      "description": "As a developer, I want STFU to recommend which code should be extracted into shared libraries based on duplication patterns and dependency overlap.",
+      "acceptanceCriteria": [
+        "Add LibraryCandidate class to stfu_core.py",
+        "Analyzes dependency clusters + code duplicates to produce library recommendations",
+        "Generates candidates: {name, type(ui-components|auth|api-client|middleware|testing-config|build-config), source_projects[], shared_deps[], estimated_dedup_savings_mb, effort_hours, priority(1-5)}",
+        "Detects UI component library opportunity: projects sharing >10 @radix-ui deps",
+        "Detects auth library opportunity: projects with similar middleware.ts patterns",
+        "Detects testing config opportunity: projects sharing vitest/playwright/eslint configs",
+        "Adds 'library_candidates' to STFU JSON output",
+        "Tests: 2+ unit tests"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Analysis found potential @jeremiah/ui-core, auth-core, api-client libraries."
+    },
+    {
+      "id": "US-005",
+      "title": "Environment Consolidation Scoring",
+      "description": "As a developer, I want STFU to identify projects that could share a single node_modules/venv/deps environment, scoring each consolidation opportunity by compatibility and disk savings.",
+      "acceptanceCriteria": [
+        "Add EnvironmentAnalyzer class to stfu_core.py",
+        "For npm projects: compare package.json dep versions, identify groups with compatible (non-conflicting) version ranges",
+        "For Python projects: compare requirements versions for compatibility",
+        "Computes per-group: estimated shared node_modules size, version conflicts count, compatibility_score (0-1)",
+        "Identifies monorepo candidates: groups of 3+ projects with >80% dep compatibility",
+        "Estimates disk savings: approximate node_modules size * (n_projects - 1) for each group",
+        "Adds 'environment_groups' to STFU JSON output with projects, conflicts, savings_estimate_mb",
+        "Tests: 2+ unit tests"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Analysis estimated 1-2 GB redundant node_modules across 22 npm projects."
+    },
+    {
+      "id": "US-006",
+      "title": "AI Semantic Analysis Integration",
+      "description": "As a developer, I want STFU to use AI (via model-sw LiteLLM proxy) to semantically compare projects beyond structural similarity - detecting functional overlap, purpose similarity, and intelligent merge recommendations.",
+      "acceptanceCriteria": [
+        "Add SemanticAnalyzer class to stfu_core.py",
+        "Uses existing ai_helper.py infrastructure (LiteLLM proxy at localhost:4000)",
+        "Batch-analyzes projects: sends README snippets + dep lists + file structure to AI for purpose classification",
+        "AI returns: {purpose, category, functional_overlap_candidates[], merge_recommendation, risk_assessment}",
+        "Compares project pairs semantically when structural score > 0.3: AI evaluates if they serve same/overlapping purpose",
+        "Graceful fallback: heuristic-only mode when AI unavailable (no errors, just lower confidence scores)",
+        "Caches AI results in ~/.cache/lfg/stfu_ai_cache.json with TTL (24h default)",
+        "Adds 'ai_analysis' section to STFU output when available",
+        "Tests: 1 unit test (mocked AI)"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "model-sw LiteLLM proxy available at localhost:4000 with Azure OpenAI + Ollama backends."
+    },
+    {
+      "id": "US-007",
+      "title": "Interactive HTML Report with Dashboard Integration",
+      "description": "As a developer, I want a rich STFU HTML report that renders in the LFG viewer with interactive tables, similarity heatmaps, cluster visualizations, and actionable recommendations.",
+      "acceptanceCriteria": [
+        "New lib/stfu_report.py generates .lfg_stfu.html from STFU JSON data",
+        "Report sections: Executive Summary, Duplicates (red), Relationships (purple), Clusters (green), Library Candidates (blue), Environment Groups (orange), AI Insights (if available)",
+        "Executive summary: project count, duplicate count, estimated savings, top 3 recommendations",
+        "Duplicates table: sortable by score, with file paths and 'View Diff' placeholder",
+        "Cluster cards: grouped projects with shared deps listed, color-coded by confidence",
+        "Library candidate cards: name, type, source projects, effort, priority badge",
+        "Environment groups: compatibility bars, conflict count, savings estimate",
+        "Uses existing LFG theme.css and ui.js (LFG.init, toast, tooltips, action buttons)",
+        "Integrates with dashboard.sh STFU main tab: dashboard loads stfu_report data",
+        "Navigation: LFG._postNav works for cross-module links",
+        "lfg stfu opens the report in viewer"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Must use existing LFG design system. Report should feel native to the LFG platform."
+    },
+    {
+      "id": "US-008",
+      "title": "Merge Wizard and Coalescence Workflow",
+      "description": "As a developer, I want STFU to provide actionable merge/coalescence commands that I can execute from the UI - not just analysis but actual operations via the Action Bridge.",
+      "acceptanceCriteria": [
+        "Add merge subcommands to stfu.sh: stfu merge-check <a> <b>, stfu merge-plan <a> <b>, stfu archive <project>",
+        "merge-check: runs full comparison (deps, structure, code patterns) between two projects, outputs compatibility report",
+        "merge-plan: generates step-by-step merge plan with commands (git remote add, rsync selective, dep merge, conflict list)",
+        "archive: moves project to ~/Developer/.archive/ with timestamp, removes from active scan",
+        "HTML report includes action buttons: 'Check Merge' (runs merge-check via LFG.exec), 'Archive' (runs archive via LFG.confirm)",
+        "Dashboard STFU tab duplicate rows have 'Merge Check' and 'Archive' action buttons",
+        "Toast feedback for all operations",
+        "Tests: 1 unit test for merge-check output format"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "This makes STFU actionable, not just analytical. Uses Action Bridge from US-001 of v2.0."
+    },
+    {
+      "id": "US-009",
+      "title": "CLI Dispatcher and Module Integration",
+      "description": "As a developer, I want STFU fully integrated into the LFG CLI with subcommands and the lfg dispatcher routing correctly.",
+      "acceptanceCriteria": [
+        "lfg stfu (no args) runs full analysis and opens HTML report",
+        "lfg stfu --json outputs JSON to stdout",
+        "lfg stfu deps runs dependency analysis only",
+        "lfg stfu fingerprint runs file pattern analysis only",
+        "lfg stfu duplicates runs code duplicate detection only",
+        "lfg stfu libraries runs shared library candidate analysis only",
+        "lfg stfu envs runs environment consolidation analysis only",
+        "lfg stfu merge-check <a> <b> runs merge compatibility check",
+        "lfg stfu archive <project> archives a project",
+        "stfu.sh orchestrates stfu_core.py and stfu_report.py",
+        "state.sh tracks stfu module runs for APM",
+        "Updated help text in lfg --help"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Polish, Testing, APM Sync, and Live Verification",
+      "description": "Final integration: comprehensive testing against real ~/Developer portfolio, APM sync for all STFU operations, performance optimization for large portfolios.",
+      "acceptanceCriteria": [
+        "Run full STFU analysis against ~/Developer (54 projects) - completes in <60 seconds",
+        "All JSON output validates against expected schema",
+        "HTML report renders correctly in LFG viewer",
+        "Dashboard STFU tab populates from live data",
+        "Side inspector panel shows top relationships",
+        "Action buttons (Merge Check, Archive) work via Action Bridge",
+        "state.sh fires APM notifications for stfu start/complete",
+        "All unit tests pass",
+        "Version noted in STFU report footer",
+        "CCEM APM shows all 10 STFU tasks as completed"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Live integration testing against real portfolio is the acceptance gate."
+    }
+  ]
+}

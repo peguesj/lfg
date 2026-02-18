@@ -563,8 +563,12 @@ class CodePatternDetector:
 class LibraryCandidateIdentifier:
     """Recommend shared libraries based on duplication patterns."""
 
+    def __init__(self, namespace: str = "@jeremiah"):
+        self.namespace = namespace
+
     def analyze(self, manifests: list[ProjectManifest], overlaps: list[OverlapResult],
                 duplicates: list[CodeDuplicate]) -> list[LibraryCandidate]:
+        ns = self.namespace
         candidates = []
 
         # UI component library: projects sharing >10 @radix-ui deps
@@ -575,7 +579,7 @@ class LibraryCandidateIdentifier:
                 radix_projects.append(m.name)
         if len(radix_projects) >= 2:
             candidates.append(LibraryCandidate(
-                name="@jeremiah/ui-core",
+                name=f"{ns}/ui-core",
                 lib_type="ui-components",
                 source_projects=radix_projects,
                 shared_deps=[d.name for d in manifests[0].deps if d.name.startswith("@radix-ui/")][:15],
@@ -589,7 +593,7 @@ class LibraryCandidateIdentifier:
         if auth_dupes:
             auth_projects = list({d.project_a for d in auth_dupes} | {d.project_b for d in auth_dupes})
             candidates.append(LibraryCandidate(
-                name="@jeremiah/auth-core",
+                name=f"{ns}/auth-core",
                 lib_type="auth",
                 source_projects=auth_projects,
                 shared_deps=["next-auth", "@supabase/supabase-js", "jsonwebtoken"],
@@ -606,7 +610,7 @@ class LibraryCandidateIdentifier:
                 test_projects.append(m.name)
         if len(test_projects) >= 3:
             candidates.append(LibraryCandidate(
-                name="@jeremiah/test-config",
+                name=f"{ns}/test-config",
                 lib_type="testing-config",
                 source_projects=test_projects,
                 shared_deps=["vitest", "playwright", "eslint", "@typescript-eslint/parser"],
@@ -619,7 +623,7 @@ class LibraryCandidateIdentifier:
         tailwind_projects = [m.name for m in manifests if "tailwind.config.js" in m.config_hashes or "tailwind.config.ts" in m.config_hashes]
         if len(tailwind_projects) >= 3:
             candidates.append(LibraryCandidate(
-                name="@jeremiah/build-config",
+                name=f"{ns}/build-config",
                 lib_type="build-config",
                 source_projects=tailwind_projects,
                 shared_deps=["tailwindcss", "postcss", "autoprefixer"],
@@ -632,7 +636,7 @@ class LibraryCandidateIdentifier:
         api_projects = [m.name for m in manifests if any(d.name in ("axios", "@supabase/supabase-js", "ky") for d in m.deps)]
         if len(api_projects) >= 3:
             candidates.append(LibraryCandidate(
-                name="@jeremiah/api-client",
+                name=f"{ns}/api-client",
                 lib_type="api-client",
                 source_projects=api_projects,
                 shared_deps=["axios", "@supabase/supabase-js", "zod"],
@@ -845,14 +849,31 @@ README: {readme[:300]}"""
 class STFUEngine:
     """Orchestrates all STFU analysis modules."""
 
-    def __init__(self, target: str = ""):
+    def __init__(self, target: str = "", namespace: str = ""):
         self.target = Path(target or os.path.expanduser("~/Developer"))
+        # Read namespace from settings if not provided
+        if not namespace:
+            namespace = self._read_namespace()
+        self.namespace = namespace
         self.dep_analyzer = DependencyAnalyzer()
         self.fingerprinter = FileFingerprinter()
         self.pattern_detector = CodePatternDetector()
-        self.library_identifier = LibraryCandidateIdentifier()
+        self.library_identifier = LibraryCandidateIdentifier(namespace=namespace)
         self.env_analyzer = EnvironmentAnalyzer()
         self.semantic_analyzer = SemanticAnalyzer()
+
+    @staticmethod
+    def _read_namespace() -> str:
+        """Read library_namespace from settings.yaml."""
+        settings_path = os.path.expanduser("~/.config/lfg/settings.yaml")
+        try:
+            with open(settings_path) as f:
+                for line in f:
+                    if line.startswith("library_namespace:"):
+                        return line.split(":", 1)[1].strip().strip('"').strip("'")
+        except FileNotFoundError:
+            pass
+        return "@jeremiah"
 
     def run_full(self, ai: bool = True) -> dict:
         """Run complete STFU analysis."""
