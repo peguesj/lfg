@@ -236,7 +236,11 @@ python3 "$STFU_REPORT" "$HTML_FILE" $REPORT_FLAGS <<< "$STFU_JSON"
 
 lfg_state_done stfu "$(echo "$STFU_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin).get('summary',{}); print(f'projects={d.get(\"total_projects\",0)} dupes={d.get(\"duplicate_pairs\",0)} clusters={d.get(\"cluster_count\",0)} savings={d.get(\"estimated_savings_mb\",0)}MB')" 2>/dev/null)" 2>/dev/null || true
 
-echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG STFU - Source Tree Forensics" &
-disown
-echo "Done."
+if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
+    echo "Done (headless)."
+else
+    echo "Opening viewer..."
+    "$VIEWER" "$HTML_FILE" "LFG STFU - Source Tree Forensics" &
+    disown
+    echo "Done."
+fi

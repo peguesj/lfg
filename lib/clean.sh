@@ -228,22 +228,24 @@ else
     lfg_state_done dtf "reclaimable=$TOTAL_DISPLAY" "cleaned=$CLEANED" "skipped=$SKIPPED" "mode=scan"
 fi
 
-CHAIN_FILE="/tmp/.lfg_chain_$$"
-
-echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG DTF - $MODE_LABEL $TOTAL_DISPLAY" --select "$CHAIN_FILE" &
-VPID=$!
-disown
-(
-  while kill -0 "$VPID" 2>/dev/null; do
-    if [[ -s "$CHAIN_FILE" ]]; then
-      SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
-      case "$SEL" in
-        wtfs) "$LFG_DIR/lib/scan.sh" ;; btau) "$LFG_DIR/lib/btau.sh" --view ;; devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
-      esac; break
-    fi; sleep 0.3
-  done; rm -f "$CHAIN_FILE"
-) &
-disown
-
-echo "Done."
+if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
+    echo "Done (headless)."
+else
+    CHAIN_FILE="/tmp/.lfg_chain_$$"
+    echo "Opening viewer..."
+    "$VIEWER" "$HTML_FILE" "LFG DTF - $MODE_LABEL $TOTAL_DISPLAY" --select "$CHAIN_FILE" &
+    VPID=$!
+    disown
+    (
+      while kill -0 "$VPID" 2>/dev/null; do
+        if [[ -s "$CHAIN_FILE" ]]; then
+          SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
+          case "$SEL" in
+            wtfs) "$LFG_DIR/lib/scan.sh" ;; btau) "$LFG_DIR/lib/btau.sh" --view ;; devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
+          esac; break
+        fi; sleep 0.3
+      done; rm -f "$CHAIN_FILE"
+    ) &
+    disown
+    echo "Done."
+fi

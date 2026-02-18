@@ -492,7 +492,11 @@ open('$HTML_FILE', 'w').write(html)
 
 export LFG_DIR HTML_FILE
 
-echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG Dashboard" &
-disown
-echo "Done."
+if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
+    echo "Done (headless)."
+else
+    echo "Opening viewer..."
+    "$VIEWER" "$HTML_FILE" "LFG Dashboard" &
+    disown
+    echo "Done."
+fi

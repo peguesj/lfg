@@ -158,31 +158,26 @@ open('$HTML_FILE', 'w').write(html)
 
 lfg_state_done wtfs "total_size=$TOTAL_HR" "dir_count=$RANK" "target=$DIR_DISPLAY"
 
-CHAIN_FILE="/tmp/.lfg_chain_$$"
-
-echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG WTFS - $DIR_DISPLAY" --select "$CHAIN_FILE" &
-VPID=$!
-disown
-
-# Chain: if user clicks a cross-module action, launch it
-(
-  while kill -0 "$VPID" 2>/dev/null; do
-    if [[ -s "$CHAIN_FILE" ]]; then
-      SEL=$(cat "$CHAIN_FILE")
-      rm -f "$CHAIN_FILE"
-      case "$SEL" in
-        dtf) "$LFG_DIR/lib/clean.sh" ;;
-        btau) "$LFG_DIR/lib/btau.sh" --view ;;
-        devdrive) "$LFG_DIR/lib/devdrive.sh" ;;
-        dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
-      esac
-      break
-    fi
-    sleep 0.3
-  done
-  rm -f "$CHAIN_FILE"
-) &
-disown
+if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
+    echo "Done (headless)."
+else
+    CHAIN_FILE="/tmp/.lfg_chain_$$"
+    echo "Opening viewer..."
+    "$VIEWER" "$HTML_FILE" "LFG WTFS - $DIR_DISPLAY" --select "$CHAIN_FILE" &
+    VPID=$!
+    disown
+    (
+      while kill -0 "$VPID" 2>/dev/null; do
+        if [[ -s "$CHAIN_FILE" ]]; then
+          SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
+          case "$SEL" in
+            dtf) "$LFG_DIR/lib/clean.sh" ;; btau) "$LFG_DIR/lib/btau.sh" --view ;;
+            devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
+          esac; break
+        fi; sleep 0.3
+      done; rm -f "$CHAIN_FILE"
+    ) &
+    disown
+fi
 
 echo "Done."

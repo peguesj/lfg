@@ -5,7 +5,6 @@ set -uo pipefail
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HTML_FILE="$LFG_DIR/.lfg_splash.html"
 VIEWER="$LFG_DIR/viewer"
-SELECT_FILE=$(mktemp /tmp/lfg_select.XXXXXX)
 
 DISK_FREE=$(df -h / | awk 'NR==2{print $4}')
 DISK_USED=$(df -h / | awk 'NR==2{print $5}')
@@ -175,7 +174,7 @@ body {
 
     requestAnimationFrame(function() { fill.style.width = '100%'; });
 
-    window.webkit.messageHandlers.lfg.postMessage({ action: 'select', module: name });
+    window.webkit.messageHandlers.lfg.postMessage({ action: 'navigate', target: name });
   }
   </script>
 </body>
@@ -184,30 +183,7 @@ body {
 open('$HTML_FILE', 'w').write(html)
 "
 
-# Launch viewer with --select flag
-"$VIEWER" "$HTML_FILE" "LFG - Local File Guardian" --select "$SELECT_FILE" &
-VIEWER_PID=$!
-
-# Wait for selection or viewer close
-SELECTION=""
-while kill -0 "$VIEWER_PID" 2>/dev/null; do
-    if [[ -s "$SELECT_FILE" ]]; then
-        SELECTION=$(cat "$SELECT_FILE")
-        break
-    fi
-    sleep 0.2
-done
-
-rm -f "$SELECT_FILE"
-wait "$VIEWER_PID" 2>/dev/null || true
-
-# Launch selected module
-case "$SELECTION" in
-    wtfs)      exec "$LFG_DIR/lib/scan.sh" ;;
-    dtf)       exec "$LFG_DIR/lib/clean.sh" ;;
-    btau)      exec "$LFG_DIR/lib/btau.sh" --view ;;
-    devdrive)  exec "$LFG_DIR/lib/devdrive.sh" ;;
-    stfu)      exec "$LFG_DIR/lib/stfu.sh" ;;
-    dashboard) exec "$LFG_DIR/lib/dashboard.sh" ;;
-    *)         exit 0 ;;
-esac
+# Launch viewer (no --select; navigation happens in-process)
+"$VIEWER" "$HTML_FILE" "LFG - Local File Guardian" &
+disown
+echo "LFG launched."

@@ -155,22 +155,24 @@ open('$HTML_FILE', 'w').write(html)
 
 lfg_state_done btau "backup_count=$BACKUP_COUNT" "total_size=$TOTAL_HR"
 
-CHAIN_FILE="/tmp/.lfg_chain_$$"
-
-echo "Opening viewer..."
-"$VIEWER" "$HTML_FILE" "LFG BTAU - Backup Status" --select "$CHAIN_FILE" &
-VPID=$!
-disown
-(
-  while kill -0 "$VPID" 2>/dev/null; do
-    if [[ -s "$CHAIN_FILE" ]]; then
-      SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
-      case "$SEL" in
-        wtfs) "$LFG_DIR/lib/scan.sh" ;; dtf) "$LFG_DIR/lib/clean.sh" ;; devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
-      esac; break
-    fi; sleep 0.3
-  done; rm -f "$CHAIN_FILE"
-) &
-disown
-
-echo "Done."
+if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
+    echo "Done (headless)."
+else
+    CHAIN_FILE="/tmp/.lfg_chain_$$"
+    echo "Opening viewer..."
+    "$VIEWER" "$HTML_FILE" "LFG BTAU - Backup Status" --select "$CHAIN_FILE" &
+    VPID=$!
+    disown
+    (
+      while kill -0 "$VPID" 2>/dev/null; do
+        if [[ -s "$CHAIN_FILE" ]]; then
+          SEL=$(cat "$CHAIN_FILE"); rm -f "$CHAIN_FILE"
+          case "$SEL" in
+            wtfs) "$LFG_DIR/lib/scan.sh" ;; dtf) "$LFG_DIR/lib/clean.sh" ;; devdrive) "$LFG_DIR/lib/devdrive.sh" ;; dashboard) "$LFG_DIR/lib/dashboard.sh" ;;
+          esac; break
+        fi; sleep 0.3
+      done; rm -f "$CHAIN_FILE"
+    ) &
+    disown
+    echo "Done."
+fi

@@ -129,6 +129,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         "dtf": ModuleState(),
         "btau": ModuleState(),
         "devdrive": ModuleState(),
+        "stfu": ModuleState(),
     ]
 
     // Devdrive config state
@@ -219,6 +220,11 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             let vols = info["volume_count"] as? String ?? "0"
             let projs = info["project_count"] as? String ?? "0"
             return "\(projs) projects, \(vols) volumes"
+        case "stfu":
+            let projects = info["projects"] as? String ?? "?"
+            let dupes = info["dupes"] as? String ?? "0"
+            let savings = info["savings"] as? String ?? "0"
+            return "\(projects) projects, \(dupes) dupes, \(savings)"
         default:
             return info["status"] as? String ?? "?"
         }
@@ -410,6 +416,41 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         addSubItem(ddMenu, "Auto-Move (Execute)", action: #selector(ddAutoMoveForce), key: "")
         ddItem.submenu = ddMenu
         menu.addItem(ddItem)
+
+        // --- STFU Actions Submenu ---
+        let stfuItem = NSMenuItem(title: "STFU - Source Tree Forensics", action: nil, keyEquivalent: "")
+        let stfuMenu = NSMenu()
+        addSubItem(stfuMenu, "Full Analysis (Dry Run)", action: #selector(stfuDryRun), key: "")
+        addSubItem(stfuMenu, "Full Analysis (Execute)", action: #selector(stfuExecute), key: "")
+        stfuMenu.addItem(NSMenuItem.separator())
+        addSubItem(stfuMenu, "Dependency Analysis", action: #selector(stfuDeps), key: "")
+        addSubItem(stfuMenu, "File Fingerprinting", action: #selector(stfuFingerprint), key: "")
+        addSubItem(stfuMenu, "Duplicate Detection", action: #selector(stfuDuplicates), key: "")
+        addSubItem(stfuMenu, "Library Candidates", action: #selector(stfuLibraries), key: "")
+        addSubItem(stfuMenu, "Environment Groups", action: #selector(stfuEnvs), key: "")
+        stfuMenu.addItem(NSMenuItem.separator())
+        addSubItem(stfuMenu, "Open Viewer", action: #selector(openSTFU), key: "5")
+        stfuItem.submenu = stfuMenu
+        menu.addItem(stfuItem)
+
+        // --- AI Actions Submenu ---
+        let aiItem = NSMenuItem(title: "AI - Analysis Engine", action: nil, keyEquivalent: "")
+        let aiMenu = NSMenu()
+        addSubItem(aiMenu, "Show Config", action: #selector(aiConfigShow), key: "")
+        addSubItem(aiMenu, "Test Connection", action: #selector(aiTestConnection), key: "")
+        aiMenu.addItem(NSMenuItem.separator())
+        addSubItem(aiMenu, "Analyze ~/Developer", action: #selector(aiAnalyzeDeveloper), key: "")
+        aiItem.submenu = aiMenu
+        menu.addItem(aiItem)
+
+        // --- Settings Submenu ---
+        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        let settingsMenu = NSMenu()
+        addSubItem(settingsMenu, "Show Settings", action: #selector(settingsShow), key: "")
+        addSubItem(settingsMenu, "Show Paths", action: #selector(settingsPaths), key: "")
+        addSubItem(settingsMenu, "Reset Defaults", action: #selector(settingsReset), key: "")
+        settingsItem.submenu = settingsMenu
+        menu.addItem(settingsItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -618,6 +659,41 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     @objc func ddAutoMoveForce() {
         sendNotification(title: "LFG DEVDRIVE", body: "Executing auto-move migrations...")
         launchLFG("devdrive auto-move --force")
+    }
+
+    // STFU actions
+    @objc func openSTFU() { launchLFG("stfu") }
+    @objc func stfuDryRun() {
+        sendNotification(title: "LFG STFU", body: "Analyzing source trees (dry run)...")
+        launchLFG("stfu --dry-run")
+    }
+    @objc func stfuExecute() {
+        sendNotification(title: "LFG STFU", body: "Analyzing source trees (execute)...")
+        launchLFG("stfu --execute")
+    }
+    @objc func stfuDeps() { launchLFG("stfu deps") }
+    @objc func stfuFingerprint() { launchLFG("stfu fingerprint") }
+    @objc func stfuDuplicates() { launchLFG("stfu duplicates") }
+    @objc func stfuLibraries() { launchLFG("stfu libraries") }
+    @objc func stfuEnvs() { launchLFG("stfu envs") }
+
+    // AI actions
+    @objc func aiConfigShow() { launchLFG("ai config show") }
+    @objc func aiTestConnection() {
+        sendNotification(title: "LFG AI", body: "Testing connection...")
+        launchLFG("ai config show")
+    }
+    @objc func aiAnalyzeDeveloper() {
+        sendNotification(title: "LFG AI", body: "Analyzing ~/Developer...")
+        launchLFG("ai analyze ~/Developer")
+    }
+
+    // Settings actions
+    @objc func settingsShow() { launchLFG("settings show") }
+    @objc func settingsPaths() { launchLFG("settings paths") }
+    @objc func settingsReset() {
+        sendNotification(title: "LFG Settings", body: "Reset to defaults")
+        launchLFG("settings reset")
     }
 
     // Other
