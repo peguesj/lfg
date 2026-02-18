@@ -357,6 +357,7 @@ body {{
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.5px;
+  margin-top: 16px;
   margin-bottom: 4px;
 }}
 .greeting span {{ color: var(--accent); }}

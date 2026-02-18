@@ -390,12 +390,21 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(dtfItem)
 
         // --- BTAU Actions Submenu ---
-        let btauItem = NSMenuItem(title: "BTAU - Backups", action: nil, keyEquivalent: "")
+        let btauItem = NSMenuItem(title: "BTAU - Back That App Up", action: nil, keyEquivalent: "")
         let btauMenu = NSMenu()
         addSubItem(btauMenu, "View Status", action: #selector(openBTAU), key: "3")
+        btauMenu.addItem(NSMenuItem.separator())
+        addSubItem(btauMenu, "Migrate Project...", action: #selector(btauMigrate), key: "")
+        addSubItem(btauMenu, "Auto-Move (Dry Run)", action: #selector(btauAutoMoveDry), key: "")
+        addSubItem(btauMenu, "Auto-Move (Execute)", action: #selector(btauAutoMoveExec), key: "")
+        btauMenu.addItem(NSMenuItem.separator())
+        addSubItem(btauMenu, "Backup Now", action: #selector(btauBackup), key: "")
+        addSubItem(btauMenu, "Restore...", action: #selector(btauRestore), key: "")
+        addSubItem(btauMenu, "Rebuild Forest", action: #selector(btauRebuild), key: "")
+        btauMenu.addItem(NSMenuItem.separator())
+        addSubItem(btauMenu, "New Project", action: #selector(btauNew), key: "")
         addSubItem(btauMenu, "Discover Volumes", action: #selector(btauDiscover), key: "")
-        addSubItem(btauMenu, "Mount Devdrive", action: #selector(btauMount), key: "")
-        addSubItem(btauMenu, "Unmount Devdrive", action: #selector(btauUnmount), key: "")
+        addSubItem(btauMenu, "Configuration", action: #selector(btauConfig), key: "")
         btauItem.submenu = btauMenu
         menu.addItem(btauItem)
 
@@ -626,12 +635,39 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     // BTAU actions
     @objc func openBTAU() { launchLFG("btau --view") }
+    @objc func btauMigrate() {
+        sendNotification(title: "LFG BTAU", body: "Opening migrate wizard...")
+        launchLFG("btau migrate")
+    }
+    @objc func btauAutoMoveDry() {
+        sendNotification(title: "LFG BTAU", body: "Auto-move dry run...")
+        launchLFG("btau auto-move")
+    }
+    @objc func btauAutoMoveExec() {
+        sendNotification(title: "LFG BTAU", body: "Executing auto-move...")
+        launchLFG("btau auto-move --execute")
+    }
+    @objc func btauBackup() {
+        sendNotification(title: "LFG BTAU", body: "Starting backup...")
+        launchLFG("btau backup")
+    }
+    @objc func btauRestore() {
+        sendNotification(title: "LFG BTAU", body: "Opening restore...")
+        launchLFG("btau restore")
+    }
+    @objc func btauRebuild() {
+        sendNotification(title: "LFG BTAU", body: "Rebuilding symlink forest...")
+        launchLFG("btau rebuild")
+    }
+    @objc func btauNew() {
+        sendNotification(title: "LFG BTAU", body: "Creating new project...")
+        launchLFG("btau new")
+    }
     @objc func btauDiscover() {
         sendNotification(title: "LFG BTAU", body: "Discovering volumes...")
         launchLFG("btau discover")
     }
-    @objc func btauMount() { launchLFG("btau mount") }
-    @objc func btauUnmount() { launchLFG("btau unmount") }
+    @objc func btauConfig() { launchLFG("btau config") }
 
     // DEVDRIVE actions
     @objc func openDevdrive() { launchLFG("devdrive") }
