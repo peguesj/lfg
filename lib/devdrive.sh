@@ -394,6 +394,9 @@ html = '''<!DOCTYPE html>
       { label: \"Sync Forest\", desc: \"Rebuild symlink forest\", cli: \"lfg devdrive sync\", module: \"devdrive\", action: \"run\", args: \"sync\", color: \"#c084fc\" },
       { label: \"Verify Links\", desc: \"Audit symlink health\", cli: \"lfg devdrive verify\", module: \"devdrive\", action: \"run\", args: \"verify\", color: \"#c084fc\" },
       { label: \"Create Project\", desc: \"New project on devdrive\", cli: \"lfg devdrive create NAME\", module: \"devdrive\", action: \"run\", args: \"create\", color: \"#c084fc\" },
+      { label: \"Auto-Move (Dry Run)\", desc: \"Preview auto-move rules\", cli: \"lfg devdrive auto-move --dry-run\", module: \"devdrive\", action: \"run\", args: \"auto-move --dry-run\", color: \"#c084fc\" },
+      { label: \"Auto-Move (Execute)\", desc: \"Execute auto-move migrations\", cli: \"lfg devdrive auto-move --force\", module: \"devdrive\", action: \"run\", args: \"auto-move --force\", color: \"#ffd166\" },
+      { label: \"Show Config\", desc: \"Display devdrive configuration\", cli: \"lfg devdrive config show\", module: \"devdrive\", action: \"run\", args: \"config show\", color: \"#c084fc\" },
     ])
   );
   document.getElementById(\"action-bar\").appendChild(

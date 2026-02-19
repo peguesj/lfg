@@ -137,6 +137,12 @@ html = '''<!DOCTYPE html>
       { label: \"Show Status\", desc: \"Backup manifest status\", cli: \"lfg btau status\", module: \"btau\", action: \"run\", args: \"status\", color: \"#06d6a0\" },
       { label: \"Mount Devdrive\", desc: \"Attach sparse image\", cli: \"lfg btau mount\", module: \"btau\", action: \"run\", args: \"mount\", color: \"#4a9eff\" },
       { label: \"Unmount Devdrive\", desc: \"Safely eject volume\", cli: \"lfg btau unmount\", module: \"btau\", action: \"run\", args: \"unmount\", color: \"#ffd166\" },
+      { label: \"Migrate\", desc: \"Open migrate wizard\", cli: \"lfg btau migrate\", module: \"btau\", action: \"run\", args: \"migrate\", color: \"#06d6a0\" },
+      { label: \"Auto-Move (Dry Run)\", desc: \"Preview auto-move rules\", cli: \"lfg btau auto-move\", module: \"btau\", action: \"run\", args: \"auto-move\", color: \"#06d6a0\" },
+      { label: \"Auto-Move (Execute)\", desc: \"Execute auto-move migrations\", cli: \"lfg btau auto-move --execute\", module: \"btau\", action: \"run\", args: \"auto-move --execute\", color: \"#ffd166\" },
+      { label: \"Backup Now\", desc: \"Run backup immediately\", cli: \"lfg btau backup\", module: \"btau\", action: \"run\", args: \"backup\", color: \"#06d6a0\" },
+      { label: \"Restore\", desc: \"Restore from backup\", cli: \"lfg btau restore\", module: \"btau\", action: \"run\", args: \"restore\", color: \"#ffd166\" },
+      { label: \"Rebuild Forest\", desc: \"Rebuild symlink forest\", cli: \"lfg btau rebuild\", module: \"btau\", action: \"run\", args: \"rebuild\", color: \"#ff4d6a\" },
     ])
   );
   document.getElementById(\"action-bar\").appendChild(

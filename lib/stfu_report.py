@@ -312,6 +312,7 @@ table th:hover {{ color:#e879f9; }}
     {'<table><thead><tr><th>Project</th><th>Purpose</th><th>Category</th><th>Merge Risk</th></tr></thead><tbody>' + ai_html + '</tbody></table>' if ai_html else '<div class="empty-state">AI analysis not available. Check: lfg ai config show</div>'}
   </div>
 
+  <div id="action-bar"></div>
   <div class="footer">lfg stfu v2.1.0 | {summary.get('total_projects', 0)} projects | {mode_label}</div>
 
   <script>{uijs}
@@ -353,6 +354,20 @@ table th:hover {{ color:#e879f9; }}
         next.style.display = show ? '' : 'none';
       }}
     }});
+  }}
+  // Command panel
+  if (typeof LFG !== 'undefined' && LFG.createCommandPanel) {{
+    document.getElementById('action-bar').appendChild(
+      LFG.createCommandPanel('STFU Actions', [
+        {{ label: "Full Analysis (Dry Run)", desc: "Analyze without changes", cli: "lfg stfu --dry-run", module: "stfu", action: "run", args: "--dry-run", color: "#e879f9" }},
+        {{ label: "Full Analysis (Execute)", desc: "Analyze and execute actions", cli: "lfg stfu --execute", module: "stfu", action: "run", args: "--execute", color: "#ff4d6a" }},
+        {{ label: "Dependency Analysis", desc: "Scan project dependencies", cli: "lfg stfu deps", module: "stfu", action: "run", args: "deps", color: "#e879f9" }},
+        {{ label: "File Fingerprinting", desc: "Hash and compare files", cli: "lfg stfu fingerprint", module: "stfu", action: "run", args: "fingerprint", color: "#e879f9" }},
+        {{ label: "Duplicate Detection", desc: "Find duplicate projects", cli: "lfg stfu duplicates", module: "stfu", action: "run", args: "duplicates", color: "#e879f9" }},
+        {{ label: "Library Candidates", desc: "Identify shared lib opportunities", cli: "lfg stfu libraries", module: "stfu", action: "run", args: "libraries", color: "#e879f9" }},
+        {{ label: "Environment Groups", desc: "Group similar environments", cli: "lfg stfu envs", module: "stfu", action: "run", args: "envs", color: "#e879f9" }}
+      ])
+    );
   }}
   // Sortable columns
   document.querySelectorAll('table th').forEach(function(th, idx) {{

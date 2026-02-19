@@ -146,6 +146,16 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             button.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
         }
 
+        // US-007: Register for viewer IPC notifications
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleViewerNotification(_:)),
+            name: NSNotification.Name("com.lfg.viewer.settingsChanged"), object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleViewerNotification(_:)),
+            name: NSNotification.Name("com.lfg.viewer.actionCompleted"), object: nil
+        )
+
         loadDiskHistory()
         loadState()
         buildMenu()
@@ -449,6 +459,8 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         addSubItem(aiMenu, "Test Connection", action: #selector(aiTestConnection), key: "")
         aiMenu.addItem(NSMenuItem.separator())
         addSubItem(aiMenu, "Analyze ~/Developer", action: #selector(aiAnalyzeDeveloper), key: "")
+        addSubItem(aiMenu, "Compare Projects", action: #selector(aiCompare), key: "")
+        addSubItem(aiMenu, "Suggest Optimizations", action: #selector(aiSuggest), key: "")
         aiItem.submenu = aiMenu
         menu.addItem(aiItem)
 
@@ -724,6 +736,24 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         launchLFG("ai analyze ~/Developer")
     }
 
+    @objc func aiCompare() {
+        sendNotification(title: "LFG AI", body: "Comparing projects...")
+        launchLFG("ai compare")
+    }
+    @objc func aiSuggest() {
+        sendNotification(title: "LFG AI", body: "Generating suggestions...")
+        launchLFG("ai suggest")
+    }
+
+    // US-007: IPC handler for viewer notifications
+    @objc func handleViewerNotification(_ notification: Notification) {
+        DispatchQueue.main.async { [self] in
+            refreshStats()
+            loadState()
+            buildMenu()
+        }
+    }
+
     // Settings actions
     @objc func settingsShow() { launchLFG("settings show") }
     @objc func settingsPaths() { launchLFG("settings paths") }
@@ -749,6 +779,13 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         graphTimer?.invalidate()
         graphTimer = Timer.scheduledTimer(withTimeInterval: graphInterval, repeats: true) { [weak self] _ in
             self?.recordDiskDataPoint()
+        }
+        // US-005: Persist graph interval to settings.yaml
+        DispatchQueue.global().async { [self] in
+            let task = Process()
+            task.launchPath = "/bin/bash"
+            task.arguments = ["-c", "\(lfgPath) settings set graph_interval \(sender.tag)"]
+            try? task.run()
         }
         buildMenu()
         sendNotification(title: "LFG Menubar", body: "Graph interval: \(sender.title)")

@@ -1,198 +1,164 @@
 {
   "project": "lfg",
-  "branchName": "ralph/lfg-v2.1-actions-settings-customization",
-  "description": "LFG v2.1 - Actionable STFU operations (dry-run + execute), customizable library namespaces, global settings system with custom scan paths and per-module path access controls, polished UX throughout",
+  "branchName": "ralph/lfg-v2.2-ui-menubar-integration",
+  "baseBranch": "ralph/lfg-v2.1-actions-settings-customization",
+  "description": "LFG v2.2 - Full UI/Menubar action parity, bidirectional state sync, and missing command panels",
+  "upm": {
+    "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
+    "checkpointRange": null,
+    "builtWaves": 2,
+    "verifiedAt": null,
+    "shippedAt": null,
+    "prUrl": null
+  },
   "userStories": [
     {
       "id": "US-001",
-      "title": "Global LFG settings system with config file",
-      "description": "As a developer, I want a centralized settings file at ~/.config/lfg/settings.yaml that all modules read, replacing scattered defaults and positional args with a unified config.",
+      "title": "BTAU command panel - add all missing menubar actions",
+      "description": "As a user viewing the BTAU module in WebKit, I want action buttons for Migrate, Auto-Move (dry/execute), Backup Now, Restore, Rebuild Forest, New Project, and Configuration so I can perform all BTAU operations without switching to the menubar.",
       "acceptanceCriteria": [
-        "New lib/settings.sh with functions: lfg_settings_get, lfg_settings_set, lfg_settings_list, lfg_settings_reset",
-        "Config file at ~/.config/lfg/settings.yaml auto-created with defaults on first run",
-        "Default settings: scan_paths: ['~/Developer'], library_namespace: '@jeremiah', theme: 'dark'",
-        "Settings include module_access map: {wtfs: ['~/Developer'], dtf: ['~/Developer'], btau: ['~/Developer'], devdrive: ['~/Developer'], stfu: ['~/Developer']} - each module lists which paths it can scan",
-        "lfg settings show prints all settings as formatted YAML",
-        "lfg settings get <key> returns single value",
-        "lfg settings set <key> <value> updates single value",
-        "lfg settings paths add <path> adds to scan_paths array",
-        "lfg settings paths remove <path> removes from scan_paths",
-        "lfg settings access <module> add <path> grants module access to path",
-        "lfg settings access <module> remove <path> revokes module access",
-        "All existing modules (scan.sh, clean.sh, stfu.sh, dashboard.sh) source settings.sh and use lfg_settings_get scan_paths instead of hardcoded ~/Developer",
-        "Typecheck passes"
+        "btau.sh command panel includes: Migrate, Auto-Move Dry Run, Auto-Move Execute, Backup Now, Restore, Rebuild Forest, New Project, Configuration",
+        "Each button uses LFG.actionButton() with appropriate confirm dialogs for destructive operations",
+        "Destructive operations (Rebuild Forest, Auto-Move Execute) use LFG.confirm()",
+        "Non-destructive operations (Status, Discover, Config) use LFG.exec()",
+        "Button layout matches existing command panel grid style"
       ],
-      "priority": 1,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 2,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "5f6e004c-7a02-4be7-b802-9598f0cd372b",
+      "checkpointId": null,
+      "wave": 1
     },
     {
       "id": "US-002",
-      "title": "Settings UI panel in dashboard",
-      "description": "As a developer, I want a rich Settings panel in the dashboard side column where I can manage scan paths, module access, library namespace, and all preferences visually.",
+      "title": "STFU command panel - add individual analysis mode buttons",
+      "description": "As a user viewing the STFU module in WebKit, I want buttons for each individual analysis mode (deps, fingerprint, duplicates, libraries, envs) so I can run targeted analyses without using the CLI.",
       "acceptanceCriteria": [
-        "Dashboard Settings tab (Cmd+8) shows: Scan Paths section with list + Add/Remove buttons, Module Access grid (checkbox matrix: modules x paths), Library Namespace input field, AI settings (existing model/endpoint/temp), Theme toggle",
-        "Adding a scan path calls LFG.exec('lfg settings paths add <path>') and refreshes the list",
-        "Removing a scan path shows LFG.confirm before executing",
-        "Module access checkboxes call lfg settings access <module> add/remove <path>",
-        "Library namespace field saves via lfg settings set library_namespace <value>",
-        "All changes persist to ~/.config/lfg/settings.yaml",
-        "Settings load on panel open via LFG.exec('lfg settings show --json')",
-        "Typecheck passes"
+        "STFU view includes command panel with: Dependency Analysis, File Fingerprinting, Duplicate Detection, Library Candidates, Environment Groups",
+        "Each button runs the corresponding lfg stfu subcommand via LFG.exec()",
+        "Results refresh the STFU view after completion",
+        "Full Analysis (Dry Run) and Full Analysis (Execute) buttons also present"
       ],
-      "priority": 2,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 2,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "27007e8c-cb27-462a-bb4b-01f670e87d7e",
+      "checkpointId": null,
+      "wave": 1
     },
     {
       "id": "US-003",
-      "title": "Multi-path scanning across all modules",
-      "description": "As a developer with projects in multiple directories (~/Developer, ~/Projects, /Volumes/DevDrive/src), I want all LFG modules to scan all configured paths.",
+      "title": "DTF command panel - add Docker and Sudo clean options",
+      "description": "As a user viewing the DTF module in WebKit, I want Clean+Docker, Clean+Sudo, and Nuclear (all flags) buttons so I have the same cleanup options available in the menubar.",
       "acceptanceCriteria": [
-        "scan.sh reads scan_paths from settings, iterates all paths, merges results into single sorted table",
-        "clean.sh reads scan_paths, discovers caches across all configured directories",
-        "stfu.sh reads scan_paths, analyzes projects from all directories combined",
-        "dashboard.sh aggregates data from all paths in each tab",
-        "Each module respects module_access - only scans paths it has been granted",
-        "Path badges show which scan_path each project belongs to (e.g. [DEV] [EXT])",
-        "Summary stats include per-path breakdowns",
-        "Typecheck passes"
+        "DTF command panel adds: Clean + Docker, Clean + Sudo, Nuclear (--force --docker --sudo)",
+        "Docker and Sudo options use LFG.confirm() with clear warning messages",
+        "Nuclear option has a distinct visual treatment (red/danger styling)",
+        "Existing Scan Only and Clean All buttons remain unchanged"
       ],
-      "priority": 3,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 1,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "5b6c7e51-414f-4cc8-8f76-91e65bf6b213",
+      "checkpointId": null,
+      "wave": 1
     },
     {
       "id": "US-004",
-      "title": "STFU dry-run mode with action previews",
-      "description": "As a developer, I want STFU to show me exactly what actions it recommends (merge projects, create shared lib, consolidate envs) with detailed previews before I execute anything.",
+      "title": "DEVDRIVE command panel - add auto-move and config",
+      "description": "As a user viewing the DevDrive module in WebKit, I want Auto-Move (dry/execute) and Show Config buttons matching the menubar actions.",
       "acceptanceCriteria": [
-        "STFU HTML report shows action cards for each recommendation: Merge Candidate, Create Shared Library, Consolidate Environment, Archive Project",
-        "Each action card shows: what will happen (files moved/created/deleted), estimated disk savings, affected projects, risk level (low/medium/high)",
-        "Action cards have 'Preview' button that expands to show exact commands that would run",
-        "Preview includes file-level diff preview for merge operations (which files from A, which from B)",
-        "Dry-run is the default mode - no actions execute without explicit confirmation",
-        "lfg stfu --dry-run (default) shows recommendations only",
-        "Action cards are clearly labeled 'DRY RUN - No changes will be made'",
-        "Typecheck passes"
+        "DevDrive command panel adds: Auto-Move (Dry Run), Auto-Move (Execute), Show Config",
+        "Auto-Move Execute uses LFG.confirm()",
+        "Show Config displays output inline or in a modal",
+        "Existing Mount/Unmount/Sync/Verify/Create buttons remain unchanged"
       ],
-      "priority": 4,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 1,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "ac9781d3-c7e4-4c81-9394-015a0b8ce141",
+      "checkpointId": null,
+      "wave": 1
     },
     {
       "id": "US-005",
-      "title": "STFU executable actions with confirmation flow",
-      "description": "As a developer, I want to execute STFU recommendations directly from the report UI with native confirmation dialogs and progress feedback.",
+      "title": "Graph interval selector in Settings UI panel",
+      "description": "As a user, I want to configure the menubar disk graph interval from the Settings UI panel, and have it persist to settings.yaml.",
       "acceptanceCriteria": [
-        "Each action card has 'Execute' button (disabled during dry-run, enabled after review)",
-        "Execute button triggers LFG.confirm with detailed description of what will happen",
-        "Archive action: moves project to ~/Developer/.archive/{name}_{timestamp}, updates stfu report",
-        "Merge action: runs lfg stfu merge-check <projA> <projB> first, shows conflicts, then executes rsync + verify",
-        "Create shared lib action: generates scaffold at configured namespace (e.g. @jeremiah/ui-core) with extracted shared code",
-        "Consolidate env action: creates shared package.json/mix.exs with common deps, symlinks node_modules",
-        "All actions show progress bar during execution",
-        "After action completes, toast notification with result, report auto-refreshes",
-        "Rollback info shown: 'Archived to .archive/ - restore with: mv .archive/x ~/Developer/x'",
-        "Typecheck passes"
+        "Settings panel (both dashboard side panel and native sheet) includes Graph Interval selector",
+        "Options: 1 min, 5 min, 15 min, 30 min (matching menubar)",
+        "Selection persists to ~/.config/lfg/settings.yaml as graph_interval key",
+        "Menubar reads graph_interval from settings.yaml on launch and refresh"
       ],
-      "priority": 5,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 2,
+      "dependencies": [
+        "US-007"
+      ],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "2f453126-b2d9-4523-9c70-0fc9f3dce561",
+      "checkpointId": null,
+      "wave": 2
     },
     {
       "id": "US-006",
-      "title": "Customizable library namespace and scaffold generator",
-      "description": "As a developer, I want to configure the namespace prefix for shared library candidates and have STFU generate starter scaffolds.",
+      "title": "APM Monitor link in WebKit UI",
+      "description": "As a user, I want an APM Monitor link in the splash screen footer and dashboard so I can access the CCEM APM dashboard without the menubar.",
       "acceptanceCriteria": [
-        "Library namespace configurable via settings: lfg settings set library_namespace '@myorg'",
-        "STFU library candidates display with configured namespace (e.g. @myorg/ui-core instead of @jeremiah/ui-core)",
-        "stfu_core.py LibraryCandidateIdentifier reads namespace from settings",
-        "New lfg stfu scaffold <library-name> command generates starter package: package.json with namespace, src/ dir, index.ts with extracted shared exports, tsconfig.json, README.md",
-        "Scaffold respects detected ecosystem: npm package for JS projects, hex package for Elixir, pip package for Python",
-        "Scaffold command shows preview of what will be created before executing",
-        "Generated scaffold includes list of projects that should depend on it",
-        "Typecheck passes"
+        "Splash screen footer includes APM link (already partially exists)",
+        "Dashboard header or side panel includes APM Monitor button",
+        "Link opens http://localhost:3031 in default browser via LFG.exec('open http://localhost:3031')",
+        "Visual indicator shows APM status (green dot if reachable)"
       ],
-      "priority": 6,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 1,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "e1cbce6a-72b8-4d0b-99f0-4625b4aad1a1",
+      "checkpointId": null,
+      "wave": 1
     },
     {
       "id": "US-007",
-      "title": "STFU report UX polish and interactive features",
-      "description": "As a developer, I want the STFU HTML report to be visually polished with smooth interactions, clear hierarchy, and intuitive navigation.",
+      "title": "Bidirectional IPC between menubar and viewer",
+      "description": "As a user, I want the menubar and viewer to stay in sync - menubar actions should trigger UI refresh, and UI settings changes should update the menubar without manual refresh.",
       "acceptanceCriteria": [
-        "Section navigation tabs with animated underline indicator",
-        "Sortable tables: click column headers to sort by name, similarity, savings, risk",
-        "Expandable rows: click a duplicate pair to see detailed comparison (shared deps list, unique deps, file diff summary)",
-        "Project search/filter: text input filters all tables by project name",
-        "Relationship graph: mini force-directed graph (CSS-only or canvas) showing project connections, node size = dep count, edge thickness = similarity",
-        "Color-coded risk levels: green (low), amber (medium), red (high) with consistent dot indicators",
-        "Print-friendly mode: Cmd+P produces clean black/white report",
-        "Stats summary cards at top with animated counters on load",
-        "Typecheck passes"
+        "Implement DistributedNotificationCenter IPC between menubar.swift and viewer.swift",
+        "When menubar triggers a module action, post notification that viewer observes to auto-refresh",
+        "When viewer changes settings, post notification that menubar observes to rebuild menu",
+        "Both processes watch state.json (already implemented) but also respond to explicit IPC signals",
+        "Graph interval changes in UI propagate to menubar timer immediately"
       ],
-      "priority": 7,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 3,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "ae5f04ff-22f7-44bc-9246-74abf145a78b",
+      "checkpointId": null,
+      "wave": 2
     },
     {
       "id": "US-008",
-      "title": "LFG dispatcher and help system updates",
-      "description": "As a developer, I want all new commands registered in the lfg dispatcher with comprehensive help text.",
+      "title": "Menubar AI submenu enhancements",
+      "description": "As a user, I want the menubar AI submenu to include analyze, compare, and suggest subcommands so I can trigger AI operations from the menubar.",
       "acceptanceCriteria": [
-        "lfg settings dispatches to lib/settings.sh",
-        "lfg stfu scaffold dispatches correctly",
-        "lfg stfu --dry-run and lfg stfu --execute flags work",
-        "lfg help shows all commands grouped by category: Scan (wtfs), Clean (dtf), Backup (btau), Drive (devdrive), Forensics (stfu), AI (ai), Settings (settings)",
-        "lfg stfu help shows STFU-specific subcommands and flags",
-        "lfg settings help shows settings subcommands",
-        "Version bumped to 2.1.0",
-        "Typecheck passes"
+        "AI menubar submenu adds: Analyze (prompts for path), Compare, Suggest",
+        "Analyze opens the viewer to the AI side panel with results",
+        "Compare and Suggest fire corresponding lfg ai subcommands",
+        "Existing Show Config and Test Connection items remain"
       ],
-      "priority": 8,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-009",
-      "title": "Dashboard integration of new features",
-      "description": "As a developer, I want the dashboard to reflect all new settings, multi-path scanning, and STFU actions.",
-      "acceptanceCriteria": [
-        "Dashboard STFU tab shows action cards with dry-run/execute buttons",
-        "Dashboard WTFs tab shows projects from all scan_paths with path badges",
-        "Dashboard DTF tab discovers caches from all scan_paths",
-        "Settings panel fully functional with all US-002 controls",
-        "STFU side inspector shows quick actions for selected project",
-        "Path selector dropdown in header for filtering by scan path",
-        "Keyboard shortcuts documented in help overlay (Cmd+?)",
-        "Typecheck passes"
-      ],
-      "priority": 9,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-010",
-      "title": "End-to-end testing and integration verification",
-      "description": "As a developer, I want confidence that all new features work together correctly across the full LFG pipeline.",
-      "acceptanceCriteria": [
-        "lfg settings show returns valid YAML with all default keys",
-        "lfg settings paths add /tmp/test_projects works and persists",
-        "lfg stfu --dry-run completes in <5s with action recommendations",
-        "STFU HTML report renders all sections with action cards",
-        "Library candidates show configured namespace",
-        "Settings panel in dashboard loads and saves correctly",
-        "Multi-path scan aggregates projects from all configured paths",
-        "Archive action moves project and report refreshes",
-        "lfg help shows all commands",
-        "All modules respect module_access permissions",
-        "Typecheck passes"
-      ],
-      "priority": 10,
-      "passes": false,
-      "notes": ""
+      "estimatedPoints": 2,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "planeIssueId": "98ecf058-e727-4e46-83a9-445253edca5e",
+      "checkpointId": null,
+      "wave": 2
     }
   ]
 }

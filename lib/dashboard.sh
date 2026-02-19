@@ -193,6 +193,7 @@ html = f'''<!DOCTYPE html>
   <div class="header">
     <h1><span class="brand">lfg</span> Local File Guardian</h1>
     <span class="meta">TIMESTAMP_PH</span>
+    <button onclick="LFG.exec('open http://localhost:3031')" style="background:rgba(6,214,160,0.15);color:#06d6a0;border:1px solid rgba(6,214,160,0.3);border-radius:20px;padding:4px 12px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-left:auto;"><span style="width:6px;height:6px;border-radius:50%;background:#06d6a0;display:inline-block;"></span>APM Monitor</button>
   </div>
   <div class="summary">
     <div class="stat clickable" onclick="switchTab('wtfs')" data-tip="Click to view disk usage">
@@ -290,6 +291,14 @@ html = f'''<!DOCTYPE html>
       <div class="setting-row"><span class="setting-label">System Override</span><label class="setting-toggle"><input type="checkbox" id="set-override" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set system_override '+(this.checked?'true':'false'),function(){{}})"><span class="toggle-slider"></span></label></div>
       <button onclick="LFG.exec('~/tools/@yj/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:8px;width:100%" class="action-btn">Test Connection</button>
 
+      <div class="section-title" style="margin-top:16px">Graph Interval</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <button onclick="setGraphInterval(60,'1 min')" class="action-btn" style="padding:4px 12px;font-size:10px">1 min</button>
+        <button onclick="setGraphInterval(300,'5 min')" class="action-btn" style="padding:4px 12px;font-size:10px">5 min</button>
+        <button onclick="setGraphInterval(900,'15 min')" class="action-btn" style="padding:4px 12px;font-size:10px">15 min</button>
+        <button onclick="setGraphInterval(1800,'30 min')" class="action-btn" style="padding:4px 12px;font-size:10px">30 min</button>
+      </div>
+
       <div class="section-title" style="margin-top:16px">Module Access</div>
       <div id="module-access-grid" style="font-size:10px;color:#6b6b78"></div>
 
@@ -311,6 +320,12 @@ html = f'''<!DOCTYPE html>
     ],
     keyHandlers: {{}}
   }});
+  function setGraphInterval(secs, label) {{
+    LFG.exec('~/tools/@yj/lfg/lfg settings set graph_interval ' + secs, function(out, err, code) {{
+      if (code === 0) LFG.toast('Graph interval set to ' + label, {{type:'success'}});
+      else LFG.toast('Failed to set interval', {{type:'error'}});
+    }});
+  }}
   function switchTab(name) {{
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
