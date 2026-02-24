@@ -1,4 +1,8 @@
 import Cocoa
+import os.log
+import UserNotifications
+
+private let lfgMenuLog = OSLog(subsystem: "io.pegues.yj-tools.lfg.menubar", category: "menubar")
 
 // =============================================================================
 // LFG Menubar v2 - Status monitor with actions, disk graph, notifications
@@ -142,8 +146,16 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
+            // SF Symbol icon with compact text label
+            if let img = NSImage(systemSymbolName: "externaldrive.fill", accessibilityDescription: "LFG Disk Management") {
+                let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+                button.image = img.withSymbolConfiguration(config)
+                button.imagePosition = .imageLeading
+            }
             button.title = "LFG ..."
             button.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
+            button.setAccessibilityLabel("LFG Disk Management Menu")
+            button.setAccessibilityHelp("Click to open LFG module and disk management menu")
         }
 
         // US-007: Register for viewer IPC notifications
@@ -174,6 +186,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         refreshStats()
         refreshDevdriveConfig()
         recordDiskDataPoint()
+        os_log("Menubar launched, state: %{public}@", log: lfgMenuLog, type: .info, stateFile)
         sendNotification(title: "LFG Menubar", body: "Monitoring active")
     }
 
@@ -261,14 +274,12 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     func recordDiskDataPoint() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let raw = Self.shell("df / | awk 'NR==2{print $3 \"|\" $4 \"|\" $5}'")
+            // APFS-aware: use capacity% for used, calculate free from total
+            let raw = Self.shell("df / | awk 'NR==2{t=$2*512/1e9;p=$5+0;a=$4*512/1e9;printf \"%.1f|%.1f|%d\",t,a,p}'")
             let parts = raw.split(separator: "|")
             guard parts.count >= 3 else { return }
-            // $3=used blocks, $4=available blocks, $5=capacity%
-            let pctStr = String(parts[2]).replacingOccurrences(of: "%", with: "")
-            let usedPct = Double(pctStr) ?? 0
-            let freeBlocks = Double(String(parts[1])) ?? 0
-            let freeGB = freeBlocks * 512 / 1_073_741_824  // 512-byte blocks -> GB
+            let usedPct = Double(String(parts[2])) ?? 0
+            let freeGB = Double(String(parts[1])) ?? 0
 
             let ts = Self.shell("date '+%H:%M'")
 
@@ -324,6 +335,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)]
         )
         header.isEnabled = false
+        header.setAccessibilityLabel("LFG - Local File Guardian status menu")
         menu.addItem(header)
         menu.addItem(NSMenuItem.separator())
 
@@ -455,6 +467,9 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         // --- AI Actions Submenu ---
         let aiItem = NSMenuItem(title: "AI - Analysis Engine", action: nil, keyEquivalent: "")
         let aiMenu = NSMenu()
+        addSubItem(aiMenu, "Open Chat", action: #selector(openChat), key: "6")
+        addSubItem(aiMenu, "Quick Ask...", action: #selector(quickAsk), key: "")
+        aiMenu.addItem(NSMenuItem.separator())
         addSubItem(aiMenu, "Show Config", action: #selector(aiConfigShow), key: "")
         addSubItem(aiMenu, "Test Connection", action: #selector(aiTestConnection), key: "")
         aiMenu.addItem(NSMenuItem.separator())
@@ -542,14 +557,17 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     func refreshStats() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let disk = Self.shell("df -h / | awk 'NR==2{print $4 \"|\" $5}'")
+            // APFS-aware: calculate used from total * capacity%, output in GB
+            let disk = Self.shell("df / | awk 'NR==2{t=int($2*512/1e9+.5);p=$5+0;u=int(t*p/100+.5);a=$4*512/1e9;printf \"%d|%d|%.1f|%d\",t,u,a,p}'")
             let parts = disk.split(separator: "|")
             DispatchQueue.main.async {
-                self?.diskFree = parts.count > 0 ? String(parts[0]) : "?"
-                self?.diskUsed = parts.count > 1 ? String(parts[1]) : "?"
-                if let pctStr = parts.count > 1 ? String(parts[1]).replacingOccurrences(of: "%", with: "") : nil {
-                    self?.diskUsedPct = Double(pctStr) ?? 0
-                }
+                let totalGB = parts.count > 0 ? String(parts[0]) : "?"
+                let usedGB = parts.count > 1 ? String(parts[1]) : "?"
+                let availGB = parts.count > 2 ? String(parts[2]) : "?"
+                let pct = parts.count > 3 ? Double(String(parts[3])) ?? 0 : 0
+                self?.diskFree = "\(availGB) GB"
+                self?.diskUsed = "\(usedGB) of \(totalGB) GB (\(Int(pct))%)"
+                self?.diskUsedPct = pct
                 self?.updateTitle()
                 self?.buildMenu()
             }
@@ -580,17 +598,22 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Notifications
+    // MARK: - Notifications (UNUserNotificationCenter)
 
     func sendNotification(title: String, body: String) {
-        let escaped_title = title.replacingOccurrences(of: "\"", with: "\\\"")
-        let escaped_body = body.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "display notification \"\(escaped_body)\" with title \"\(escaped_title)\" sound name \"Glass\""
-        DispatchQueue.global(qos: .utility).async {
-            let task = Process()
-            task.launchPath = "/usr/bin/osascript"
-            task.arguments = ["-e", script]
-            try? task.run()
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: UUID().uuidString,
+                content: content,
+                trigger: nil
+            )
+            center.add(request, withCompletionHandler: nil)
         }
     }
 
@@ -724,6 +747,33 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     @objc func stfuDuplicates() { launchLFG("stfu duplicates") }
     @objc func stfuLibraries() { launchLFG("stfu libraries") }
     @objc func stfuEnvs() { launchLFG("stfu envs") }
+
+    // Chat actions
+    @objc func openChat() { launchLFG("chat") }
+    @objc func quickAsk() {
+        let alert = NSAlert()
+        alert.messageText = "Quick Ask"
+        alert.informativeText = "Enter your question for LFG:"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Ask")
+        alert.addButton(withTitle: "Cancel")
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        input.placeholderString = "e.g. What's using the most space?"
+        alert.accessoryView = input
+        if alert.runModal() == .alertFirstButtonReturn {
+            let question = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !question.isEmpty {
+                sendNotification(title: "LFG Chat", body: "Asking...")
+                DispatchQueue.global(qos: .userInitiated).async { [self] in
+                    let escaped = question.replacingOccurrences(of: "'", with: "'\\''")
+                    let result = Self.shell("\(lfgPath) chat send '\(escaped)'")
+                    DispatchQueue.main.async {
+                        self.sendNotification(title: "LFG Chat", body: String(result.prefix(200)))
+                    }
+                }
+            }
+        }
+    }
 
     // AI actions
     @objc func aiConfigShow() { launchLFG("ai config show") }

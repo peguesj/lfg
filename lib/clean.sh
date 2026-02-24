@@ -3,10 +3,11 @@
 set -uo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-HTML_FILE="$LFG_DIR/.lfg_clean.html"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+LFG_MODULE="dtf"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_clean.html"
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start dtf
 
@@ -177,28 +178,21 @@ html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">
 <style>''' + theme + '''</style>
 </head><body>
-  <div class=\"header\">
-    <h1><span class=\"brand\">lfg</span> dtf <span class=\"dim\">$MODE_TAG</span></h1>
-    <span class=\"meta\">$TIMESTAMP</span>
-  </div>
   <div class=\"summary\">
     <div class=\"stat\" data-tip=\"Total $MODE_LABEL space\"><span class=\"label\">$MODE_LABEL</span><span class=\"value $TOTAL_CLASS\">$TOTAL_DISPLAY</span></div>
     <div class=\"stat\" data-tip=\"Current free disk space\"><span class=\"label\">Disk Free</span><span class=\"value accent\">$DISK_FREE</span></div>
     <div class=\"stat\" data-tip=\"Caches successfully cleaned\"><span class=\"label\">Cleaned</span><span class=\"value\">$CLEANED</span></div>
     <div class=\"stat\" data-tip=\"Caches not found or empty\"><span class=\"label\">Skipped</span><span class=\"value\">$SKIPPED</span></div>
   </div>
-  <div class=\"guidance\">
-    <strong>DTF</strong> scans developer, build, application, and system caches.
-    ''' + ('Run <code>lfg dtf --force</code> to actually clean these caches.' if '$FORCE' == 'false' else 'Cleanup complete. Run <code>lfg wtfs</code> to see updated disk usage.') + '''
-  </div>
-  <table>
+  <table id=\"main-table\">
     <thead><tr><th>Cat</th><th>Cache</th><th class=\"r\">Size</th><th>Share</th><th>Status</th><th></th></tr></thead>
     <tbody>''' + rows + '''</tbody>
   </table>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg dtf - Local File Guardian | $FOOTER_MSG</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"dtf\", context: \"$MODE_TAG\", moduleVersion: \"1.0.0\", welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\" });
+  LFG.init({ module: \"dtf\", context: \"$MODE_TAG\", moduleVersion: \"2.3.1\", welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\", helpContent: \"<strong>DTF</strong> scans developer, build, application, and system caches.<br><br>''' + ('Run <code>lfg dtf --force</code> to actually clean these caches.' if '$FORCE' == 'false' else 'Cleanup complete. Run <code>lfg wtfs</code> to see updated disk usage.') + '''<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle.\" });
+  LFG.select.init('main-table');
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"DTF Actions\", [
       { label: \"Scan Only\", desc: \"Dry run - show reclaimable\", cli: \"lfg dtf\", module: \"dtf\", action: \"run\", color: \"#4a9eff\" },

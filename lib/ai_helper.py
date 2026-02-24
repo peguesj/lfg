@@ -1,25 +1,58 @@
 #!/usr/bin/env python3
-"""LFG AI Helper - Calls LiteLLM proxy for project analysis."""
+"""LFG AI Helper - Multi-backend LLM calls for project analysis.
+
+Backends: litellm (default), claude (Anthropic API), ollama (local).
+Configured via ~/.config/lfg/ai.yaml or settings.yaml ai.backend field.
+"""
 
 import json
 import os
 import sys
+import time
 import urllib.request
 import urllib.error
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 CONFIG_PATH = os.path.expanduser("~/.config/lfg/ai.yaml")
+SETTINGS_PATH = os.path.expanduser("~/.config/lfg/settings.yaml")
+
+_MAX_RETRIES: int = 3
+_BACKOFF_BASE: float = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Custom Exceptions
+# ---------------------------------------------------------------------------
+
+class LFGAIError(Exception):
+    """Base exception for LFG AI operations."""
+
+class LFGConnectionError(LFGAIError):
+    """Raised when the AI backend is unreachable."""
+
+class LFGConfigError(LFGAIError):
+    """Raised when AI configuration is missing or invalid."""
+
+
+def _log_error(msg: str) -> None:
+    print(f"[LFG-AI ERROR] {msg}", file=sys.stderr)
+
+def _log_warn(msg: str) -> None:
+    print(f"[LFG-AI WARN] {msg}", file=sys.stderr)
 
 
 def load_config():
     """Load AI config from YAML (fallback to defaults if unavailable)."""
     defaults = {
+        "backend": "litellm",
         "model": "gpt-4o-mini",
         "endpoint": "http://localhost:4000",
         "temperature": 0.3,
         "system_override": False,
         "max_tokens": 1024,
     }
+    # Load ai.yaml
     try:
         import yaml
         with open(CONFIG_PATH) as f:
@@ -27,36 +60,175 @@ def load_config():
         defaults.update(cfg)
     except Exception:
         pass
+    # Check settings.yaml for ai.backend override
+    try:
+        if os.path.exists(SETTINGS_PATH):
+            in_ai = False
+            for line in open(SETTINGS_PATH):
+                stripped = line.strip()
+                if stripped == "ai:" or stripped.startswith("ai:"):
+                    in_ai = True
+                    continue
+                if in_ai and line.startswith("  "):
+                    import re
+                    m = re.match(r"\s+(\w+):\s*(.*)", line)
+                    if m:
+                        key, val = m.group(1), m.group(2).strip().strip("\"'")
+                        if val:
+                            defaults[key] = val
+                elif in_ai and not line.startswith(" "):
+                    in_ai = False
+    except Exception:
+        pass
     return defaults
 
 
 def call_llm(prompt, system="You are a project analysis assistant. Return JSON only.", config=None):
-    """Call LiteLLM proxy endpoint."""
+    """Call LLM with multi-backend support."""
     cfg = config or load_config()
+    backend = cfg.get("backend", "litellm")
+
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": prompt},
+    ]
+
+    if backend == "claude":
+        return _call_claude(messages, cfg)
+    elif backend == "ollama":
+        return _call_ollama(messages, cfg)
+    else:
+        return _call_openai_compat(messages, cfg)
+
+
+def _call_openai_compat(messages: list, cfg: dict) -> Optional[str]:
+    """OpenAI-compatible endpoint (LiteLLM proxy) with retry/backoff."""
     endpoint = cfg["endpoint"].rstrip("/")
     url = f"{endpoint}/chat/completions"
-
     payload = {
         "model": cfg["model"],
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": cfg.get("temperature", 0.3),
-        "max_tokens": cfg.get("max_tokens", 1024),
+        "messages": messages,
+        "temperature": float(cfg.get("temperature", 0.3)),
+        "max_tokens": int(cfg.get("max_tokens", 1024)),
     }
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+                return data["choices"][0]["message"]["content"]
+        except urllib.error.URLError as exc:
+            last_exc = exc
+            _log_warn(f"OpenAI-compat attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        except (json.JSONDecodeError, KeyError) as exc:
+            _log_error(f"Malformed response from {url}: {exc}")
+            return None
+        except Exception as exc:
+            last_exc = exc
+            _log_warn(f"Unexpected error attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        if attempt < _MAX_RETRIES:
+            time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
+    _log_error(f"All {_MAX_RETRIES} attempts to {url} failed: {last_exc}")
+    return None
 
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["choices"][0]["message"]["content"]
-    except Exception as e:
+
+def _call_claude(messages: list, cfg: dict) -> Optional[str]:
+    """Direct Anthropic API call with retry/backoff."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        _log_warn("ANTHROPIC_API_KEY not set")
         return None
+
+    model = cfg["model"]
+    if not model.startswith("claude"):
+        model = "claude-sonnet-4-5-20250929"
+
+    system_msg = ""
+    api_messages = []
+    for m in messages:
+        if m["role"] == "system":
+            system_msg = m["content"]
+        else:
+            api_messages.append({"role": m["role"], "content": m["content"]})
+
+    payload = {
+        "model": model,
+        "max_tokens": int(cfg.get("max_tokens", 1024)),
+        "messages": api_messages,
+    }
+    if system_msg:
+        payload["system"] = system_msg
+
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/messages",
+                data=json.dumps(payload).encode(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read())
+                return data["content"][0]["text"]
+        except urllib.error.URLError as exc:
+            last_exc = exc
+            _log_warn(f"Claude API attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        except (json.JSONDecodeError, KeyError) as exc:
+            _log_error(f"Malformed Claude response: {exc}")
+            return None
+        except Exception as exc:
+            last_exc = exc
+            _log_warn(f"Claude unexpected error attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        if attempt < _MAX_RETRIES:
+            time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
+    _log_error(f"All {_MAX_RETRIES} Claude API attempts failed: {last_exc}")
+    return None
+
+
+def _call_ollama(messages: list, cfg: dict) -> Optional[str]:
+    """Ollama local API call with retry/backoff."""
+    model = cfg["model"]
+    if model.startswith("ollama/"):
+        model = model[7:]
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+    }
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            req = urllib.request.Request(
+                "http://localhost:11434/api/chat",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read())
+                return data["message"]["content"]
+        except urllib.error.URLError as exc:
+            last_exc = exc
+            _log_warn(f"Ollama attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        except (json.JSONDecodeError, KeyError) as exc:
+            _log_error(f"Malformed Ollama response: {exc}")
+            return None
+        except Exception as exc:
+            last_exc = exc
+            _log_warn(f"Ollama unexpected error attempt {attempt}/{_MAX_RETRIES}: {exc}")
+        if attempt < _MAX_RETRIES:
+            time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
+    _log_error(f"All {_MAX_RETRIES} Ollama attempts failed: {last_exc}")
+    return None
 
 
 def scan_project(path):

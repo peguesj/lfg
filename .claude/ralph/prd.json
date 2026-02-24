@@ -1,164 +1,101 @@
 {
-  "project": "lfg",
-  "branchName": "ralph/lfg-v2.2-ui-menubar-integration",
-  "baseBranch": "ralph/lfg-v2.1-actions-settings-customization",
-  "description": "LFG v2.2 - Full UI/Menubar action parity, bidirectional state sync, and missing command panels",
-  "upm": {
-    "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
-    "checkpointRange": null,
-    "builtWaves": 2,
-    "verifiedAt": null,
-    "shippedAt": null,
-    "prUrl": null
-  },
+  "project": "LFG - Local File Guardian",
+  "branchName": "ralph/lfg-v2.3.2-devdrive-cache",
+  "baseBranch": "ralph/lfg-v2.2-ui-menubar-integration",
+  "description": "Move LFG generated HTML cache files from main SSD to DevDrive volume to reduce write wear",
   "userStories": [
     {
       "id": "US-001",
-      "title": "BTAU command panel - add all missing menubar actions",
-      "description": "As a user viewing the BTAU module in WebKit, I want action buttons for Migrate, Auto-Move (dry/execute), Backup Now, Restore, Rebuild Forest, New Project, and Configuration so I can perform all BTAU operations without switching to the menubar.",
+      "title": "Add LFG_CACHE_DIR resolution to state.sh",
+      "description": "Add a shared cache directory variable to lib/state.sh that all modules source. If DevDrive is mounted at /Volumes/900DEVELOPER, use /Volumes/900DEVELOPER/.lfg-cache/ as cache dir. Otherwise fall back to $LFG_DIR (current behavior). Create the cache dir if it doesn't exist. Export LFG_CACHE_DIR for all modules.",
       "acceptanceCriteria": [
-        "btau.sh command panel includes: Migrate, Auto-Move Dry Run, Auto-Move Execute, Backup Now, Restore, Rebuild Forest, New Project, Configuration",
-        "Each button uses LFG.actionButton() with appropriate confirm dialogs for destructive operations",
-        "Destructive operations (Rebuild Forest, Auto-Move Execute) use LFG.confirm()",
-        "Non-destructive operations (Status, Discover, Config) use LFG.exec()",
-        "Button layout matches existing command panel grid style"
+        "LFG_CACHE_DIR exported from state.sh",
+        "If /Volumes/900DEVELOPER is mounted, LFG_CACHE_DIR=/Volumes/900DEVELOPER/.lfg-cache",
+        "If not mounted, LFG_CACHE_DIR=$LFG_DIR (backward compat)",
+        "Cache dir is mkdir -p created on source",
+        "bash -n lib/state.sh passes"
       ],
-      "estimatedPoints": 2,
+      "estimatedPoints": 1,
       "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "5f6e004c-7a02-4be7-b802-9598f0cd372b",
-      "checkpointId": null,
+      "status": "pending",
+      "passes": false,
       "wave": 1
     },
     {
       "id": "US-002",
-      "title": "STFU command panel - add individual analysis mode buttons",
-      "description": "As a user viewing the STFU module in WebKit, I want buttons for each individual analysis mode (deps, fingerprint, duplicates, libraries, envs) so I can run targeted analyses without using the CLI.",
+      "title": "Update all module scripts to use LFG_CACHE_DIR for HTML output",
+      "description": "Change HTML_FILE assignments in scan.sh, clean.sh, btau.sh, devdrive.sh, stfu.sh, splash.sh, dashboard.sh, and chat.sh from $LFG_DIR/.lfg_*.html to $LFG_CACHE_DIR/.lfg_*.html. Each module already sources state.sh so the variable is available.",
       "acceptanceCriteria": [
-        "STFU view includes command panel with: Dependency Analysis, File Fingerprinting, Duplicate Detection, Library Candidates, Environment Groups",
-        "Each button runs the corresponding lfg stfu subcommand via LFG.exec()",
-        "Results refresh the STFU view after completion",
-        "Full Analysis (Dry Run) and Full Analysis (Execute) buttons also present"
+        "All 8 module scripts use $LFG_CACHE_DIR for HTML_FILE",
+        "bash -n passes for all 8 scripts",
+        "Modules still source state.sh before using the variable"
       ],
       "estimatedPoints": 2,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "27007e8c-cb27-462a-bb4b-01f670e87d7e",
-      "checkpointId": null,
-      "wave": 1
+      "dependencies": ["US-001"],
+      "status": "pending",
+      "passes": false,
+      "wave": 2
     },
     {
       "id": "US-003",
-      "title": "DTF command panel - add Docker and Sudo clean options",
-      "description": "As a user viewing the DTF module in WebKit, I want Clean+Docker, Clean+Sudo, and Nuclear (all flags) buttons so I have the same cleanup options available in the menubar.",
+      "title": "Update viewer.swift navigation paths to resolve cache dir dynamically",
+      "description": "In viewer.swift, the navigate action hardcodes lfgDir + '/.lfg_*.html'. Change this to check /Volumes/900DEVELOPER/.lfg-cache/ first, then fall back to lfgDir. Also update the LFG_NO_VIEWER background command to pass the correct output path. Update the home action's splash path similarly.",
       "acceptanceCriteria": [
-        "DTF command panel adds: Clean + Docker, Clean + Sudo, Nuclear (--force --docker --sudo)",
-        "Docker and Sudo options use LFG.confirm() with clear warning messages",
-        "Nuclear option has a distinct visual treatment (red/danger styling)",
-        "Existing Scan Only and Clean All buttons remain unchanged"
+        "viewer.swift checks DevDrive cache path first, falls back to lfgDir",
+        "Navigation to all modules works when DevDrive is mounted",
+        "Navigation still works when DevDrive is NOT mounted (fallback)",
+        "swiftc compiles without errors"
       ],
-      "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "5b6c7e51-414f-4cc8-8f76-91e65bf6b213",
-      "checkpointId": null,
-      "wave": 1
+      "estimatedPoints": 2,
+      "dependencies": ["US-001"],
+      "status": "pending",
+      "passes": false,
+      "wave": 2
     },
     {
       "id": "US-004",
-      "title": "DEVDRIVE command panel - add auto-move and config",
-      "description": "As a user viewing the DevDrive module in WebKit, I want Auto-Move (dry/execute) and Show Config buttons matching the menubar actions.",
+      "title": "Update LFG agents to use DevDrive cache paths",
+      "description": "Update the lfg-scan, lfg-clean, lfg-backup, lfg-devdrive, and lfg-monitor agent specifications in ~/.claude/agents/ to reference LFG_CACHE_DIR awareness. Update the CLAUDE.md key paths table to document the new cache location.",
       "acceptanceCriteria": [
-        "DevDrive command panel adds: Auto-Move (Dry Run), Auto-Move (Execute), Show Config",
-        "Auto-Move Execute uses LFG.confirm()",
-        "Show Config displays output inline or in a modal",
-        "Existing Mount/Unmount/Sync/Verify/Create buttons remain unchanged"
+        "Agent descriptions mention DevDrive cache awareness",
+        "CLAUDE.md key paths table updated with cache dir",
+        "No hardcoded /Users/jeremiah paths in agent specs for cache"
       ],
       "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "ac9781d3-c7e4-4c81-9394-015a0b8ce141",
-      "checkpointId": null,
-      "wave": 1
+      "dependencies": ["US-001"],
+      "status": "pending",
+      "passes": false,
+      "wave": 2
     },
     {
       "id": "US-005",
-      "title": "Graph interval selector in Settings UI panel",
-      "description": "As a user, I want to configure the menubar disk graph interval from the Settings UI panel, and have it persist to settings.yaml.",
+      "title": "Update ui.js refreshView to handle DevDrive cache paths",
+      "description": "The LFG.refreshView() function in ui.js uses window.location.pathname to extract the module name via regex. This regex must work regardless of whether the HTML is served from /Users/jeremiah/tools/@yj/lfg/ or /Volumes/900DEVELOPER/.lfg-cache/. The existing regex .lfg_(\\w+).html already handles this since it only matches the filename, but verify and add a comment.",
       "acceptanceCriteria": [
-        "Settings panel (both dashboard side panel and native sheet) includes Graph Interval selector",
-        "Options: 1 min, 5 min, 15 min, 30 min (matching menubar)",
-        "Selection persists to ~/.config/lfg/settings.yaml as graph_interval key",
-        "Menubar reads graph_interval from settings.yaml on launch and refresh"
-      ],
-      "estimatedPoints": 2,
-      "dependencies": [
-        "US-007"
-      ],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "2f453126-b2d9-4523-9c70-0fc9f3dce561",
-      "checkpointId": null,
-      "wave": 2
-    },
-    {
-      "id": "US-006",
-      "title": "APM Monitor link in WebKit UI",
-      "description": "As a user, I want an APM Monitor link in the splash screen footer and dashboard so I can access the CCEM APM dashboard without the menubar.",
-      "acceptanceCriteria": [
-        "Splash screen footer includes APM link (already partially exists)",
-        "Dashboard header or side panel includes APM Monitor button",
-        "Link opens http://localhost:3031 in default browser via LFG.exec('open http://localhost:3031')",
-        "Visual indicator shows APM status (green dot if reachable)"
+        "refreshView regex works with both cache locations",
+        "node -e passes on ui.js"
       ],
       "estimatedPoints": 1,
       "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "e1cbce6a-72b8-4d0b-99f0-4625b4aad1a1",
-      "checkpointId": null,
+      "status": "pending",
+      "passes": false,
       "wave": 1
     },
     {
-      "id": "US-007",
-      "title": "Bidirectional IPC between menubar and viewer",
-      "description": "As a user, I want the menubar and viewer to stay in sync - menubar actions should trigger UI refresh, and UI settings changes should update the menubar without manual refresh.",
+      "id": "US-006",
+      "title": "End-to-end verification and notification",
+      "description": "Run lfg splash with DevDrive mounted, verify HTML files are written to /Volumes/900DEVELOPER/.lfg-cache/, navigate to all modules, confirm cache hits from DevDrive. Add a startup notification via LFG.notifications.add() indicating cache location.",
       "acceptanceCriteria": [
-        "Implement DistributedNotificationCenter IPC between menubar.swift and viewer.swift",
-        "When menubar triggers a module action, post notification that viewer observes to auto-refresh",
-        "When viewer changes settings, post notification that menubar observes to rebuild menu",
-        "Both processes watch state.json (already implemented) but also respond to explicit IPC signals",
-        "Graph interval changes in UI propagate to menubar timer immediately"
+        "lfg splash writes .lfg_splash.html to DevDrive cache",
+        "Navigation to WTFS/DTF/BTAU/DEVDRIVE/STFU all work from DevDrive cache",
+        "Splash shows notification indicating cache location",
+        "All syntax checks pass"
       ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "ae5f04ff-22f7-44bc-9246-74abf145a78b",
-      "checkpointId": null,
-      "wave": 2
-    },
-    {
-      "id": "US-008",
-      "title": "Menubar AI submenu enhancements",
-      "description": "As a user, I want the menubar AI submenu to include analyze, compare, and suggest subcommands so I can trigger AI operations from the menubar.",
-      "acceptanceCriteria": [
-        "AI menubar submenu adds: Analyze (prompts for path), Compare, Suggest",
-        "Analyze opens the viewer to the AI side panel with results",
-        "Compare and Suggest fire corresponding lfg ai subcommands",
-        "Existing Show Config and Test Connection items remain"
-      ],
-      "estimatedPoints": 2,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "planeIssueId": "98ecf058-e727-4e46-83a9-445253edca5e",
-      "checkpointId": null,
-      "wave": 2
+      "estimatedPoints": 1,
+      "dependencies": ["US-002", "US-003", "US-004", "US-005"],
+      "status": "pending",
+      "passes": false,
+      "wave": 3
     }
   ]
 }

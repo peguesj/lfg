@@ -4,11 +4,12 @@ set -uo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DEVDRIVE_DIR="$HOME/tools/yj-devdrive"
-HTML_FILE="$LFG_DIR/.lfg_devdrive.html"
 VIEWER="$LFG_DIR/viewer"
 MOUNT_POINT="/Volumes/900DEVELOPER"
 
 source "$LFG_DIR/lib/state.sh"
+LFG_MODULE="devdrive"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_devdrive.html"
 
 # Pass-through to devdrive subcommands
 case "${1:-}" in
@@ -362,13 +363,9 @@ else:
 html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">
 <style>''' + theme + '''
-.guidance { border-left-color: #c084fc; }
+
 </style>
 </head><body>
-  <div class=\"header\">
-    <h1><span class=\"brand\">lfg</span> devdrive <span class=\"dim\">Developer Drive</span></h1>
-    <span class=\"meta\">$TIMESTAMP</span>
-  </div>
   <div class=\"summary\">
     <div class=\"stat\" data-tip=\"Mount status of $MOUNT_POINT\"><span class=\"label\">Status</span><span class=\"value $MOUNT_STATUS_CLASS\">$MOUNT_STATUS</span></div>
     <div class=\"stat\" data-tip=\"Devdrive volumes with 900DEVELOPER\"><span class=\"label\">Volumes</span><span class=\"value\">$VOLUME_COUNT</span></div>
@@ -376,17 +373,12 @@ html = '''<!DOCTYPE html>
     <div class=\"stat\" data-tip=\"Healthy symlinks\"><span class=\"label\">Healthy</span><span class=\"value good\">$HEALTHY_COUNT</span></div>
     <div class=\"stat\" data-tip=\"Broken symlinks\"><span class=\"label\">Broken</span><span class=\"value''' + (' danger' if $BROKEN_COUNT > 0 else '') + '''\">$BROKEN_COUNT</span></div>
   </div>
-  <div class=\"guidance\">
-    <strong>DEVDRIVE</strong> manages the unified symlink forest at <code>$MOUNT_POINT</code>.
-    Projects from multiple external volumes are linked into a single view.
-    Run <code>lfg devdrive sync</code> to rebuild links, or <code>lfg devdrive verify</code> to audit health.
-  </div>
   ''' + volumes_html + '''
   ''' + projects_html + '''
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg devdrive - Local File Guardian | Developer Drive</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"devdrive\", context: \"Developer Drive\", moduleVersion: \"1.0.0\", welcome: \"$PROJECT_COUNT projects across $VOLUME_COUNT volumes\" });
+  LFG.init({ module: \"devdrive\", context: \"Developer Drive\", moduleVersion: \"2.3.1\", welcome: \"$PROJECT_COUNT projects across $VOLUME_COUNT volumes\", helpContent: \"<strong>DEVDRIVE</strong> manages the unified symlink forest at <code>$MOUNT_POINT</code>.<br><br>Projects from multiple external volumes are linked into a single view.<br>Run <code>lfg devdrive sync</code> to rebuild links, or <code>lfg devdrive verify</code> to audit health.\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"DEVDRIVE Actions\", [
       { label: \"Mount\", desc: \"Attach sparse image\", cli: \"lfg devdrive mount\", module: \"devdrive\", action: \"run\", args: \"mount\", color: \"#c084fc\" },

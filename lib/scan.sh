@@ -3,10 +3,11 @@
 set -euo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-HTML_FILE="$LFG_DIR/.lfg_scan.html"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+LFG_MODULE="wtfs"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_scan.html"
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start wtfs
 
@@ -112,29 +113,21 @@ html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">
 <style>''' + theme + '''</style>
 </head><body>
-  <div class=\"header\">
-    <h1><span class=\"brand\">lfg</span> wtfs <span class=\"dim\">$DIR_DISPLAY</span></h1>
-    <span class=\"meta\">$TIMESTAMP</span>
-  </div>
   <div class=\"summary\">
     <div class=\"stat\" data-tip=\"Total size of $DIR_DISPLAY\"><span class=\"label\">Total Used</span><span class=\"value\">$TOTAL_HR</span></div>
     <div class=\"stat\" data-tip=\"Available disk space\"><span class=\"label\">Disk Free</span><span class=\"value accent\">$DISK_FREE</span></div>
     <div class=\"stat\" data-tip=\"$RANK directories scanned\"><span class=\"label\">Directories</span><span class=\"value\">$RANK</span></div>
   </div>
-  <div class=\"guidance\">
-    <strong>WTFS</strong> shows disk usage for <code>$DIR_DISPLAY</code>.
-    Hover rows for details. Largest directories are at the top.
-    Run <code>lfg dtf</code> to find reclaimable caches, or <code>lfg btau</code> for backups.
-  </div>
   <div class=\"composition-legend\"><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#4a9eff\"></span>Dependencies</span><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#ffd166\"></span>Cache/Build</span><span class=\"legend-item\"><span class=\"legend-dot\" style=\"background:#06d6a0\"></span>Source</span></div>
-  <table>
+  <table id=\"main-table\">
     <thead><tr><th>#</th><th>Directory</th><th class=\"r\">Size</th><th>Composition</th><th class=\"r\">%</th></tr></thead>
     <tbody>''' + rows + '''</tbody>
   </table>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg wtfs - Local File Guardian | $DIR_DISPLAY</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"wtfs\", context: \"$DIR_DISPLAY\", moduleVersion: \"1.0.0\", welcome: \"Showing $RANK directories in $DIR_DISPLAY\" });
+  LFG.init({ module: \"wtfs\", context: \"$DIR_DISPLAY\", moduleVersion: \"2.3.1\", welcome: \"Showing $RANK directories in $DIR_DISPLAY\", helpContent: \"<strong>WTFS</strong> shows disk usage for <code>$DIR_DISPLAY</code>.<br><br>Hover rows for details. Largest directories are at the top.<br>Run <code>lfg dtf</code> to find reclaimable caches, or <code>lfg btau</code> for backups.<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle, Cmd+A to select all.\" });
+  LFG.select.init('main-table');
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"WTFS Actions\", [
       { label: \"Scan ~/Developer\", desc: \"Default scan target\", cli: \"lfg wtfs ~/Developer\", module: \"wtfs\", action: \"run\", args: \"~/Developer\", color: \"#4a9eff\" },

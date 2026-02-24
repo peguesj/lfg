@@ -1,7 +1,11 @@
 import Cocoa
 import WebKit
+import os.log
 
-class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
+private let lfgLog = OSLog(subsystem: "io.pegues.yj-tools.lfg", category: "viewer")
+private let kWindowFrameKey = "LFGViewerWindowFrame"
+
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate {
     var window: NSWindow!
     var webView: WKWebView!
     let htmlPath: String
@@ -23,20 +27,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         "btau": "BTAU - Back That App Up",
         "devdrive": "DEVDRIVE - Developer Drive",
         "stfu": "STFU - Source Tree Forensics",
+        "chat": "LFG Chat",
         "dashboard": "LFG Dashboard",
         "splash": "LFG - Local File Guardian"
     ]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Restore saved window frame or calculate default
         let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 900, height: 700)
-        let width: CGFloat = min(880, screenFrame.width * 0.65)
-        let height: CGFloat = min(750, screenFrame.height * 0.85)
-        let x = screenFrame.origin.x + (screenFrame.width - width) / 2
-        let y = screenFrame.origin.y + (screenFrame.height - height) / 2
+        var windowRect: NSRect
+        if let savedFrame = UserDefaults.standard.string(forKey: kWindowFrameKey) {
+            let restored = NSRectFromString(savedFrame)
+            if restored.width >= 500 && restored.height >= 400 {
+                windowRect = restored
+            } else {
+                let w = min(880, screenFrame.width * 0.65)
+                let h = min(750, screenFrame.height * 0.85)
+                windowRect = NSRect(x: screenFrame.origin.x + (screenFrame.width - w) / 2,
+                                    y: screenFrame.origin.y + (screenFrame.height - h) / 2,
+                                    width: w, height: h)
+            }
+        } else {
+            let w = min(880, screenFrame.width * 0.65)
+            let h = min(750, screenFrame.height * 0.85)
+            windowRect = NSRect(x: screenFrame.origin.x + (screenFrame.width - w) / 2,
+                                y: screenFrame.origin.y + (screenFrame.height - h) / 2,
+                                width: w, height: h)
+        }
 
         window = NSWindow(
-            contentRect: NSRect(x: x, y: y, width: width, height: height),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            contentRect: windowRect,
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -45,6 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         window.backgroundColor = NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 1.0)
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 500, height: 400)
+        window.delegate = self
 
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
@@ -53,14 +75,50 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         config.userContentController.add(self, name: "lfg")
 
         webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = self
         webView.setValue(false, forKey: "drawsBackground")
+        webView.setAccessibilityLabel("LFG Module Content")
+        webView.setAccessibilityRole(.group)
         window.contentView = webView
 
         let url = URL(fileURLWithPath: htmlPath)
+        os_log("Launching viewer with HTML: %{public}@", log: lfgLog, type: .info, htmlPath)
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // IPC: observe menubar notifications to auto-refresh
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleMenubarNotification(_:)),
+            name: NSNotification.Name("com.lfg.menubar.actionCompleted"), object: nil
+        )
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(handleMenubarNotification(_:)),
+            name: NSNotification.Name("com.lfg.menubar.settingsChanged"), object: nil
+        )
+    }
+
+    @objc func handleMenubarNotification(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.reload()
+        }
+    }
+
+    /// Post IPC notification to menubar when viewer changes settings
+    func postSettingsChanged() {
+        DistributedNotificationCenter.default().post(
+            name: NSNotification.Name("com.lfg.viewer.settingsChanged"),
+            object: nil
+        )
+    }
+
+    /// Post IPC notification when viewer completes an action
+    func postActionCompleted() {
+        DistributedNotificationCenter.default().post(
+            name: NSNotification.Name("com.lfg.viewer.actionCompleted"),
+            object: nil
+        )
     }
 
     // Handle messages from JavaScript
@@ -77,8 +135,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         let sourceWebView: WKWebView = message.webView ?? webView
 
         if action == "exec", let cmd = str("cmd"), let reqId = str("id") {
+            let isSettingsCmd = cmd.contains("settings set") || cmd.contains("settings paths") || cmd.contains("settings reset")
             // Execute a shell command and return results to JS
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global(qos: .userInitiated).async { [self] in
                 let task = Process()
                 task.launchPath = "/bin/bash"
                 task.arguments = ["-c", cmd]
@@ -99,7 +158,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
                 let stdout = String(data: outPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
                 let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
                 let code = task.terminationStatus
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [self] in
                     // Escape for JS string literal
                     func esc(_ s: String) -> String {
                         s.replacingOccurrences(of: "\\", with: "\\\\")
@@ -109,6 +168,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
                     }
                     let js = "LFG._onExecResult('\(reqId)', '\(esc(stdout))', '\(esc(stderr))', \(code))"
                     sourceWebView.evaluateJavaScript(js, completionHandler: nil)
+                    if isSettingsCmd && code == 0 { postSettingsChanged() }
+                    else if code == 0 { postActionCompleted() }
                 }
             }
         } else if action == "confirm", let msg = str("message"), let cmd = str("cmd"), let reqId = str("id") {
@@ -141,6 +202,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
                         }
                         let js = "LFG._onExecResult('\(reqId)', '\(esc(stdout))', '\(esc(stderr))', \(code))"
                         sourceWebView.evaluateJavaScript(js, completionHandler: nil)
+                        if code == 0 { self.postActionCompleted() }
                     }
                 }
             } else {
@@ -154,17 +216,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             }
         } else if action == "navigate", let target = str("target") {
             // In-place navigation with loading screen
+            os_log("Navigate request: %{public}@", log: lfgLog, type: .info, target)
             let lfgDir = NSHomeDirectory() + "/tools/@yj/lfg"
+            let devDriveCache = "/Volumes/900DEVELOPER/.lfg-cache"
+            let fm = FileManager.default
+            // Resolve cache dir: DevDrive if available, fallback to lfgDir
+            let cacheDir = fm.fileExists(atPath: devDriveCache) ? devDriveCache : lfgDir
             let targetPath: String
             let moduleCmd: String?
             switch target {
-            case "wtfs":      targetPath = lfgDir + "/.lfg_scan.html"; moduleCmd = "wtfs"
-            case "dtf":       targetPath = lfgDir + "/.lfg_clean.html"; moduleCmd = "dtf"
-            case "btau":      targetPath = lfgDir + "/.lfg_btau.html"; moduleCmd = "btau"
-            case "devdrive":  targetPath = lfgDir + "/.lfg_devdrive.html"; moduleCmd = "devdrive"
-            case "stfu":      targetPath = lfgDir + "/.lfg_stfu.html"; moduleCmd = "stfu"
-            case "dashboard": targetPath = lfgDir + "/.lfg_dashboard.html"; moduleCmd = "dashboard"
-            case "splash":    targetPath = lfgDir + "/.lfg_splash.html"; moduleCmd = nil
+            case "wtfs":      targetPath = cacheDir + "/.lfg_scan.html"; moduleCmd = "wtfs"
+            case "dtf":       targetPath = cacheDir + "/.lfg_clean.html"; moduleCmd = "dtf"
+            case "btau":      targetPath = cacheDir + "/.lfg_btau.html"; moduleCmd = "btau"
+            case "devdrive":  targetPath = cacheDir + "/.lfg_devdrive.html"; moduleCmd = "devdrive"
+            case "stfu":      targetPath = cacheDir + "/.lfg_stfu.html"; moduleCmd = "stfu"
+            case "chat":      targetPath = cacheDir + "/.lfg_chat.html"; moduleCmd = "chat"
+            case "dashboard": targetPath = cacheDir + "/.lfg_dashboard.html"; moduleCmd = "dashboard"
+            case "splash":    targetPath = cacheDir + "/.lfg_splash.html"; moduleCmd = nil
             default:          targetPath = target; moduleCmd = nil
             }
 
@@ -188,12 +256,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             // Show loading screen inline, then generate in background
             let colors: [String: String] = [
                 "wtfs": "#4a9eff", "dtf": "#ff8c42", "btau": "#06d6a0",
-                "devdrive": "#c084fc", "stfu": "#e879f9", "dashboard": "#4a9eff"
+                "devdrive": "#c084fc", "stfu": "#e879f9", "chat": "#4a9eff", "dashboard": "#4a9eff"
             ]
             let labels: [String: String] = [
                 "wtfs": "Scanning disk usage...", "dtf": "Discovering caches...",
                 "btau": "Checking backups...", "devdrive": "Loading developer drive...",
-                "stfu": "Analyzing source trees...", "dashboard": "Building dashboard..."
+                "stfu": "Analyzing source trees...", "chat": "Starting chat...", "dashboard": "Building dashboard..."
             ]
             let accentColor = colors[target] ?? "#4a9eff"
             let loadingLabel = labels[target] ?? "Loading..."
@@ -247,17 +315,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             syncNavDepth()
 
             // Generate module HTML in background (LFG_NO_VIEWER suppresses viewer launch)
-            let cmd = "LFG_NO_VIEWER=1 \(lfgDir)/lfg \(moduleCmd ?? target) 2>/dev/null; true"
+            let cmd = "LFG_NO_VIEWER=1 \(lfgDir)/lfg \(moduleCmd ?? target) 2>&1"
+            os_log("Exec module: %{public}@", log: lfgLog, type: .info, cmd)
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 let task = Process()
+                let errPipe = Pipe()
                 task.launchPath = "/bin/bash"
                 task.arguments = ["-c", cmd]
-                try? task.run()
-                task.waitUntilExit()
+                task.standardOutput = FileHandle.nullDevice
+                task.standardError = errPipe
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    if task.terminationStatus != 0 {
+                        let stderr = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                        os_log("Module %{public}@ exited %d: %{public}@", log: lfgLog, type: .error, moduleCmd ?? target, task.terminationStatus, stderr)
+                    }
+                } catch {
+                    os_log("Module launch failed: %{public}@", log: lfgLog, type: .fault, error.localizedDescription)
+                }
                 DispatchQueue.main.async {
                     let targetURL = URL(fileURLWithPath: targetPath)
-                    let lfgDirURL = URL(fileURLWithPath: lfgDir)
-                    self?.webView.loadFileURL(targetURL, allowingReadAccessTo: lfgDirURL)
+                    os_log("Navigate load: %{public}@", log: lfgLog, type: .info, targetPath)
+                    self?.webView.loadFileURL(targetURL, allowingReadAccessTo: targetURL.deletingLastPathComponent())
                 }
             }
         } else if action == "back" {
@@ -266,9 +346,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
                 syncNavDepth()
             }
         } else if action == "home" {
-            let splashPath = NSHomeDirectory() + "/tools/@yj/lfg/.lfg_splash.html"
+            let lfgHome = NSHomeDirectory() + "/tools/@yj/lfg"
+            let devCache = "/Volumes/900DEVELOPER/.lfg-cache"
+            let homeCache = FileManager.default.fileExists(atPath: devCache) ? devCache : lfgHome
+            let splashPath = homeCache + "/.lfg_splash.html"
             navigationStack.removeAll()
             window.title = "LFG - Local File Guardian"
+            os_log("Home navigation: %{public}@", log: lfgLog, type: .info, splashPath)
             let splashURL = URL(fileURLWithPath: splashPath)
             webView.loadFileURL(splashURL, allowingReadAccessTo: splashURL.deletingLastPathComponent())
             syncNavDepth()
@@ -282,6 +366,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
                 task.arguments = ["-c", cmd]
                 try? task.run()
             }
+        } else if action == "open-settings" {
+            openSettings()
         } else if action == "close-settings" {
             if let sw = settingsWindow {
                 window.endSheet(sw)
@@ -289,6 +375,43 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
             }
         } else if action == "quit" {
             NSApp.terminate(nil)
+        }
+    }
+
+    // MARK: - WKNavigationDelegate (error recovery)
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let nsError = error as NSError
+        os_log("WebKit load failed: %{public}@ (code %d)", log: lfgLog, type: .error, nsError.localizedDescription, nsError.code)
+
+        // Fallback: if DevDrive path failed, try lfgDir
+        if let failedURL = nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
+            let path = failedURL.path
+            if path.hasPrefix("/Volumes/900DEVELOPER/.lfg-cache/") {
+                let filename = failedURL.lastPathComponent
+                let fallback = NSHomeDirectory() + "/tools/@yj/lfg/" + filename
+                os_log("Fallback to: %{public}@", log: lfgLog, type: .info, fallback)
+                let fallbackURL = URL(fileURLWithPath: fallback)
+                if FileManager.default.fileExists(atPath: fallback) {
+                    webView.loadFileURL(fallbackURL, allowingReadAccessTo: fallbackURL.deletingLastPathComponent())
+                    return
+                }
+            }
+        }
+
+        // Last resort: show error in-page
+        let errorHTML = """
+        <html><body style="background:#141418;color:#ff4d6a;font-family:monospace;padding:40px;text-align:center">
+        <h2>Load Error</h2><p>\(nsError.localizedDescription)</p>
+        <p style="color:#6b6b78;font-size:12px">Check Console.app → filter "io.pegues.yj-tools.lfg"</p>
+        </body></html>
+        """
+        webView.loadHTMLString(errorHTML, baseURL: nil)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if let url = webView.url {
+            os_log("Loaded: %{public}@", log: lfgLog, type: .info, url.absoluteString)
         }
     }
 
@@ -301,6 +424,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
 
     @objc func reloadPage() {
         webView.reload()
+    }
+
+    @objc func navigateBack() {
+        if let prev = navigationStack.popLast() {
+            webView.loadFileURL(prev, allowingReadAccessTo: prev.deletingLastPathComponent())
+            syncNavDepth()
+        }
+    }
+
+    @objc func navigateHome() {
+        // Trigger the "home" action via the existing handler
+        let lfgHome = NSHomeDirectory() + "/tools/@yj/lfg"
+        let devCache = "/Volumes/900DEVELOPER/.lfg-cache"
+        let homeCache = FileManager.default.fileExists(atPath: devCache) ? devCache : lfgHome
+        let splashPath = homeCache + "/.lfg_splash.html"
+        navigationStack.removeAll()
+        window.title = "LFG - Local File Guardian"
+        let splashURL = URL(fileURLWithPath: splashPath)
+        webView.loadFileURL(splashURL, allowingReadAccessTo: splashURL.deletingLastPathComponent())
+        syncNavDepth()
+    }
+
+    @objc func navigateToModule(_ sender: NSMenuItem) {
+        guard let mod = sender.representedObject as? String else { return }
+        // Trigger navigation via the WKScriptMessageHandler bridge
+        let js = "window.webkit.messageHandlers.lfg.postMessage({action:'navigate',target:'\(mod)'})"
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     @objc func openSettings() {
@@ -396,7 +546,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         window.LFG = { _onExecResult: function(id,out,err,code){ if(window._scb[id]){window._scb[id](out,err,code);delete window._scb[id];} } };
 
         function loadSettings() {
-          exec('\\(lfgDir)/lfg settings show --json', function(out) {
+          exec('\(lfgDir)/lfg settings show --json', function(out) {
             try { settings = JSON.parse(out); } catch(e) { settings = {}; }
             document.getElementById('loading').style.display = 'none';
             document.getElementById('content').style.display = 'block';
@@ -416,13 +566,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         function addPath() {
           var p = document.getElementById('new-path').value.trim();
           if (!p) return;
-          exec('\\(lfgDir)/lfg settings paths add "'+p+'"', function(){ document.getElementById('new-path').value=''; toast('Path added'); reloadSettings(); });
+          exec('\(lfgDir)/lfg settings paths add "'+p+'"', function(){ document.getElementById('new-path').value=''; toast('Path added'); reloadSettings(); });
         }
         function removePath(p) {
-          exec('\\(lfgDir)/lfg settings paths remove "'+p+'"', function(){ toast('Path removed'); reloadSettings(); });
+          exec('\(lfgDir)/lfg settings paths remove "'+p+'"', function(){ toast('Path removed'); reloadSettings(); });
         }
         function saveSetting(key, val) {
-          exec('\\(lfgDir)/lfg settings set '+key+' "'+val+'"', function(){ toast('Saved'); });
+          exec('\(lfgDir)/lfg settings set '+key+' "'+val+'"', function(){ toast('Saved'); });
         }
         function renderAccess() {
           var mods = ['wtfs','dtf','btau','devdrive','stfu'];
@@ -436,10 +586,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
         function toggleAccess(mod) {
           var cur = (settings.module_access || {})[mod] || 'all';
           var next = cur === 'all' ? 'none' : 'all';
-          exec('\\(lfgDir)/lfg settings set module_access.'+mod+' '+next, function(){ toast(mod.toUpperCase()+' access: '+next); reloadSettings(); });
+          exec('\(lfgDir)/lfg settings set module_access.'+mod+' '+next, function(){ toast(mod.toUpperCase()+' access: '+next); reloadSettings(); });
         }
         function resetDefaults() {
-          exec('\\(lfgDir)/lfg settings reset', function(){ toast('Reset to defaults'); reloadSettings(); });
+          exec('\(lfgDir)/lfg settings reset', function(){ toast('Reset to defaults'); reloadSettings(); });
         }
         function reloadSettings() { loadSettings(); }
         loadSettings();
@@ -471,6 +621,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
     }
 
     var settingsWindow: NSWindow?
+
+    // MARK: - NSWindowDelegate (frame persistence)
+
+    func windowDidResize(_ notification: Notification) {
+        saveWindowFrame()
+    }
+
+    func windowDidMove(_ notification: Notification) {
+        saveWindowFrame()
+    }
+
+    func saveWindowFrame() {
+        UserDefaults.standard.set(NSStringFromRect(window.frame), forKey: kWindowFrameKey)
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ application: NSApplication) -> Bool {
         return true
@@ -536,6 +700,29 @@ viewMenu.addItem(NSMenuItem.separator())
 viewMenu.addItem(withTitle: "Toggle Developer Tools", action: nil, keyEquivalent: "")
 viewMenuItem.submenu = viewMenu
 mainMenu.addItem(viewMenuItem)
+
+// Navigate menu (Cmd+[ for back, Cmd+1..5 for modules)
+let navMenuItem = NSMenuItem()
+let navMenu = NSMenu(title: "Navigate")
+navMenu.addItem(withTitle: "Back", action: #selector(AppDelegate.navigateBack), keyEquivalent: "[")
+navMenu.addItem(withTitle: "Home", action: #selector(AppDelegate.navigateHome), keyEquivalent: "")
+navMenu.addItem(NSMenuItem.separator())
+let navModules: [(String, String, String)] = [
+    ("Dashboard", "dashboard", "1"),
+    ("WTFS - Scan", "wtfs", "2"),
+    ("DTF - Clean", "dtf", "3"),
+    ("STFU", "stfu", "4"),
+    ("DevDrive", "devdrive", "5"),
+    ("BTAU", "btau", "6"),
+]
+for (label, mod, key) in navModules {
+    let mi = NSMenuItem(title: label, action: #selector(AppDelegate.navigateToModule(_:)), keyEquivalent: key)
+    mi.representedObject = mod
+    mi.target = delegate
+    navMenu.addItem(mi)
+}
+navMenuItem.submenu = navMenu
+mainMenu.addItem(navMenuItem)
 
 // Help menu
 let helpMenuItem = NSMenuItem()

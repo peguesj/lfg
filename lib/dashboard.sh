@@ -4,7 +4,9 @@ set -uo pipefail
 
 TARGET="${1:-$HOME/Developer}"
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-HTML_FILE="$LFG_DIR/.lfg_dashboard.html"
+source "$LFG_DIR/lib/state.sh"
+LFG_MODULE="dashboard"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_dashboard.html"
 VIEWER="$LFG_DIR/viewer"
 
 echo "Scanning $TARGET..."
@@ -173,6 +175,8 @@ DISK_USED=$(df -h "$TARGET" | awk 'NR==2{print $5}')
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 DIR_DISPLAY=$(echo "$TARGET" | sed "s|$HOME|~|")
 
+export LFG_DIR HTML_FILE
+
 python3 << 'PYEOF'
 import os
 
@@ -190,11 +194,6 @@ html = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>{theme}</style>
 </head><body>
-  <div class="header">
-    <h1><span class="brand">lfg</span> Local File Guardian</h1>
-    <span class="meta">TIMESTAMP_PH</span>
-    <button onclick="LFG.exec('open http://localhost:3031')" style="background:rgba(6,214,160,0.15);color:#06d6a0;border:1px solid rgba(6,214,160,0.3);border-radius:20px;padding:4px 12px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-left:auto;"><span style="width:6px;height:6px;border-radius:50%;background:#06d6a0;display:inline-block;"></span>APM Monitor</button>
-  </div>
   <div class="summary">
     <div class="stat clickable" onclick="switchTab('wtfs')" data-tip="Click to view disk usage">
       <span class="label">Developer</span><span class="value">TOTAL_HR_PH</span>
@@ -225,26 +224,21 @@ html = f'''<!DOCTYPE html>
   <div class="dashboard-layout">
   <div class="main-column">
   <div id="tab-wtfs" class="tab-content active">
-    <div class="guidance"><strong>WTFS</strong> - Top directories in <code>DIR_DISPLAY_PH</code> by size. Hover rows for details.</div>
     <table><thead><tr><th>#</th><th>Directory</th><th class="r">Size</th><th>Usage</th><th class="r">%</th></tr></thead>
     <tbody>{scan_rows}</tbody></table>
   </div>
   <div id="tab-dtf" class="tab-content">
-    <div class="guidance"><strong>DTF</strong> - CACHE_COUNT_PH active caches found. Run <code>lfg dtf --force</code> to clean.</div>
     <table><thead><tr><th>Cat</th><th>Cache</th><th class="r">Size</th></tr></thead>
     <tbody>{cache_rows}</tbody></table>
   </div>
   <div id="tab-btau" class="tab-content">
-    <div class="guidance"><strong>BTAU</strong> - Last backup: <strong>LAST_BACKUP_PH</strong>. Run <code>lfg btau discover</code> to scan volumes.</div>
     ''' + (f'<table><thead><tr><th>Volume</th><th>Type</th><th>Timestamp</th></tr></thead><tbody>{backup_rows}</tbody></table>' if backup_rows.strip() else '<div class="empty-state">No backups found. Run: lfg btau backup VOLUME</div>') + f'''
   </div>
   <div id="tab-devdrive" class="tab-content">
-    <div class="guidance" style="border-left-color:#c084fc"><strong>DEVDRIVE</strong> - DD_PROJECT_COUNT_PH projects across DD_VOLUME_COUNT_PH volumes. Run <code>lfg devdrive</code> for full view.</div>
     ''' + (f'<div class="section-title" style="color:#c084fc">Volumes</div><table><thead><tr><th>Volume</th><th class="r">Free</th><th class="r">Projects</th></tr></thead><tbody>{dd_volume_rows}</tbody></table>' if dd_volume_rows.strip() else '<div class="section-title" style="color:#c084fc">Volumes</div><div class="empty-state">No devdrive volumes detected.</div>') + f'''
     ''' + (f'<div class="section-title" style="color:#c084fc">Symlink Forest</div><table><thead><tr><th>Project</th><th>Volume</th><th>Status</th></tr></thead><tbody>{dd_project_rows}</tbody></table>' if dd_project_rows.strip() else '<div class="section-title" style="color:#c084fc">Symlink Forest</div><div class="empty-state">No projects in symlink forest.</div>') + f'''
   </div>
   <div id="tab-stfu" class="tab-content">
-    <div class="guidance" style="border-left-color:#c084fc"><strong>STFU</strong> - Source Tree Forensics &amp; Unification. Scans <code>DIR_DISPLAY_PH</code> for project relationships, duplicates, and coalescence candidates.</div>
     <div id="stfu-main-loading" class="empty-state">Scanning project relationships...</div>
     <div id="stfu-main-duplicates" style="display:none"></div>
     <div id="stfu-main-relationships" style="display:none"></div>
@@ -265,11 +259,13 @@ html = f'''<!DOCTYPE html>
       <div id="stfu-clusters" style="display:none"></div>
     </div>
     <div id="side-ai" class="side-panel">
-      <div class="section-title">AI Analysis</div>
-      <div class="setting-row"><span class="setting-label">Status</span><span id="ai-status" class="ai-pill" style="background:#6b6b78">Checking...</span></div>
-      <div class="setting-row"><span class="setting-label">Model</span><span id="ai-model">--</span></div>
-      <button id="ai-analyze-btn" style="margin-top:12px;width:100%" class="action-btn">Analyze Selected</button>
-      <div id="ai-results" style="margin-top:12px"></div>
+      <div id="chat-panel-container"></div>
+      <div style="margin-top:12px;padding-top:8px;border-top:1px solid #2a2a34">
+        <div class="setting-row"><span class="setting-label">Status</span><span id="ai-status" class="ai-pill" style="background:#6b6b78">Checking...</span></div>
+        <div class="setting-row"><span class="setting-label">Model</span><span id="ai-model">--</span></div>
+        <button id="ai-analyze-btn" style="margin-top:8px;width:100%;padding:7px 16px;border:1px solid #4a9eff;border-radius:6px;background:transparent;color:#4a9eff;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit" class="action-btn">Analyze Selected</button>
+        <div id="ai-results" style="margin-top:8px"></div>
+      </div>
     </div>
     <div id="side-settings" class="side-panel">
       <div class="section-title">Scan Paths</div>
@@ -285,6 +281,7 @@ html = f'''<!DOCTYPE html>
       </div>
 
       <div class="section-title">AI Settings</div>
+      <div class="setting-row"><span class="setting-label">Backend</span><select id="set-backend" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg settings set ai.backend '+this.value,function(){{}})"><option value="litellm">LiteLLM Proxy</option><option value="claude">Claude (Anthropic)</option><option value="ollama">Ollama (Local)</option></select></div>
       <div class="setting-row"><span class="setting-label">Model</span><select id="set-model" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set model '+this.value,function(){{}})"><option>gpt-4o-mini</option><option>gpt-4o</option><option>claude-sonnet-4-5-20250929</option><option>ollama/llama3</option></select></div>
       <div class="setting-row"><span class="setting-label">Endpoint</span><input id="set-endpoint" class="setting-input" value="http://localhost:4000" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set endpoint '+this.value,function(){{}})"></div>
       <div class="setting-row"><span class="setting-label">Temperature</span><input id="set-temp" type="range" min="0" max="1" step="0.1" value="0.3" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set temperature '+this.value,function(){{}})"></div>
@@ -309,8 +306,9 @@ html = f'''<!DOCTYPE html>
   <div class="footer">lfg v2.1.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI + Settings</div>
   <script>{uijs}
   LFG.init({{
-    module: "dashboard", context: "All Modules", moduleVersion: "2.1.0",
+    module: "dashboard", context: "All Modules", moduleVersion: "2.3.1",
     welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups, DD_PROJECT_COUNT_PH devdrive projects",
+    helpContent: "<strong>LFG Dashboard</strong><br><br><strong>WTFS</strong> - Top directories by size. Hover rows for details.<br><strong>DTF</strong> - Active caches found. Run <code>lfg dtf --force</code> to clean.<br><strong>BTAU</strong> - Backup history. Run <code>lfg btau discover</code> to scan volumes.<br><strong>DEVDRIVE</strong> - Symlink forest status. Run <code>lfg devdrive</code> for full view.<br><strong>STFU</strong> - Source Tree Forensics. Scans for project relationships and duplicates.<br><br>Use module tabs or nav pills in the header to switch views.",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [
       {{ icon: "\\uD83D\\uDD12", title: "Welcome to LFG", desc: "Local File Guardian keeps your Mac lean. Four modules work together to scan, clean, protect, and organize your files.", color: "#4a9eff" }},
       {{ icon: "\\uD83D\\uDD0D", title: "WTFS - Disk Usage", desc: "See where your disk space is going. Scans ~/Developer by default, showing the biggest directories first.", color: "#4a9eff" }},
@@ -340,11 +338,18 @@ html = f'''<!DOCTYPE html>
     if (e.metaKey && e.key === '4') switchTab('devdrive');
     if (e.metaKey && e.key === '5') switchTab('stfu');
   }});
-  // AI status check
+  // Initialize chat panel
   setTimeout(function() {{
-    LFG.ai.isAvailable(function(ok) {{
+    LFG.chat.initPanel('chat-panel-container');
+    LFG.chat.isAvailable(function(ok, info) {{
       var el = document.getElementById('ai-status');
-      if (el) {{ el.textContent = ok ? 'Connected' : 'Offline'; el.style.background = ok ? '#06d6a0' : '#ff4d6a'; }}
+      if (el) {{
+        el.textContent = ok ? 'Connected' : 'Offline';
+        el.style.background = ok ? 'rgba(6,214,160,0.12)' : 'rgba(255,77,106,0.12)';
+        el.style.color = ok ? '#06d6a0' : '#ff4d6a';
+      }}
+      var modelEl = document.getElementById('ai-model');
+      if (modelEl && ok && info) modelEl.textContent = info.model || info.backend || '--';
     }});
     LFG.exec('~/tools/@yj/lfg/lfg ai config get model', function(out) {{
       var el = document.getElementById('ai-model');
@@ -504,8 +509,6 @@ html = html.replace('DD_VOLUME_ROWS_PLACEHOLDER', '''$DD_VOLUME_ROWS''')
 html = html.replace('DD_PROJECT_ROWS_PLACEHOLDER', '''$DD_PROJECT_ROWS''')
 open('$HTML_FILE', 'w').write(html)
 "
-
-export LFG_DIR HTML_FILE
 
 if [[ "${LFG_NO_VIEWER:-}" == "1" ]]; then
     echo "Done (headless)."

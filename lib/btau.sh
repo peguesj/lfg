@@ -4,10 +4,11 @@ set -uo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BTAU_DIR="$HOME/tools/yj-devdrive"
-HTML_FILE="$LFG_DIR/.lfg_btau.html"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+LFG_MODULE="btau"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_btau.html"
 
 # Pass-through to btau CLI if args given
 if [[ $# -gt 0 && "$1" != "--view" ]]; then
@@ -116,10 +117,6 @@ html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">
 <style>''' + theme + '''</style>
 </head><body>
-  <div class=\"header\">
-    <h1><span class=\"brand\">lfg</span> btau <span class=\"dim\">Back That App Up</span></h1>
-    <span class=\"meta\">$TIMESTAMP</span>
-  </div>
   <div class=\"summary\">
     <div class=\"stat\"><span class=\"label\">Backups</span><span class=\"value\">$BACKUP_COUNT</span></div>
     <div class=\"stat\"><span class=\"label\">Total Size</span><span class=\"value accent\">$TOTAL_HR</span></div>
@@ -130,7 +127,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg btau - Local File Guardian | Back That App Up</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"btau\", context: \"Back That App Up\", moduleVersion: \"1.0.0\", welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\" });
+  LFG.init({ module: \"btau\", context: \"Back That App Up\", moduleVersion: \"2.3.1\", welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\", helpContent: \"<strong>BTAU</strong> manages backups with sparse images, incremental sync, and integrity verification.<br><br>Use <code>lfg btau discover</code> to scan for volumes, <code>lfg btau backup</code> to create a backup, <code>lfg btau restore</code> to restore.\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"BTAU Actions\", [
       { label: \"Discover Volumes\", desc: \"Scan for devdrive volumes\", cli: \"lfg btau discover\", module: \"btau\", action: \"run\", args: \"discover\", color: \"#06d6a0\" },

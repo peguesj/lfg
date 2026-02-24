@@ -44,6 +44,7 @@ Developer-focused volume management for mounting, unmounting, syncing, and verif
 |-----------|------|
 | Dispatcher | `~/tools/@yj/lfg/lfg` |
 | Modules | `~/tools/@yj/lfg/lib/{scan,clean,btau,devdrive,splash,dashboard}.sh` |
+| Cache HTML | `/Volumes/900DEVELOPER/.lfg-cache/` (fallback: `~/tools/@yj/lfg/`) |
 | State | `~/.config/lfg/state.json` |
 | Swift sources | `~/tools/@yj/lfg/{viewer,menubar}.swift` |
 | Theme | `~/tools/@yj/lfg/lib/theme.css` |
@@ -93,6 +94,50 @@ LFG is registered as a Claude Code skill at `~/.claude/commands/lfg.md`.
 - **Reference Registry**: `~/.claude/config/reference-registry.json` (triggers: lfg, disk, cache, cleanup, backup, devdrive, wtfs, dtf, btau)
 - **Slash Commands**: `~/.claude/config/slash-commands.json` (registered as `/lfg`)
 - **Related**: yj-devdrive/btau at `~/tools/yj-devdrive/btau/`
+
+## UI Themes
+
+LFG supports two themes toggled via `state.json` key `theme` (`"default"` or `"glass"`):
+
+- **Default**: Dark opaque theme (#141418 bg, solid surfaces)
+- **Liquid Glass**: Apple-inspired glassmorphism with backdrop-filter blur, semi-transparent surfaces, specular highlights, and refraction effects
+
+### Liquid Glass - Authoritative Resources
+
+- **Apple Developer Docs**: https://developer.apple.com/documentation/technologyoverviews/liquid-glass
+- **Figma UI Kit**: https://www.figma.com/community/file/1514405085901665002/glassmorphism-dashboard-ui-kit
+- **Awesome Liquid Glass**: https://github.com/carolhsiaoo/awesome-liquid-glass
+- **CSS-Tricks Guide**: https://css-tricks.com/getting-clarity-on-apples-liquid-glass/
+- **CSS+SVG Refraction**: https://kube.io/blog/liquid-glass-css-svg/
+- **Pure CSS Implementation**: https://github.com/kevinbism/liquid-glass-effect
+
+### Liquid Glass CSS Pattern
+
+```css
+/* Three-layer composition: highlight, shadow, illumination */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+```
+
+## Dependency Map
+
+**Authoritative source**: `.claude/dependency-map.json` - comprehensive dependency graph mapping all scripts, Swift apps, Python modules, state files, IPC channels, and external dependencies. Updated at v2.3.3.
+
+- **High fan-in**: `state.sh` (9 dependents), `settings.sh` (6), `theme.css`/`ui.js` (6 each)
+- **High fan-out**: `lfg` dispatcher (15 deps), `dashboard.sh` (8), `devdrive.sh` (8)
+- **No circular dependencies** detected
+- **Bundle IDs**: `io.pegues.yj-tools.lfg` (viewer), `io.pegues.yj-tools.lfg.menubar` (menubar)
+
+## Development Rules
+
+- **Agent replacement policy**: When a subagent's output file is updated, close the existing agent and spawn a new one rather than resuming the old one. This ensures agents always operate on fresh state.
 
 ## Patterns
 

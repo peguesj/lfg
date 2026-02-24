@@ -5,12 +5,13 @@
 set -uo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-HTML_FILE="$LFG_DIR/.lfg_stfu.html"
 VIEWER="$LFG_DIR/viewer"
 STFU_CORE="$LFG_DIR/lib/stfu_core.py"
 STFU_REPORT="$LFG_DIR/lib/stfu_report.py"
 
 source "$LFG_DIR/lib/state.sh" 2>/dev/null || true
+LFG_MODULE="stfu"
+HTML_FILE="$LFG_CACHE_DIR/.lfg_stfu.html"
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start stfu 2>/dev/null || true
 

@@ -10,14 +10,37 @@ readonly LFG_STATE_DIR="$HOME/.config/lfg"
 readonly LFG_STATE_FILE="$LFG_STATE_DIR/state.json"
 readonly LFG_LOG_FILE="$LFG_STATE_DIR/lfg.log"
 
-mkdir -p "$LFG_STATE_DIR"
+# Cache directory: prefer DevDrive to reduce main SSD writes
+if [[ -d "/Volumes/900DEVELOPER" ]]; then
+    readonly LFG_CACHE_DIR="/Volumes/900DEVELOPER/.lfg-cache"
+else
+    readonly LFG_CACHE_DIR="${LFG_DIR:-.}"
+fi
+
+mkdir -p "$LFG_STATE_DIR" "$LFG_CACHE_DIR" 2>/dev/null || {
+    echo "[lfg] WARN: Failed to create dirs, falling back to LFG_DIR" >&2
+    LFG_CACHE_DIR="${LFG_DIR:-.}"
+}
+
+# Global error trap for module scripts
+_lfg_trap_exit() {
+    local code=$?
+    if [[ $code -ne 0 ]] && [[ -n "${LFG_MODULE:-}" ]]; then
+        lfg_state_error "$LFG_MODULE" "Exit code $code at line ${BASH_LINENO[0]:-?}"
+        lfg_log "$LFG_MODULE: TRAP exit code=$code line=${BASH_LINENO[0]:-?}"
+    fi
+}
+trap _lfg_trap_exit EXIT
 
 # Initialize state file if missing
 [[ -f "$LFG_STATE_FILE" ]] || echo '{"modules":{}}' > "$LFG_STATE_FILE"
 
-# Log to lfg.log
+# Log to lfg.log + syslog + stderr
 lfg_log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [lfg] $*" >> "$LFG_LOG_FILE"
+    local msg="$(date '+%Y-%m-%d %H:%M:%S') [lfg] $*"
+    echo "$msg" >> "$LFG_LOG_FILE"
+    logger -t "lfg" "$*" 2>/dev/null
+    echo "$msg" >&2
 }
 
 # Update module state atomically via python3
@@ -37,13 +60,20 @@ if '$module' not in state['modules']: state['modules']['$module'] = {}
 state['modules']['$module']['$key'] = '$value'
 state['modules']['$module']['updated_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 state['last_updated'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-# Disk stats
+# Disk stats (APFS-aware: used = total * capacity%, in GB)
 import subprocess
-df = subprocess.run(['df','-h','/'], capture_output=True, text=True).stdout.split('\n')
+df = subprocess.run(['df','/'], capture_output=True, text=True).stdout.split('\n')
 if len(df) > 1:
     parts = df[1].split()
-    state['disk_free'] = parts[3] if len(parts) > 3 else '?'
-    state['disk_used'] = parts[4] if len(parts) > 4 else '?'
+    if len(parts) > 4:
+        total_gb = int(int(parts[1]) * 512 / 1e9 + 0.5)
+        pct = int(parts[4].replace('%',''))
+        used_gb = int(total_gb * pct / 100 + 0.5)
+        avail_gb = round(int(parts[3]) * 512 / 1e9, 1)
+        state['disk_free'] = f'{avail_gb} GB'
+        state['disk_used'] = f'{pct}%'
+        state['disk_total_gb'] = total_gb
+        state['disk_used_gb'] = used_gb
 tmp = path + '.tmp'
 with open(tmp, 'w') as f: json.dump(state, f, indent=2)
 os.replace(tmp, path)
@@ -91,6 +121,8 @@ lfg_state_done() {
     done
     lfg_log "$module: completed $*"
     lfg_notify_apm "LFG $module" "Completed: $*" "success" "lfg-$module"
+    # Trigger incremental search index update (non-blocking)
+    python3 "$(dirname "$0")/search_index.py" update >/dev/null 2>&1 &
 }
 
 # Set module as errored

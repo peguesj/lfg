@@ -21,24 +21,23 @@
 # =============================================================================
 set -euo pipefail
 
-readonly LFG_VERSION="2.1.0"
+readonly LFG_VERSION="2.3.0"
 SELF="$0"
 [[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
 readonly LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
-readonly VIEWER="$LFG_DIR/viewer"
+readonly VIEWER="$LFG_DIR/LFG.app/Contents/MacOS/LFG"
 
-# Compile viewer if needed
+# Build viewer app bundle if needed
 ensure_viewer() {
     if [[ ! -x "$VIEWER" ]] || [[ "$LFG_DIR/viewer.swift" -nt "$VIEWER" ]]; then
-        echo "Compiling viewer..."
-        swiftc -O -o "$VIEWER" "$LFG_DIR/viewer.swift" \
-            -framework Cocoa -framework WebKit
+        echo "Building LFG.app..."
+        make -C "$LFG_DIR" LFG.app 2>&1
     fi
 }
 
 show_help() {
     cat <<'HELP'
-lfg - Local File Guardian v2.1.0
+lfg - Local File Guardian v2.3.0
 
 SCAN:
     wtfs [path]                  Where's The Free Space (configured paths)
@@ -68,6 +67,15 @@ AI:
     ai config [show|get|set]     AI model configuration
     ai analyze|compare|suggest   AI-powered analysis
 
+CHAT:
+    chat                         Open AI chat interface
+    chat send "<message>"        Send message, print response
+
+SEARCH:
+    search <query>               Semantic search across projects/files/history
+    search index                 Rebuild search index
+    search update                Incremental index update
+
 SETTINGS:
     settings show [--json]       Show all settings
     settings get|set <key>       Read/write settings
@@ -82,7 +90,7 @@ COMMANDS:
     lfg --help / --version
 
 SHORTCUTS (viewer):
-    Cmd+1-5  Main tabs    Cmd+6-8  Side tabs    Cmd+?  Help
+    Cmd+1-5  Main tabs    Cmd+6  Chat    Cmd+7  AI    Cmd+8  Settings
 
 HELP
 }
@@ -139,17 +147,27 @@ case "${1:-}" in
         shift
         exec bash "$LFG_DIR/lib/ai.sh" "$@"
         ;;
+    chat)
+        shift
+        ensure_viewer
+        exec bash "$LFG_DIR/lib/chat.sh" "$@"
+        ;;
+    search)
+        shift
+        exec bash "$LFG_DIR/lib/search.sh" "$@"
+        ;;
     stfu)
         shift || true
         exec bash "$LFG_DIR/lib/stfu.sh" "$@"
         ;;
     menubar)
-        # Compile menubar if needed
-        if [[ ! -x "$LFG_DIR/lfg-menubar" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$LFG_DIR/lfg-menubar" ]]; then
-            echo "Compiling menubar..."
-            swiftc -O -o "$LFG_DIR/lfg-menubar" "$LFG_DIR/menubar.swift" -framework Cocoa
+        # Build menubar app bundle if needed
+        local menubar_bin="$LFG_DIR/LFG Menubar.app/Contents/MacOS/LFG Menubar"
+        if [[ ! -x "$menubar_bin" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$menubar_bin" ]]; then
+            echo "Building LFG Menubar.app..."
+            make -C "$LFG_DIR" "LFG Menubar.app" 2>&1
         fi
-        "$LFG_DIR/lfg-menubar" &
+        "$menubar_bin" &
         disown
         echo "LFG menubar started."
         exit 0
