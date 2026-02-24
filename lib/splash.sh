@@ -27,7 +27,7 @@ STATE_FILE="$HOME/.config/lfg/state.json"
 STATE_JSON="{}"
 [[ -f "$STATE_FILE" ]] && STATE_JSON=$(cat "$STATE_FILE")
 
-export LFG_DIR HTML_FILE DISK_TOTAL DISK_USED_AMT DISK_FREE DISK_USED_PCT TIMESTAMP STATE_JSON
+export LFG_DIR HTML_FILE DISK_TOTAL DISK_USED_AMT DISK_FREE DISK_USED_PCT TIMESTAMP STATE_JSON LFG_CACHE_DIR
 
 python3 << 'PYEOF'
 import json, os, sys
@@ -39,6 +39,7 @@ disk_used_amt = os.environ.get("DISK_USED_AMT", "?")
 disk_free = os.environ.get("DISK_FREE", "?")
 disk_used_pct = int(os.environ.get("DISK_USED_PCT", "0"))
 timestamp = os.environ.get("TIMESTAMP", "")
+lfg_cache_dir = os.environ.get("LFG_CACHE_DIR", lfg_dir)
 
 # Load state
 try:
@@ -253,6 +254,7 @@ LFG.init({{
   moduleVersion: "2.4.0",
   helpContent: "<strong>LFG Home</strong><br><br>Navigate modules using the <strong>nav pills</strong> in the header bar, or use keyboard shortcuts:<br><br><code>&#8984;1</code> WTFS &mdash; Disk usage analysis<br><code>&#8984;2</code> DTF &mdash; Cache cleanup<br><code>&#8984;3</code> BTAU &mdash; Backup manager<br><code>&#8984;4</code> DEVDRIVE &mdash; Developer drive<br><code>&#8984;5</code> STFU &mdash; Source tree forensics<br><code>&#8984;6</code> Chat &mdash; AI chat<br><code>&#8984;D</code> Dashboard &mdash; Combined view<br><br>Press <code>?</code> anytime to open this help."
 }});
+LFG.notifications.add('Cache: {lfg_cache_dir}', 'info');
   </script>
 </body>
 </html>'''

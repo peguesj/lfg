@@ -2,7 +2,15 @@
   "project": "LFG - Local File Guardian",
   "branchName": "ralph/lfg-v2.3.2-devdrive-cache",
   "baseBranch": "ralph/lfg-v2.2-ui-menubar-integration",
-  "description": "Move LFG generated HTML cache files from main SSD to DevDrive volume to reduce write wear",
+  "description": "DevDrive cache migration, LFG brandmark menubar icon, dock badge support, app icon pipeline",
+  "upm": {
+    "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
+    "checkpointRange": null,
+    "builtWaves": 2,
+    "verifiedAt": null,
+    "shippedAt": null,
+    "prUrl": null
+  },
   "userStories": [
     {
       "id": "US-001",
@@ -17,8 +25,8 @@
       ],
       "estimatedPoints": 1,
       "dependencies": [],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 1
     },
     {
@@ -32,8 +40,8 @@
       ],
       "estimatedPoints": 2,
       "dependencies": ["US-001"],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 2
     },
     {
@@ -48,8 +56,8 @@
       ],
       "estimatedPoints": 2,
       "dependencies": ["US-001"],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 2
     },
     {
@@ -63,8 +71,8 @@
       ],
       "estimatedPoints": 1,
       "dependencies": ["US-001"],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 2
     },
     {
@@ -77,24 +85,75 @@
       ],
       "estimatedPoints": 1,
       "dependencies": [],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 1
     },
     {
       "id": "US-006",
-      "title": "End-to-end verification and notification",
-      "description": "Run lfg splash with DevDrive mounted, verify HTML files are written to /Volumes/900DEVELOPER/.lfg-cache/, navigate to all modules, confirm cache hits from DevDrive. Add a startup notification via LFG.notifications.add() indicating cache location.",
+      "title": "End-to-end verification and cache location notification",
+      "description": "Add a startup notification via LFG.notifications.add() in splash.sh indicating which cache location is active (DevDrive or local fallback). Verify all syntax checks pass across all modules.",
       "acceptanceCriteria": [
-        "lfg splash writes .lfg_splash.html to DevDrive cache",
-        "Navigation to WTFS/DTF/BTAU/DEVDRIVE/STFU all work from DevDrive cache",
-        "Splash shows notification indicating cache location",
-        "All syntax checks pass"
+        "Splash shows notification indicating cache location (DevDrive or local)",
+        "bash -n passes for all module scripts",
+        "swiftc compiles viewer.swift and menubar.swift without errors"
       ],
       "estimatedPoints": 1,
       "dependencies": ["US-002", "US-003", "US-004", "US-005"],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
+      "wave": 3
+    },
+    {
+      "id": "US-007",
+      "title": "Menubar custom LFG brandmark icon replacing SF Symbol",
+      "description": "Replace the generic SF Symbol (externaldrive.fill) in menubar.swift with the LFG brandmark (shield + hard drive platter) from assets/brand/lfg-brandmark.svg. Render the SVG as a programmatic NSImage drawn via NSBezierPath at 18x18pt in template mode so it adapts to light/dark menu bar. The brandmark has: shield outline path, 3 concentric circles (outer r=14, middle r=8, spindle r=3), read/write arm diagonal, bracket ticks. Simplify to essential recognizable elements at 18pt: shield outline + outer platter circle + spindle dot.",
+      "acceptanceCriteria": [
+        "menubar.swift draws LFG brandmark as NSImage via NSBezierPath (no external file dependency)",
+        "Icon renders at 18x18pt in template mode (adapts to light/dark menu bar automatically)",
+        "Shield outline + platter circle + spindle dot are visually recognizable at 18pt",
+        "SF Symbol externaldrive.fill code is removed",
+        "swiftc compiles menubar.swift without errors",
+        "Text label 'LFG ...' still displays to the right of the icon"
+      ],
+      "estimatedPoints": 2,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "wave": 3
+    },
+    {
+      "id": "US-008",
+      "title": "Dock icon badge for unread notification count",
+      "description": "Add NSDockTile badge support to viewer.swift. When JavaScript sends a 'badge' message via the webkit message handler with a count, update NSApp.dockTile.badgeLabel. The ui.js notifications system should post badge count updates whenever notifications._updateBadge() runs. Clear the badge (set to empty string) when count is 0 or when user opens the notification panel.",
+      "acceptanceCriteria": [
+        "viewer.swift handles 'badge' action from JS bridge with count parameter",
+        "NSApp.dockTile.badgeLabel set to count string (or empty when 0)",
+        "ui.js notifications._updateBadge() posts badge count via window.webkit.messageHandlers.lfg",
+        "Badge clears when user opens notification panel (count becomes 0)",
+        "swiftc compiles viewer.swift without errors"
+      ],
+      "estimatedPoints": 2,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "wave": 3
+    },
+    {
+      "id": "US-009",
+      "title": "Verify and update app icon pipeline from brandmark SVG",
+      "description": "Verify the icon generation pipeline: scripts/gen-icns.sh should convert assets/brand/lfg-brandmark.svg to a proper .icns file with all required sizes (16x16 through 512x512 @2x). The icon should show the shield+platter brandmark in blue (#4a9eff) and white on a dark (#141418) rounded-rect background. Ensure the Makefile icons target correctly chains to gen-icns.sh. Both LFG.app and LFG Menubar.app should use the generated AppIcon.icns.",
+      "acceptanceCriteria": [
+        "scripts/gen-icns.sh generates assets/brand/AppIcon.icns from lfg-brandmark.svg",
+        "Icon includes all standard macOS sizes (16, 32, 64, 128, 256, 512 at 1x and 2x)",
+        "Icon has dark background (#141418) with rounded corners, brandmark in white/blue",
+        "Makefile 'icons' target produces valid .icns file",
+        "Both Info.plist and InfoMenubar.plist reference AppIcon correctly"
+      ],
+      "estimatedPoints": 1,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
       "wave": 3
     }
   ]

@@ -143,15 +143,58 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     // MARK: - Application Lifecycle
 
+    /// Draw LFG brandmark (shield + platter + spindle) as 18x18 template NSImage
+    func makeBrandmarkIcon() -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let img = NSImage(size: size, flipped: false) { rect in
+            let s: CGFloat = 18.0 / 64.0  // scale factor from 64x64 SVG viewBox
+
+            // Shield outline
+            let shield = NSBezierPath()
+            shield.move(to: NSPoint(x: 32 * s, y: rect.height - 4 * s))
+            shield.line(to: NSPoint(x: 10 * s, y: rect.height - 12 * s))
+            shield.line(to: NSPoint(x: 10 * s, y: rect.height - 36 * s))
+            shield.curve(to: NSPoint(x: 32 * s, y: rect.height - 60 * s),
+                         controlPoint1: NSPoint(x: 10 * s, y: rect.height - 48 * s),
+                         controlPoint2: NSPoint(x: 20 * s, y: rect.height - 56 * s))
+            shield.curve(to: NSPoint(x: 54 * s, y: rect.height - 36 * s),
+                         controlPoint1: NSPoint(x: 44 * s, y: rect.height - 56 * s),
+                         controlPoint2: NSPoint(x: 54 * s, y: rect.height - 48 * s))
+            shield.line(to: NSPoint(x: 54 * s, y: rect.height - 12 * s))
+            shield.close()
+            shield.lineWidth = 1.5
+            NSColor.black.setStroke()
+            shield.stroke()
+
+            // Outer platter circle (r=14 in 64x64)
+            let cx = 32 * s
+            let cy = rect.height - 33 * s
+            let outerR = 14 * s
+            let outer = NSBezierPath(ovalIn: NSRect(
+                x: cx - outerR, y: cy - outerR,
+                width: outerR * 2, height: outerR * 2))
+            outer.lineWidth = 1.2
+            outer.stroke()
+
+            // Spindle dot (r=2.5, filled)
+            let spindleR: CGFloat = 2.5 * s
+            let spindle = NSBezierPath(ovalIn: NSRect(
+                x: cx - spindleR, y: cy - spindleR,
+                width: spindleR * 2, height: spindleR * 2))
+            NSColor.black.setFill()
+            spindle.fill()
+
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            // SF Symbol icon with compact text label
-            if let img = NSImage(systemSymbolName: "externaldrive.fill", accessibilityDescription: "LFG Disk Management") {
-                let config = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
-                button.image = img.withSymbolConfiguration(config)
-                button.imagePosition = .imageLeading
-            }
+            button.image = makeBrandmarkIcon()
+            button.imagePosition = .imageLeading
             button.title = "LFG ..."
             button.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
             button.setAccessibilityLabel("LFG Disk Management Menu")

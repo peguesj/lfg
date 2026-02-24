@@ -373,6 +373,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 window.endSheet(sw)
                 settingsWindow = nil
             }
+        } else if action == "badge" {
+            let count = body["count"] as? Int ?? 0
+            DispatchQueue.main.async {
+                NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+            }
         } else if action == "quit" {
             NSApp.terminate(nil)
         }
