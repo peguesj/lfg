@@ -6,10 +6,10 @@
   "upm": {
     "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
     "checkpointRange": null,
-    "builtWaves": 2,
-    "verifiedAt": null,
-    "shippedAt": null,
-    "prUrl": null
+    "builtWaves": 3,
+    "verifiedAt": "2026-02-24T00:00:00Z",
+    "shippedAt": "2026-02-24T00:00:00Z",
+    "prUrl": "https://github.com/peguesj/yj_tools/pull/4"
   },
   "userStories": [
     {
