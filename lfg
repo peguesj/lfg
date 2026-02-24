@@ -162,7 +162,7 @@ case "${1:-}" in
         ;;
     menubar)
         # Build menubar app bundle if needed
-        local menubar_bin="$LFG_DIR/LFG Menubar.app/Contents/MacOS/LFG Menubar"
+        menubar_bin="$LFG_DIR/LFG Menubar.app/Contents/MacOS/LFG Menubar"
         if [[ ! -x "$menubar_bin" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$menubar_bin" ]]; then
             echo "Building LFG Menubar.app..."
             make -C "$LFG_DIR" "LFG Menubar.app" 2>&1

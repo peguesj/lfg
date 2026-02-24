@@ -143,47 +143,19 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     // MARK: - Application Lifecycle
 
-    /// Draw LFG brandmark (shield + platter + spindle) as 18x18 template NSImage
+    /// Draw LFG wordmark as menubar icon -- bold "LFG" text rendered as template image
     func makeBrandmarkIcon() -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let img = NSImage(size: size, flipped: false) { rect in
-            let s: CGFloat = 18.0 / 64.0  // scale factor from 64x64 SVG viewBox
-
-            // Shield outline
-            let shield = NSBezierPath()
-            shield.move(to: NSPoint(x: 32 * s, y: rect.height - 4 * s))
-            shield.line(to: NSPoint(x: 10 * s, y: rect.height - 12 * s))
-            shield.line(to: NSPoint(x: 10 * s, y: rect.height - 36 * s))
-            shield.curve(to: NSPoint(x: 32 * s, y: rect.height - 60 * s),
-                         controlPoint1: NSPoint(x: 10 * s, y: rect.height - 48 * s),
-                         controlPoint2: NSPoint(x: 20 * s, y: rect.height - 56 * s))
-            shield.curve(to: NSPoint(x: 54 * s, y: rect.height - 36 * s),
-                         controlPoint1: NSPoint(x: 44 * s, y: rect.height - 56 * s),
-                         controlPoint2: NSPoint(x: 54 * s, y: rect.height - 48 * s))
-            shield.line(to: NSPoint(x: 54 * s, y: rect.height - 12 * s))
-            shield.close()
-            shield.lineWidth = 1.5
-            NSColor.black.setStroke()
-            shield.stroke()
-
-            // Outer platter circle (r=14 in 64x64)
-            let cx = 32 * s
-            let cy = rect.height - 33 * s
-            let outerR = 14 * s
-            let outer = NSBezierPath(ovalIn: NSRect(
-                x: cx - outerR, y: cy - outerR,
-                width: outerR * 2, height: outerR * 2))
-            outer.lineWidth = 1.2
-            outer.stroke()
-
-            // Spindle dot (r=2.5, filled)
-            let spindleR: CGFloat = 2.5 * s
-            let spindle = NSBezierPath(ovalIn: NSRect(
-                x: cx - spindleR, y: cy - spindleR,
-                width: spindleR * 2, height: spindleR * 2))
-            NSColor.black.setFill()
-            spindle.fill()
-
+        let text = "LFG" as NSString
+        let font = NSFont.systemFont(ofSize: 12, weight: .black)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.black  // template mode inverts automatically
+        ]
+        let textSize = text.size(withAttributes: attrs)
+        let imgSize = NSSize(width: ceil(textSize.width) + 2, height: 18)
+        let img = NSImage(size: imgSize, flipped: false) { rect in
+            let y = (rect.height - textSize.height) / 2.0
+            text.draw(at: NSPoint(x: 1, y: y), withAttributes: attrs)
             return true
         }
         img.isTemplate = true
@@ -195,7 +167,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         if let button = statusItem.button {
             button.image = makeBrandmarkIcon()
             button.imagePosition = .imageLeading
-            button.title = "LFG ..."
+            button.title = ""
             button.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .bold)
             button.setAccessibilityLabel("LFG Disk Management Menu")
             button.setAccessibilityHelp("Click to open LFG module and disk management menu")
@@ -590,9 +562,9 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         guard let button = statusItem.button else { return }
         let running = modules.first(where: { $0.value.status == "running" })
         if let r = running {
-            button.title = "LFG \u{25B6} \(r.key.uppercased())"
+            button.title = " \u{25B6} \(r.key.uppercased())"
         } else {
-            button.title = "LFG \(diskFree)"
+            button.title = " \(diskFree)"
         }
     }
 
