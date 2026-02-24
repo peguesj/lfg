@@ -433,7 +433,7 @@ body {{
   <script>
 {ui_js}
 
-LFG.init({{ module: "chat", context: "AI Chat", moduleVersion: "2.3.1", helpContent: "<strong>LFG Chat</strong><br><br>AI-powered chat for disk management. Ask questions about disk usage, cache cleanup, backups, and developer drive.<br><br>The chat server runs locally at <code>localhost:3033</code>. Start with: <code>python3 lib/chat_server.py &amp;</code>" }});
+LFG.init({{ module: "chat", context: "AI Chat", moduleVersion: "2.4.0", helpContent: "<strong>LFG Chat</strong><br><br>AI-powered chat for disk management. Ask questions about disk usage, cache cleanup, backups, and developer drive.<br><br>The chat server runs locally at <code>localhost:3033</code>. Start with: <code>python3 lib/chat_server.py &amp;</code>" }});
 
 var conversationId = null;
 var agentColors = {{

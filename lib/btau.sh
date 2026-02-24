@@ -127,7 +127,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg btau - Local File Guardian | Back That App Up</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"btau\", context: \"Back That App Up\", moduleVersion: \"2.3.1\", welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\", helpContent: \"<strong>BTAU</strong> manages backups with sparse images, incremental sync, and integrity verification.<br><br>Use <code>lfg btau discover</code> to scan for volumes, <code>lfg btau backup</code> to create a backup, <code>lfg btau restore</code> to restore.\" });
+  LFG.init({ module: \"btau\", context: \"Back That App Up\", moduleVersion: \"2.4.0\", welcome: \"$BACKUP_COUNT backups, $TOTAL_HR total\", helpContent: \"<strong>BTAU</strong> manages backups with sparse images, incremental sync, and integrity verification.<br><br>Use <code>lfg btau discover</code> to scan for volumes, <code>lfg btau backup</code> to create a backup, <code>lfg btau restore</code> to restore.\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"BTAU Actions\", [
       { label: \"Discover Volumes\", desc: \"Scan for devdrive volumes\", cli: \"lfg btau discover\", module: \"btau\", action: \"run\", args: \"discover\", color: \"#06d6a0\" },

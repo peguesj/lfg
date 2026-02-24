@@ -191,7 +191,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg dtf - Local File Guardian | $FOOTER_MSG</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"dtf\", context: \"$MODE_TAG\", moduleVersion: \"2.3.1\", welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\", helpContent: \"<strong>DTF</strong> scans developer, build, application, and system caches.<br><br>''' + ('Run <code>lfg dtf --force</code> to actually clean these caches.' if '$FORCE' == 'false' else 'Cleanup complete. Run <code>lfg wtfs</code> to see updated disk usage.') + '''<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle.\" });
+  LFG.init({ module: \"dtf\", context: \"$MODE_TAG\", moduleVersion: \"2.4.0\", welcome: \"$MODE_LABEL: $TOTAL_DISPLAY across caches\", helpContent: \"<strong>DTF</strong> scans developer, build, application, and system caches.<br><br>''' + ('Run <code>lfg dtf --force</code> to actually clean these caches.' if '$FORCE' == 'false' else 'Cleanup complete. Run <code>lfg wtfs</code> to see updated disk usage.') + '''<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle.\" });
   LFG.select.init('main-table');
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"DTF Actions\", [

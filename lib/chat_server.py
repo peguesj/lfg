@@ -560,7 +560,7 @@ class ChatHandler(BaseHTTPRequestHandler):
             cfg = load_ai_config()
             self._json_response({
                 "status": "ok",
-                "version": "2.3.0",
+                "version": "2.4.0",
                 "backend": cfg["backend"],
                 "model": cfg["model"],
                 "uptime": time.time() - _start_time,

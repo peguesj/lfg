@@ -378,7 +378,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg devdrive - Local File Guardian | Developer Drive</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"devdrive\", context: \"Developer Drive\", moduleVersion: \"2.3.1\", welcome: \"$PROJECT_COUNT projects across $VOLUME_COUNT volumes\", helpContent: \"<strong>DEVDRIVE</strong> manages the unified symlink forest at <code>$MOUNT_POINT</code>.<br><br>Projects from multiple external volumes are linked into a single view.<br>Run <code>lfg devdrive sync</code> to rebuild links, or <code>lfg devdrive verify</code> to audit health.\" });
+  LFG.init({ module: \"devdrive\", context: \"Developer Drive\", moduleVersion: \"2.4.0\", welcome: \"$PROJECT_COUNT projects across $VOLUME_COUNT volumes\", helpContent: \"<strong>DEVDRIVE</strong> manages the unified symlink forest at <code>$MOUNT_POINT</code>.<br><br>Projects from multiple external volumes are linked into a single view.<br>Run <code>lfg devdrive sync</code> to rebuild links, or <code>lfg devdrive verify</code> to audit health.\" });
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"DEVDRIVE Actions\", [
       { label: \"Mount\", desc: \"Attach sparse image\", cli: \"lfg devdrive mount\", module: \"devdrive\", action: \"run\", args: \"mount\", color: \"#c084fc\" },

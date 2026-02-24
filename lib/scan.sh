@@ -126,7 +126,7 @@ html = '''<!DOCTYPE html>
   <div id=\"action-bar\"></div>
   <div class=\"footer\">lfg wtfs - Local File Guardian | $DIR_DISPLAY</div>
   <script>''' + uijs + '''
-  LFG.init({ module: \"wtfs\", context: \"$DIR_DISPLAY\", moduleVersion: \"2.3.1\", welcome: \"Showing $RANK directories in $DIR_DISPLAY\", helpContent: \"<strong>WTFS</strong> shows disk usage for <code>$DIR_DISPLAY</code>.<br><br>Hover rows for details. Largest directories are at the top.<br>Run <code>lfg dtf</code> to find reclaimable caches, or <code>lfg btau</code> for backups.<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle, Cmd+A to select all.\" });
+  LFG.init({ module: \"wtfs\", context: \"$DIR_DISPLAY\", moduleVersion: \"2.4.0\", welcome: \"Showing $RANK directories in $DIR_DISPLAY\", helpContent: \"<strong>WTFS</strong> shows disk usage for <code>$DIR_DISPLAY</code>.<br><br>Hover rows for details. Largest directories are at the top.<br>Run <code>lfg dtf</code> to find reclaimable caches, or <code>lfg btau</code> for backups.<br><br><strong>Selection:</strong> Click rows to select, Shift+click for range, Cmd+click to toggle, Cmd+A to select all.\" });
   LFG.select.init('main-table');
   document.getElementById(\"action-bar\").appendChild(
     LFG.createCommandPanel(\"WTFS Actions\", [

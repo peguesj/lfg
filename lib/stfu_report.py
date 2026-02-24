@@ -313,12 +313,12 @@ table th:hover {{ color:#e879f9; }}
   </div>
 
   <div id="action-bar"></div>
-  <div class="footer">lfg stfu v2.1.0 | {summary.get('total_projects', 0)} projects | {mode_label}</div>
+  <div class="footer">lfg stfu v2.4.0 | {summary.get('total_projects', 0)} projects | {mode_label}</div>
 
   <script>{uijs}
   LFG.init({{
     module: "stfu", context: "Source Tree Forensics",
-    moduleVersion: "2.1.0",
+    moduleVersion: "2.4.0",
     welcome: "{summary.get('total_projects', 0)} projects, {summary.get('duplicate_pairs', 0)} duplicates, ~{savings:.0f} MB savings"
   }});
   function showSection(id, el) {{

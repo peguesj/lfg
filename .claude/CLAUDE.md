@@ -1,11 +1,11 @@
-# LFG - Local File Guardian v1.4.0
+# LFG - Local File Guardian v2.4.0
 
 ## Project Overview
 
 - **Name**: LFG - Local File Guardian
-- **Version**: 1.4.0
+- **Version**: 2.4.0
 - **Working Directory**: `~/tools/@yj/lfg`
-- **Type**: macOS disk management tool suite with WebKit UI and menubar integration
+- **Type**: macOS disk management tool suite with WebKit UI, menubar agent, and AI chat
 
 ## Modules
 
@@ -16,50 +16,88 @@ Disk usage analyzer that scans directories and presents storage breakdown via We
 Cache scanner and cleaner that identifies and removes temporary/cache files across common application directories.
 
 ### BTAU - Back That App Up
-Backup manager for application data with scheduling and restore capabilities.
+Backup manager for application data using sparse images, incremental sync, and integrity verification.
 
 ### DEVDRIVE - Developer Drive
-Developer-focused volume management for mounting, unmounting, syncing, and verifying developer drives. Supports APFS volume operations with integrity verification.
+Developer-focused volume management for mounting, unmounting, syncing, and verifying developer drives. Supports APFS volume operations with integrity verification and symlink forest management.
 
-**Commands**: `mount`, `unmount`, `sync`, `verify`, `status`
+**Commands**: `mount`, `unmount`, `sync`, `verify`, `status`, `create`, `config`, `auto-move`
 
-```bash
-~/tools/@yj/lfg/lfg devdrive mount     # Mount developer drive
-~/tools/@yj/lfg/lfg devdrive unmount   # Safely unmount
-~/tools/@yj/lfg/lfg devdrive sync      # Sync drive contents
-~/tools/@yj/lfg/lfg devdrive verify    # Verify drive integrity
-~/tools/@yj/lfg/lfg devdrive status    # Show drive status
-```
+### STFU - Source Tree Forensics & Unification
+Code forensics engine for duplicate detection, dependency analysis, project relationship mapping, library extraction candidates, and merge feasibility checks.
+
+**Commands**: `deps`, `fingerprint`, `duplicates`, `libraries`, `envs`, `merge-check`, `scaffold`, `archive`
+
+### Chat - AI Chat Interface
+Multi-backend AI chat with agent routing (Router, WTFS, DTF, BTAU, DEVDRIVE, STFU specialists). SSE streaming, conversation history, semantic search integration.
+
+**Server**: `python3 lib/chat_server.py` on port 3033
+**Backends**: Ollama (default), LiteLLM, Claude API
+
+### Search - Semantic Search
+Full-text search across projects, filesystem, and history with SQLite FTS5.
+
+**Commands**: `search <query>`, `search index`, `search update`
 
 ## Stack
 
-- **Bash** - Core dispatcher and module scripts
-- **Swift** - Native macOS components (viewer.swift for WebKit views, menubar.swift for status bar integration)
-- **Python3** - HTML templating engine for safe multi-line content generation
-- **HTML/CSS/JS** - WebKit-rendered UI views
+- **Bash** - Core dispatcher (`lfg`) and module scripts
+- **Swift (AppKit/WebKit)** - Native macOS components:
+  - `viewer.swift` - WebKit viewer app with JS-to-native bridge, dock badge support
+  - `menubar.swift` - NSStatusBar agent with LFG wordmark icon, disk graph, module actions
+- **Python3** - HTML templating, AI chat server, search indexer, STFU forensics
+- **HTML/CSS/JS** - WebKit-rendered UI views with shared theme and component library
 
 ## Key Paths
 
 | Component | Path |
 |-----------|------|
 | Dispatcher | `~/tools/@yj/lfg/lfg` |
-| Modules | `~/tools/@yj/lfg/lib/{scan,clean,btau,devdrive,splash,dashboard}.sh` |
-| Cache HTML | `/Volumes/900DEVELOPER/.lfg-cache/` (fallback: `~/tools/@yj/lfg/`) |
+| Modules | `~/tools/@yj/lfg/lib/{scan,clean,btau,devdrive,stfu,splash,dashboard,chat,search}.sh` |
+| Cache HTML | `$LFG_CACHE_DIR` → `/Volumes/900DEVELOPER/.lfg-cache/` (fallback: `~/tools/@yj/lfg/`) |
 | State | `~/.config/lfg/state.json` |
+| Settings | `~/.config/lfg/settings.yaml` |
+| AI Config | `~/.config/lfg/ai.yaml` |
 | Swift sources | `~/tools/@yj/lfg/{viewer,menubar}.swift` |
 | Theme | `~/tools/@yj/lfg/lib/theme.css` |
 | UI JS | `~/tools/@yj/lfg/lib/ui.js` |
+| Chat server | `~/tools/@yj/lfg/lib/chat_server.py` |
+| Brand assets | `~/tools/@yj/lfg/assets/brand/{lfg-wordmark.svg,lfg-brandmark.svg,lfg-icon.svg,AppIcon.icns}` |
+| Build system | `~/tools/@yj/lfg/Makefile` |
 | Symlinks | `~/bin/{lfg,wtfs,dtf}` |
 
 ## Build Commands
 
 ```bash
-# Compile WebKit viewer
-swiftc -O -o viewer viewer.swift -framework Cocoa -framework WebKit
+# Build everything (viewer app + menubar app + icons)
+make all
 
-# Compile menubar app
-swiftc -O -o lfg-menubar menubar.swift -framework Cocoa
+# Individual targets
+make viewer-app       # Compile LFG.app (WebKit viewer)
+make menubar-app      # Compile LFG Menubar.app (status bar agent)
+make icons            # Generate AppIcon.icns from lfg-icon.svg
+make clean            # Remove build artifacts
+
+# Manual compilation (without Makefile)
+swiftc -O -o viewer viewer.swift -framework Cocoa -framework WebKit
+swiftc -O -o lfg-menubar menubar.swift -framework Cocoa -framework UserNotifications
 ```
+
+## Version Matrix
+
+| Component | Version | File(s) |
+|-----------|---------|---------|
+| LFG Platform | 2.4.0 | `lfg` (LFG_VERSION), `lib/ui.js`, `lib/theme.css` |
+| LFG.app (Viewer) | 2.4.0 | `Info.plist` (CFBundleVersion) |
+| LFG Menubar.app | 2.4.0 | `InfoMenubar.plist` (CFBundleVersion) |
+| WTFS module | 2.4.0 | `lib/scan.sh` (moduleVersion) |
+| DTF module | 2.4.0 | `lib/clean.sh` (moduleVersion) |
+| BTAU module | 2.4.0 | `lib/btau.sh` (moduleVersion) |
+| DEVDRIVE module | 2.4.0 | `lib/devdrive.sh` (moduleVersion) |
+| STFU module | 2.4.0 | `lib/stfu_report.py` (moduleVersion) |
+| Dashboard | 2.4.0 | `lib/dashboard.sh` (moduleVersion) |
+| Splash | 2.4.0 | `lib/splash.sh` (moduleVersion) |
+| Chat | 2.4.0 | `lib/chat.sh` (moduleVersion), `lib/chat_server.py` |
 
 ## Skill Command Reference
 
@@ -71,9 +109,13 @@ LFG is registered as a Claude Code skill at `~/.claude/commands/lfg.md`.
 | `/lfg clean [--force]` | DTF cache cleanup (default: dry run) | `/lfg clean --force` |
 | `/lfg backup [cmd]` | BTAU backup operations | `/lfg backup status` |
 | `/lfg devdrive [cmd]` | DEVDRIVE volume management | `/lfg devdrive mount` |
-| `/lfg status` | Show LFG state | `/lfg status` |
-| `/lfg splash` | Open LFG WebKit viewer | `/lfg splash` |
-| `/lfg dashboard` | Open combined dashboard | `/lfg dashboard` |
+| `/lfg stfu [cmd]` | STFU source tree forensics | `/lfg stfu deps` |
+| `/lfg chat [send]` | AI chat interface | `/lfg chat send "check space"` |
+| `/lfg search <query>` | Semantic search | `/lfg search "docker"` |
+| `/lfg dashboard` | Combined dashboard | `/lfg dashboard` |
+| `/lfg settings [cmd]` | Settings management | `/lfg settings show` |
+| `/lfg menubar` | Launch menubar agent | `/lfg menubar` |
+| `lfg` (no args) | Splash screen | `lfg` |
 
 ## Agent Squadron
 
@@ -87,13 +129,35 @@ LFG is registered as a Claude Code skill at `~/.claude/commands/lfg.md`.
 | `lfg-devdrive` | Developer drive management - mount/unmount/sync/verify operations with integrity checks |
 | `lfg-monitor` | System monitoring - watches disk usage, state changes, alerts on thresholds |
 
+## Identity & Branding
+
+### LFG Wordmark
+The primary identity is the **LFG wordmark** -- geometric monospace-feel letterforms where "L", "F", "G" are constructed from stroked line segments with accent blue (#4a9eff) details.
+
+- **SVG source**: `assets/brand/lfg-wordmark.svg` (200x64 viewBox)
+- **App icon**: `assets/brand/lfg-icon.svg` (wordmark on dark rounded-rect, 512x512)
+- **Menubar**: Bold "LFG" text rendered as NSImage template (auto light/dark)
+- **Chat badges**: White "LFG" + agent-colored module label (e.g., "LFG STFU" in purple)
+- **Brandmark**: `assets/brand/lfg-brandmark.svg` (shield + platter, legacy)
+
+### Agent Colors
+| Agent | Color |
+|-------|-------|
+| Router | `#4a9eff` (blue) |
+| WTFS | `#4a9eff` (blue) |
+| DTF | `#ff8c42` (orange) |
+| BTAU | `#06d6a0` (green) |
+| DEVDRIVE | `#c084fc` (purple) |
+| STFU | `#e879f9` (magenta) |
+
 ## Integration
 
 - **CCEM APM Bridge**: `~/Developer/ccem/apm/bridges/lfg-devdrive.json`
 - **Claude Code Skill**: `~/.claude/commands/lfg.md`
-- **Reference Registry**: `~/.claude/config/reference-registry.json` (triggers: lfg, disk, cache, cleanup, backup, devdrive, wtfs, dtf, btau)
+- **Reference Registry**: `~/.claude/config/reference-registry.json`
 - **Slash Commands**: `~/.claude/config/slash-commands.json` (registered as `/lfg`)
-- **Related**: yj-devdrive/btau at `~/tools/yj-devdrive/btau/`
+- **Plane PM**: Project ID `6bc05edb-a2b4-44c1-9cfc-2c938edb38a3`
+- **PR**: https://github.com/peguesj/yj_tools/pull/4
 
 ## UI Themes
 
@@ -102,19 +166,9 @@ LFG supports two themes toggled via `state.json` key `theme` (`"default"` or `"g
 - **Default**: Dark opaque theme (#141418 bg, solid surfaces)
 - **Liquid Glass**: Apple-inspired glassmorphism with backdrop-filter blur, semi-transparent surfaces, specular highlights, and refraction effects
 
-### Liquid Glass - Authoritative Resources
-
-- **Apple Developer Docs**: https://developer.apple.com/documentation/technologyoverviews/liquid-glass
-- **Figma UI Kit**: https://www.figma.com/community/file/1514405085901665002/glassmorphism-dashboard-ui-kit
-- **Awesome Liquid Glass**: https://github.com/carolhsiaoo/awesome-liquid-glass
-- **CSS-Tricks Guide**: https://css-tricks.com/getting-clarity-on-apples-liquid-glass/
-- **CSS+SVG Refraction**: https://kube.io/blog/liquid-glass-css-svg/
-- **Pure CSS Implementation**: https://github.com/kevinbism/liquid-glass-effect
-
 ### Liquid Glass CSS Pattern
 
 ```css
-/* Three-layer composition: highlight, shadow, illumination */
 .glass {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(24px) saturate(180%);
@@ -128,21 +182,39 @@ LFG supports two themes toggled via `state.json` key `theme` (`"default"` or `"g
 
 ## Dependency Map
 
-**Authoritative source**: `.claude/dependency-map.json` - comprehensive dependency graph mapping all scripts, Swift apps, Python modules, state files, IPC channels, and external dependencies. Updated at v2.3.3.
+**Authoritative source**: `.claude/dependency-map.json` - comprehensive dependency graph mapping all scripts, Swift apps, Python modules, state files, IPC channels, and external dependencies. Updated at v2.4.0.
 
-- **High fan-in**: `state.sh` (9 dependents), `settings.sh` (6), `theme.css`/`ui.js` (6 each)
-- **High fan-out**: `lfg` dispatcher (15 deps), `dashboard.sh` (8), `devdrive.sh` (8)
+- **High fan-in**: `state.sh` (9 dependents), `settings.sh` (6), `theme.css`/`ui.js` (8 each)
+- **High fan-out**: `lfg` dispatcher (17 deps), `dashboard.sh` (8), `devdrive.sh` (8)
 - **No circular dependencies** detected
 - **Bundle IDs**: `io.pegues.yj-tools.lfg` (viewer), `io.pegues.yj-tools.lfg.menubar` (menubar)
 
+## Architecture
+
+### DevDrive Cache Layer
+All module scripts write HTML output to `$LFG_CACHE_DIR`, resolved by `lib/state.sh`:
+- If `/Volumes/900DEVELOPER` is mounted: `/Volumes/900DEVELOPER/.lfg-cache/`
+- Otherwise: `$LFG_DIR` (backward compatible fallback)
+
+### IPC
+- **JS → Swift**: `window.webkit.messageHandlers.lfg.postMessage()` (navigate, run, badge, quit, home, settings)
+- **Menubar ↔ Viewer**: `DistributedNotificationCenter` (`com.lfg.viewer.*`, `com.lfg.menubar.*`)
+- **Chat**: HTTP on localhost:3033 (POST /chat, GET /health, GET /history, POST /search)
+
+### Dock Badge
+`viewer.swift` handles `badge` action from JS bridge, sets `NSApp.dockTile.badgeLabel`. The `ui.js` notifications system posts unread count via webkit message handler.
+
 ## Development Rules
 
-- **Agent replacement policy**: When a subagent's output file is updated, close the existing agent and spawn a new one rather than resuming the old one. This ensures agents always operate on fresh state.
+- **Agent replacement policy**: When a subagent's output file is updated, close the existing agent and spawn a new one rather than resuming the old one.
+- **Version updates**: When bumping versions, update ALL files listed in the Version Matrix above.
 
 ## Patterns
 
-- Modules source `lib/state.sh` for status tracking
+- Modules source `lib/state.sh` for status tracking and `LFG_CACHE_DIR`
 - HTML generated via `python3` (not sed) for safe multi-line templating
 - WebKit viewer uses `WKScriptMessageHandler` for JS-to-native bridge
 - Cross-module chaining via temp file polling
 - Menubar watches `~/.config/lfg/state.json` via `DispatchSource`
+- Chat agent routing: Router classifies intent, delegates to specialist via `[DELEGATE:XXX]` protocol (stripped before display)
+- LFG wordmark used consistently for all identity: menubar icon, app icon, chat agent badges

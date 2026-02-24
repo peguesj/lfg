@@ -303,10 +303,10 @@ html = f'''<!DOCTYPE html>
     </div>
   </div>
   </div><!-- /dashboard-layout -->
-  <div class="footer">lfg v2.1.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI + Settings</div>
+  <div class="footer">lfg v2.4.0 - Local File Guardian | WTFS + DTF + BTAU + DEVDRIVE + STFU + AI + Settings</div>
   <script>{uijs}
   LFG.init({{
-    module: "dashboard", context: "All Modules", moduleVersion: "2.3.1",
+    module: "dashboard", context: "All Modules", moduleVersion: "2.4.0",
     welcome: "Dashboard loaded - RANK_PH dirs, CACHE_COUNT_PH caches, BACKUP_COUNT_PH backups, DD_PROJECT_COUNT_PH devdrive projects",
     helpContent: "<strong>LFG Dashboard</strong><br><br><strong>WTFS</strong> - Top directories by size. Hover rows for details.<br><strong>DTF</strong> - Active caches found. Run <code>lfg dtf --force</code> to clean.<br><strong>BTAU</strong> - Backup history. Run <code>lfg btau discover</code> to scan volumes.<br><strong>DEVDRIVE</strong> - Symlink forest status. Run <code>lfg devdrive</code> for full view.<br><strong>STFU</strong> - Source Tree Forensics. Scans for project relationships and duplicates.<br><br>Use module tabs or nav pills in the header to switch views.",
     onboarding: localStorage.getItem('lfg-onboarded') ? null : [

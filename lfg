@@ -21,7 +21,7 @@
 # =============================================================================
 set -euo pipefail
 
-readonly LFG_VERSION="2.3.0"
+readonly LFG_VERSION="2.4.0"
 SELF="$0"
 [[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
 readonly LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
@@ -37,7 +37,7 @@ ensure_viewer() {
 
 show_help() {
     cat <<'HELP'
-lfg - Local File Guardian v2.3.0
+lfg - Local File Guardian v2.4.0
 
 SCAN:
     wtfs [path]                  Where's The Free Space (configured paths)
