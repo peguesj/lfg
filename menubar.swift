@@ -15,12 +15,26 @@ private let lfgMenuLog = OSLog(subsystem: "io.pegues.yj-tools.lfg.menubar", cate
 // MARK: - Disk Graph View (custom NSView for menu item)
 
 class DiskGraphView: NSView {
-    var dataPoints: [(free: Double, used: Double, timestamp: String)] = []
+    var dataPoints: [(free: Double, used: Double, timestamp: String)] = [] {
+        didSet { needsDisplay = true }
+    }
     let maxPoints = 24
     let graphHeight: CGFloat = 48
     let graphWidth: CGFloat = 280
     let barWidth: CGFloat = 8
     let barGap: CGFloat = 3
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+    }
+
+    override var allowsVibrancy: Bool { return false }
 
     override var intrinsicContentSize: NSSize {
         return NSSize(width: graphWidth + 20, height: graphHeight + 36)
@@ -28,24 +42,22 @@ class DiskGraphView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
 
         let pad: CGFloat = 10
         let top: CGFloat = 20
         let w = bounds.width - pad * 2
         let h = graphHeight
 
-        // Title
+        // Title - use NSColor.draw methods for proper appearance handling
         let titleAttrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .bold),
             .foregroundColor: NSColor.secondaryLabelColor
         ]
         ("DISK USAGE" as NSString).draw(at: NSPoint(x: pad, y: bounds.height - 14), withAttributes: titleAttrs)
 
-        // Background
-        ctx.setFillColor(NSColor(white: 0.12, alpha: 1).cgColor)
-        let bgRect = CGRect(x: pad, y: top, width: w, height: h)
-        ctx.fill(bgRect)
+        // Background - use NSColor fill for proper compositing
+        NSColor(white: 0.12, alpha: 1).setFill()
+        NSRect(x: pad, y: top, width: w, height: h).fill()
 
         guard !dataPoints.isEmpty else {
             let emptyAttrs: [NSAttributedString.Key: Any] = [
@@ -66,19 +78,19 @@ class DiskGraphView: NSView {
             let usedPct = dp.used / 100.0
             let barH = CGFloat(usedPct) * h
 
-            // Used portion
+            // Used portion - use NSColor setFill for proper compositing in menus
             let usedColor: NSColor
-            if usedPct > 0.90 { usedColor = NSColor(red: 1, green: 0.3, blue: 0.42, alpha: 0.8) }
-            else if usedPct > 0.80 { usedColor = NSColor(red: 1, green: 0.55, blue: 0.26, alpha: 0.8) }
-            else if usedPct > 0.70 { usedColor = NSColor(red: 1, green: 0.82, blue: 0.4, alpha: 0.8) }
-            else { usedColor = NSColor(red: 0.02, green: 0.84, blue: 0.63, alpha: 0.8) }
+            if usedPct > 0.90 { usedColor = NSColor(red: 1, green: 0.3, blue: 0.42, alpha: 1) }
+            else if usedPct > 0.80 { usedColor = NSColor(red: 1, green: 0.55, blue: 0.26, alpha: 1) }
+            else if usedPct > 0.70 { usedColor = NSColor(red: 1, green: 0.82, blue: 0.4, alpha: 1) }
+            else { usedColor = NSColor(red: 0.02, green: 0.84, blue: 0.63, alpha: 1) }
 
-            ctx.setFillColor(usedColor.cgColor)
-            ctx.fill(CGRect(x: x, y: top, width: barWidth, height: barH))
+            usedColor.setFill()
+            NSRect(x: x, y: top, width: barWidth, height: barH).fill()
 
             // Free portion
-            ctx.setFillColor(NSColor(red: 0.29, green: 0.62, blue: 1, alpha: 0.3).cgColor)
-            ctx.fill(CGRect(x: x, y: top + barH, width: barWidth, height: h - barH))
+            NSColor(red: 0.29, green: 0.62, blue: 1, alpha: 0.4).setFill()
+            NSRect(x: x, y: top + barH, width: barWidth, height: h - barH).fill()
         }
 
         // Current value label
