@@ -10,12 +10,40 @@ readonly LFG_STATE_DIR="$HOME/.config/lfg"
 readonly LFG_STATE_FILE="$LFG_STATE_DIR/state.json"
 readonly LFG_LOG_FILE="$LFG_STATE_DIR/lfg.log"
 
-# Cache directory: prefer DevDrive to reduce main SSD writes
-if [[ -d "/Volumes/900DEVELOPER" ]]; then
-    readonly LFG_CACHE_DIR="/Volumes/900DEVELOPER/.lfg-cache"
-else
-    readonly LFG_CACHE_DIR="${LFG_DIR:-.}"
-fi
+# Cache directory: prefer mounted volume profile to reduce main SSD writes
+# Iterates volume_profiles from settings, uses first mounted volume's cache dir
+_lfg_resolve_cache_dir() {
+    local settings_file="$HOME/.config/lfg/settings.yaml"
+    if [[ -f "$settings_file" ]]; then
+        local vol_name
+        while IFS= read -r vol_name; do
+            [[ -z "$vol_name" ]] && continue
+            if [[ -d "/Volumes/$vol_name" ]]; then
+                echo "/Volumes/$vol_name/.lfg-cache"
+                return
+            fi
+        done < <(python3 -c "
+import re
+try:
+    current_key = None; in_profiles = False; in_item = False
+    with open('$settings_file') as f:
+        for line in f:
+            s = line.strip()
+            if line.startswith('volume_profiles:'):
+                in_profiles = True; continue
+            if in_profiles and not line.startswith(' ') and s:
+                break
+            if in_profiles and s.startswith('- name:'):
+                print(s.split(':',1)[1].strip().strip('\"').strip(\"'\"))
+            elif in_profiles and not s.startswith('-') and 'name:' in s and line.startswith('    '):
+                print(s.split(':',1)[1].strip().strip('\"').strip(\"'\"))
+except: pass
+" 2>/dev/null)
+    fi
+    echo "${LFG_DIR:-.}"
+}
+LFG_CACHE_DIR="$(_lfg_resolve_cache_dir)"
+readonly LFG_CACHE_DIR
 
 mkdir -p "$LFG_STATE_DIR" "$LFG_CACHE_DIR" 2>/dev/null || {
     echo "[lfg] WARN: Failed to create dirs, falling back to LFG_DIR" >&2

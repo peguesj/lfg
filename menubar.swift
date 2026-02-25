@@ -104,6 +104,8 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     var refreshTimer: Timer?
     var graphTimer: Timer?
     var fileWatchSource: DispatchSourceFileSystemObject?
+    var promptsWatchSource: DispatchSourceFileSystemObject?
+    var pendingPromptCount: Int = 0
     var previousState: [String: Any] = [:]
 
     let stateFile = NSHomeDirectory() + "/.config/lfg/state.json"
@@ -140,6 +142,16 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     var devdriveMountMode: String = "..."
     var devdriveAutoMoveEnabled: Bool = false
     var devdriveAutoMoveLastCount: Int = 0
+
+    // Volume profiles from settings.yaml
+    struct VolumeProfile {
+        let name: String
+        let purpose: String
+        let color: String
+        let mounted: Bool
+        let freeGB: Double
+    }
+    var volumeProfiles: [VolumeProfile] = []
 
     // MARK: - Application Lifecycle
 
@@ -187,6 +199,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         loadState()
         buildMenu()
         startFileWatcher()
+        watchPromptsDir()
 
         // Periodic disk stats refresh (60s)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
@@ -200,6 +213,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
         refreshStats()
         refreshDevdriveConfig()
+        refreshVolumeProfiles()
         recordDiskDataPoint()
         os_log("Menubar launched, state: %{public}@", log: lfgMenuLog, type: .info, stateFile)
         sendNotification(title: "LFG Menubar", body: "Monitoring active")
@@ -338,6 +352,88 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         fileWatchSource = source
     }
 
+    // MARK: - Prompts Watcher (in-use detection notifications)
+
+    func watchPromptsDir() {
+        let promptsDir = NSHomeDirectory() + "/.config/lfg/prompts"
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: promptsDir) {
+            try? fm.createDirectory(atPath: promptsDir, withIntermediateDirectories: true, attributes: nil)
+        }
+
+        let fd = open(promptsDir, O_EVTONLY)
+        guard fd >= 0 else { return }
+
+        let source = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write],
+            queue: .main
+        )
+        source.setEventHandler { [weak self] in
+            self?.processPrompts()
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        promptsWatchSource = source
+    }
+
+    func processPrompts() {
+        let promptsDir = NSHomeDirectory() + "/.config/lfg/prompts"
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(atPath: promptsDir) else { return }
+
+        var pendingCount = 0
+        for file in files where file.hasSuffix(".json") {
+            let path = promptsDir + "/" + file
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let status = json["status"] as? String else { continue }
+
+            if status == "pending" {
+                pendingCount += 1
+                let project = json["project"] as? String ?? "Unknown"
+                let sizeGB = json["size_gb"] as? Double ?? 0
+                let source = json["source"] as? String ?? ""
+                let dest = json["dest"] as? String ?? ""
+
+                // Show alert
+                DispatchQueue.main.async { [weak self] in
+                    let alert = NSAlert()
+                    alert.messageText = "Move \(project)?"
+                    alert.informativeText = "This project (\(String(format: "%.1f", sizeGB)) GB) is currently in use.\n\nFrom: \(source)\nTo: \(dest)\n\nMove anyway?"
+                    alert.addButton(withTitle: "Move")
+                    alert.addButton(withTitle: "Skip")
+                    alert.addButton(withTitle: "Defer")
+                    alert.alertStyle = .informational
+
+                    let response = alert.runModal()
+                    var responseStr = "skip"
+                    switch response {
+                    case .alertFirstButtonReturn: responseStr = "yes"
+                    case .alertSecondButtonReturn: responseStr = "skip"
+                    default: responseStr = "defer"
+                    }
+
+                    // Write response back
+                    var mutableJson = json
+                    mutableJson["response"] = responseStr
+                    mutableJson["status"] = "responded"
+                    if let updatedData = try? JSONSerialization.data(withJSONObject: mutableJson, options: .prettyPrinted) {
+                        try? updatedData.write(to: URL(fileURLWithPath: path))
+                    }
+                    self?.pendingPromptCount = max(0, (self?.pendingPromptCount ?? 1) - 1)
+                    NSApp.dockTile.badgeLabel = (self?.pendingPromptCount ?? 0) > 0 ? "\(self?.pendingPromptCount ?? 0)" : nil
+                }
+            }
+        }
+
+        pendingPromptCount = pendingCount
+        NSApp.dockTile.badgeLabel = pendingCount > 0 ? "\(pendingCount)" : nil
+        if pendingCount > 0 {
+            sendNotification(title: "LFG Auto-Move", body: "\(pendingCount) project(s) need your decision")
+        }
+    }
+
     // MARK: - Menu Construction
 
     func buildMenu() {
@@ -445,21 +541,61 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         btauItem.submenu = btauMenu
         menu.addItem(btauItem)
 
-        // --- DEVDRIVE Actions Submenu ---
-        let modeLabel = devdriveMountMode == "sparse_to_local" ? "sparse->local" :
-                        devdriveMountMode == "local_to_sparse" ? "local->sparse" : devdriveMountMode
-        let autoLabel = devdriveAutoMoveEnabled ? "ON" : "OFF"
-        let ddItem = NSMenuItem(title: "DEVDRIVE [\(modeLabel)] auto-move:\(autoLabel)", action: nil, keyEquivalent: "")
+        // --- DEVDRIVE Actions Submenu (per-profile) ---
+        let mountedCount = volumeProfiles.filter { $0.mounted }.count
+        let totalCount = volumeProfiles.count
+        let ddTitle = totalCount > 0 ? "DEVDRIVE [\(mountedCount)/\(totalCount) mounted]" : "DEVDRIVE"
+        let ddItem = NSMenuItem(title: ddTitle, action: nil, keyEquivalent: "")
         let ddMenu = NSMenu()
         addSubItem(ddMenu, "View Status", action: #selector(openDevdrive), key: "4")
-        addSubItem(ddMenu, "Mount (\(modeLabel))", action: #selector(ddMount), key: "")
-        addSubItem(ddMenu, "Unmount", action: #selector(ddUnmount), key: "")
-        addSubItem(ddMenu, "Sync Forest", action: #selector(ddSync), key: "")
-        addSubItem(ddMenu, "Verify Links", action: #selector(ddVerify), key: "")
         ddMenu.addItem(NSMenuItem.separator())
-        addSubItem(ddMenu, "Show Config", action: #selector(ddConfigShow), key: "")
+
+        // Per-profile sections
+        if volumeProfiles.isEmpty {
+            let noProfiles = NSMenuItem(title: "No volume profiles configured", action: nil, keyEquivalent: "")
+            noProfiles.isEnabled = false
+            ddMenu.addItem(noProfiles)
+        } else {
+            for prof in volumeProfiles {
+                let dot = prof.mounted ? "\u{25CF}" : "\u{25CB}"  // filled/empty circle
+                let status = prof.mounted ? "Mounted (\(String(format: "%.1f", prof.freeGB)) GB free)" : "Not Mounted"
+                let header = NSMenuItem(title: "\(dot) \(prof.name) - \(prof.purpose)", action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                ddMenu.addItem(header)
+
+                let statusItem = NSMenuItem(title: "    \(status)", action: nil, keyEquivalent: "")
+                statusItem.isEnabled = false
+                ddMenu.addItem(statusItem)
+
+                if prof.mounted {
+                    let unmountItem = NSMenuItem(title: "    Unmount", action: #selector(ddProfileAction(_:)), keyEquivalent: "")
+                    unmountItem.target = self
+                    unmountItem.representedObject = "devdrive unmount --profile=\(prof.name)" as NSString
+                    ddMenu.addItem(unmountItem)
+
+                    let syncItem = NSMenuItem(title: "    Sync Forest", action: #selector(ddProfileAction(_:)), keyEquivalent: "")
+                    syncItem.target = self
+                    syncItem.representedObject = "devdrive sync --profile=\(prof.name)" as NSString
+                    ddMenu.addItem(syncItem)
+
+                    let verifyItem = NSMenuItem(title: "    Verify Links", action: #selector(ddProfileAction(_:)), keyEquivalent: "")
+                    verifyItem.target = self
+                    verifyItem.representedObject = "devdrive verify --profile=\(prof.name)" as NSString
+                    ddMenu.addItem(verifyItem)
+                } else {
+                    let mountItem = NSMenuItem(title: "    Mount", action: #selector(ddProfileAction(_:)), keyEquivalent: "")
+                    mountItem.target = self
+                    mountItem.representedObject = "devdrive mount --profile=\(prof.name)" as NSString
+                    ddMenu.addItem(mountItem)
+                }
+                ddMenu.addItem(NSMenuItem.separator())
+            }
+        }
+
         addSubItem(ddMenu, "Auto-Move (Dry Run)", action: #selector(ddAutoMoveDry), key: "")
         addSubItem(ddMenu, "Auto-Move (Execute)", action: #selector(ddAutoMoveForce), key: "")
+        ddMenu.addItem(NSMenuItem.separator())
+        addSubItem(ddMenu, "Show Config", action: #selector(ddConfigShow), key: "")
         ddItem.submenu = ddMenu
         menu.addItem(ddItem)
 
@@ -613,6 +749,41 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Volume Profiles
+
+    func refreshVolumeProfiles() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let lfgDir = NSHomeDirectory() + "/tools/@yj/lfg"
+            let result = Self.shell("\(lfgDir)/lfg settings show --json 2>/dev/null")
+            var profiles: [VolumeProfile] = []
+            if let data = result.data(using: .utf8) {
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let profs = json["volume_profiles"] as? [[String: Any]] {
+                        for p in profs {
+                            let name = p["name"] as? String ?? ""
+                            let purpose = p["purpose"] as? String ?? ""
+                            let color = p["color"] as? String ?? "#c084fc"
+                            let mounted = FileManager.default.fileExists(atPath: "/Volumes/\(name)")
+                            var freeGB: Double = 0
+                            if mounted {
+                                let attrs = try? FileManager.default.attributesOfFileSystem(forPath: "/Volumes/\(name)")
+                                if let freeBytes = attrs?[.systemFreeSize] as? Int64 {
+                                    freeGB = Double(freeBytes) / (1024 * 1024 * 1024)
+                                }
+                            }
+                            profiles.append(VolumeProfile(name: name, purpose: purpose, color: color, mounted: mounted, freeGB: freeGB))
+                        }
+                    }
+                } catch {}
+            }
+            DispatchQueue.main.async {
+                self?.volumeProfiles = profiles
+                self?.buildMenu()
+            }
+        }
+    }
+
     // MARK: - Notifications (UNUserNotificationCenter)
 
     func sendNotification(title: String, body: String) {
@@ -738,6 +909,11 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         launchLFG("devdrive verify")
     }
     @objc func ddConfigShow() { launchLFG("devdrive config show") }
+    @objc func ddProfileAction(_ sender: NSMenuItem) {
+        guard let cmd = sender.representedObject as? NSString else { return }
+        sendNotification(title: "LFG DEVDRIVE", body: "Running: \(cmd)")
+        launchLFG(cmd as String)
+    }
     @objc func ddAutoMoveDry() {
         sendNotification(title: "LFG DEVDRIVE", body: "Evaluating auto-move rules...")
         launchLFG("devdrive auto-move --dry-run")
@@ -834,6 +1010,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     @objc func doRefresh() {
         refreshStats()
         refreshDevdriveConfig()
+        refreshVolumeProfiles()
         recordDiskDataPoint()
         loadState()
         buildMenu()

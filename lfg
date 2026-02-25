@@ -54,6 +54,7 @@ BACKUP:
 DRIVE:
     devdrive                     Developer Drive (status view)
     devdrive mount|unmount|sync|verify|create|config|auto-move
+    devdrive <cmd> --profile=NAME  Target specific volume profile
 
 FORENSICS:
     stfu                         Source Tree Forensics (dry run)

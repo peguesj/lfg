@@ -12,6 +12,39 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     let windowTitle: String
     let selectionFile: String?
     var navigationStack: [URL] = []
+    private var _cachedCacheDir: String?
+
+    /// Resolve cache directory from volume_profiles in settings.yaml
+    /// Returns first mounted profile's .lfg-cache dir, or falls back to lfgDir
+    func resolveCacheDir() -> String {
+        if let cached = _cachedCacheDir { return cached }
+        let lfgHome = NSHomeDirectory() + "/tools/@yj/lfg"
+        let fm = FileManager.default
+        // Read volume_profiles from settings.yaml
+        let settingsPath = NSHomeDirectory() + "/.config/lfg/settings.yaml"
+        if fm.fileExists(atPath: settingsPath),
+           let content = try? String(contentsOfFile: settingsPath, encoding: .utf8) {
+            var inProfiles = false
+            for line in content.components(separatedBy: "\n") {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if line.hasPrefix("volume_profiles:") { inProfiles = true; continue }
+                if inProfiles && !line.hasPrefix(" ") && !trimmed.isEmpty { break }
+                if inProfiles && trimmed.hasPrefix("- name:") {
+                    let name = trimmed.replacingOccurrences(of: "- name:", with: "")
+                        .trimmingCharacters(in: .whitespaces)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                    let volPath = "/Volumes/\(name)"
+                    if fm.fileExists(atPath: volPath) {
+                        let cacheDir = volPath + "/.lfg-cache"
+                        _cachedCacheDir = cacheDir
+                        return cacheDir
+                    }
+                }
+            }
+        }
+        _cachedCacheDir = lfgHome
+        return lfgHome
+    }
 
     init(htmlPath: String, windowTitle: String, selectionFile: String?) {
         self.htmlPath = htmlPath
@@ -218,10 +251,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             // In-place navigation with loading screen
             os_log("Navigate request: %{public}@", log: lfgLog, type: .info, target)
             let lfgDir = NSHomeDirectory() + "/tools/@yj/lfg"
-            let devDriveCache = "/Volumes/900DEVELOPER/.lfg-cache"
-            let fm = FileManager.default
-            // Resolve cache dir: DevDrive if available, fallback to lfgDir
-            let cacheDir = fm.fileExists(atPath: devDriveCache) ? devDriveCache : lfgDir
+            let cacheDir = resolveCacheDir()
             let targetPath: String
             let moduleCmd: String?
             switch target {
@@ -346,9 +376,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 syncNavDepth()
             }
         } else if action == "home" {
-            let lfgHome = NSHomeDirectory() + "/tools/@yj/lfg"
-            let devCache = "/Volumes/900DEVELOPER/.lfg-cache"
-            let homeCache = FileManager.default.fileExists(atPath: devCache) ? devCache : lfgHome
+            let homeCache = resolveCacheDir()
             let splashPath = homeCache + "/.lfg_splash.html"
             navigationStack.removeAll()
             window.title = "LFG - Local File Guardian"
@@ -392,7 +420,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         // Fallback: if DevDrive path failed, try lfgDir
         if let failedURL = nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
             let path = failedURL.path
-            if path.hasPrefix("/Volumes/900DEVELOPER/.lfg-cache/") {
+            if path.hasPrefix("/Volumes/") && path.contains("/.lfg-cache/") {
                 let filename = failedURL.lastPathComponent
                 let fallback = NSHomeDirectory() + "/tools/@yj/lfg/" + filename
                 os_log("Fallback to: %{public}@", log: lfgLog, type: .info, fallback)
@@ -440,9 +468,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
 
     @objc func navigateHome() {
         // Trigger the "home" action via the existing handler
-        let lfgHome = NSHomeDirectory() + "/tools/@yj/lfg"
-        let devCache = "/Volumes/900DEVELOPER/.lfg-cache"
-        let homeCache = FileManager.default.fileExists(atPath: devCache) ? devCache : lfgHome
+        let homeCache = resolveCacheDir()
         let splashPath = homeCache + "/.lfg_splash.html"
         navigationStack.removeAll()
         window.title = "LFG - Local File Guardian"

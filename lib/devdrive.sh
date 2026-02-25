@@ -5,11 +5,29 @@ set -uo pipefail
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DEVDRIVE_DIR="$HOME/tools/yj-devdrive"
 VIEWER="$LFG_DIR/viewer"
-MOUNT_POINT="/Volumes/900DEVELOPER"
 
 source "$LFG_DIR/lib/state.sh"
+source "$LFG_DIR/lib/settings.sh"
 LFG_MODULE="devdrive"
 HTML_FILE="$LFG_CACHE_DIR/.lfg_devdrive.html"
+
+# Parse --profile=<name> from any argument position; default to first profile
+ACTIVE_PROFILE=""
+REMAINING_ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --profile=*) ACTIVE_PROFILE="${arg#--profile=}" ;;
+        *) REMAINING_ARGS+=("$arg") ;;
+    esac
+done
+set -- "${REMAINING_ARGS[@]+"${REMAINING_ARGS[@]}"}"
+
+# Resolve active profile: use --profile value, or first profile from settings
+if [[ -z "$ACTIVE_PROFILE" ]]; then
+    ACTIVE_PROFILE=$(lfg_settings_get_profile_names | head -1)
+    [[ -z "$ACTIVE_PROFILE" ]] && ACTIVE_PROFILE="900DEVELOPER"
+fi
+MOUNT_POINT="/Volumes/$ACTIVE_PROFILE"
 
 # Pass-through to devdrive subcommands
 case "${1:-}" in
@@ -20,7 +38,7 @@ case "${1:-}" in
         python3 -c "
 from btau.core.sparse import attach_sparse_image
 import json, glob, os
-images = glob.glob(os.path.expanduser('~/.config/btau/*.sparseimage')) + glob.glob('/Volumes/*/900DEVELOPER.sparseimage')
+images = glob.glob(os.path.expanduser('~/.config/btau/$ACTIVE_PROFILE.sparseimage')) + glob.glob('/Volumes/*/$ACTIVE_PROFILE.sparseimage') + glob.glob(os.path.expanduser('~/.config/btau/*.sparseimage'))
 if images:
     result = attach_sparse_image(images[0])
     print(json.dumps(result, indent=2))
@@ -127,13 +145,12 @@ print(yaml.dump(cfg, default_flow_style=False, sort_keys=False))
     auto-move)
         shift
         lfg_state_start devdrive
-        export PYTHONPATH="${DEVDRIVE_DIR}:${PYTHONPATH:-}"
-        DRY_RUN="True"
+        DRY_RUN="true"
         FORCE=""
         for arg in "$@"; do
             case "$arg" in
-                --force) DRY_RUN="False"; FORCE="yes" ;;
-                --dry-run) DRY_RUN="True" ;;
+                --force) DRY_RUN="false"; FORCE="yes" ;;
+                --dry-run) DRY_RUN="true" ;;
             esac
         done
         if [[ -n "$FORCE" ]]; then
@@ -141,36 +158,136 @@ print(yaml.dump(cfg, default_flow_style=False, sort_keys=False))
         else
             echo "Evaluating auto-move rules (dry run)..."
         fi
-        python3 -c "
-import json
-from btau.core.automove import AutoMoveEngine
+        PROFILES_JSON=$(lfg_settings_get_profiles 2>/dev/null || echo '[]')
+        PROFILES_JSON="$PROFILES_JSON" DRY_RUN="$DRY_RUN" python3 << 'AUTOMOVE_PY'
+import json, os, subprocess, shutil, fnmatch
 
-engine = AutoMoveEngine.from_config()
-proposals = engine.evaluate_rules()
+profiles = json.loads(os.environ.get('PROFILES_JSON', '[]'))
+dry_run = os.environ.get('DRY_RUN', 'true') == 'true'
+prompts_dir = os.path.expanduser('~/.config/lfg/prompts')
+
+# Filter to profiles with largest_to_freest policy
+active_profiles = [p for p in profiles if p.get('auto_move_policy') == 'largest_to_freest']
+if not active_profiles:
+    print('No profiles with auto-move policy "largest_to_freest".')
+    raise SystemExit(0)
+
+proposals = []
+for prof in active_profiles:
+    name = prof.get('name', '')
+    system_link = os.path.expanduser(prof.get('system_link', ''))
+    patterns = prof.get('file_patterns', [])
+    mount = f"/Volumes/{name}"
+
+    if not os.path.isdir(mount):
+        print(f"  [{name}] Volume not mounted, skipping")
+        continue
+    if not os.path.isdir(system_link):
+        print(f"  [{name}] System link {system_link} not found, skipping")
+        continue
+
+    # Scan system_link for projects, sorted by size descending
+    projects = []
+    try:
+        for entry in os.scandir(system_link):
+            if not entry.is_dir(follow_symlinks=False) or entry.name.startswith('.'):
+                continue
+            # If file_patterns defined, check if project contains matching files
+            if patterns:
+                has_match = False
+                try:
+                    for f in os.listdir(entry.path):
+                        if any(fnmatch.fnmatch(f, pat) for pat in patterns):
+                            has_match = True
+                            break
+                except: pass
+                if not has_match:
+                    continue
+            try:
+                size = sum(
+                    os.path.getsize(os.path.join(dp, fn))
+                    for dp, dns, fns in os.walk(entry.path, followlinks=False)
+                    for fn in fns
+                )
+            except: size = 0
+            projects.append({'name': entry.name, 'path': entry.path, 'size': size})
+    except: continue
+
+    projects.sort(key=lambda p: p['size'], reverse=True)
+
+    # Find target: mounted volume with most free space
+    try:
+        st = os.statvfs(mount)
+        free_bytes = st.f_bavail * st.f_frsize
+    except: free_bytes = 0
+
+    for proj in projects[:10]:  # Top 10 largest
+        size_gb = proj['size'] / (1024**3)
+        if size_gb < 0.1:  # Skip tiny projects
+            continue
+        # Check if already on the volume (is a symlink pointing there)
+        if os.path.islink(proj['path']):
+            link_target = os.readlink(proj['path'])
+            if mount in link_target:
+                continue  # Already on this volume
+
+        # Check in-use via lsof
+        in_use = False
+        try:
+            result = subprocess.run(['lsof', '+D', proj['path']], capture_output=True, timeout=5)
+            in_use = result.returncode == 0 and len(result.stdout.strip()) > 0
+        except: pass
+
+        status = 'in-use' if in_use else 'eligible'
+        proposals.append({
+            'profile': name, 'project': proj['name'], 'path': proj['path'],
+            'size_gb': round(size_gb, 1), 'dest': f"{mount}/{proj['name']}",
+            'status': status, 'color': prof.get('color', '#c084fc'),
+            'free_gb': round(free_bytes / (1024**3), 1)
+        })
 
 if not proposals:
     print('No projects match auto-move criteria.')
 else:
-    print(f'{len(proposals)} project(s) eligible for migration:')
+    eligible = [p for p in proposals if p['status'] == 'eligible']
+    in_use = [p for p in proposals if p['status'] == 'in-use']
+    print(f'{len(proposals)} project(s) evaluated, {len(eligible)} eligible, {len(in_use)} in-use:')
     print()
     for p in proposals:
-        d = p.to_dict()
-        print(f'  {d[\"project_name\"]:30s} {d[\"size_gb\"]:6.1f} GB  {d[\"days_since_access\"]:5.0f}d  score={d[\"score\"]:.1f}')
-        print(f'    reason: {d[\"reason\"]}')
-        print(f'    {d[\"source\"]} -> {d[\"destination\"]}')
-        print()
+        marker = 'ELIGIBLE' if p['status'] == 'eligible' else 'IN-USE'
+        print(f"  [{marker:8s}] {p['project']:30s} {p['size_gb']:6.1f} GB  [{p['profile']}]")
+        print(f"             {p['path']} -> {p['dest']}")
+    print()
 
-    results = engine.execute_plan(proposals, dry_run=$DRY_RUN)
-    for r in results:
-        status = r['status']
-        name = r['project']
-        if status == 'dry_run':
-            print(f'  [DRY RUN] {name}')
-        elif status == 'success':
-            print(f'  [MOVED]   {name}')
-        else:
-            print(f'  [ERROR]   {name}: {r.get(\"error\", \"unknown\")}')
-"
+    if not dry_run:
+        for p in proposals:
+            if p['status'] == 'in-use':
+                # Write prompt file for menubar notification
+                os.makedirs(prompts_dir, exist_ok=True)
+                import uuid
+                prompt_file = os.path.join(prompts_dir, f"{uuid.uuid4()}.json")
+                prompt_data = {
+                    'type': 'auto-move', 'project': p['project'], 'size_gb': p['size_gb'],
+                    'source': p['path'], 'dest': p['dest'], 'profile': p['profile'],
+                    'status': 'pending'
+                }
+                with open(prompt_file, 'w') as f:
+                    json.dump(prompt_data, f, indent=2)
+                print(f"  [PROMPT]  {p['project']} - notification sent")
+                continue
+            try:
+                dest = p['dest']
+                if os.path.exists(dest):
+                    print(f"  [SKIP]    {p['project']} - destination exists")
+                    continue
+                shutil.move(p['path'], dest)
+                os.symlink(dest, p['path'])
+                print(f"  [MOVED]   {p['project']}")
+            except Exception as e:
+                print(f"  [ERROR]   {p['project']}: {e}")
+    else:
+        print("  (dry run - use --force to execute)")
+AUTOMOVE_PY
         lfg_state_done devdrive "action=auto-move" "dry_run=$DRY_RUN"
         exit 0
         ;;
@@ -352,7 +469,7 @@ volumes_html = ''
 if volume_rows.strip():
     volumes_html = '<div class=\"section-title\" style=\"color:#c084fc\">Devdrive Volumes</div><table><thead><tr><th>Volume</th><th>Mount Point</th><th class=\"r\">Total</th><th class=\"r\">Free</th><th>FS</th><th class=\"r\">Projects</th></tr></thead><tbody>' + volume_rows + '</tbody></table>'
 else:
-    volumes_html = '<div class=\"section-title\" style=\"color:#c084fc\">Devdrive Volumes</div><div class=\"empty-state\">No devdrive volumes detected. Attach an external drive with a 900DEVELOPER directory.</div>'
+    volumes_html = '<div class=\"section-title\" style=\"color:#c084fc\">Devdrive Volumes</div><div class=\"empty-state\">No devdrive volumes detected. Check volume_profiles in settings.</div>'
 
 projects_html = ''
 if project_rows.strip():
@@ -368,7 +485,7 @@ html = '''<!DOCTYPE html>
 </head><body>
   <div class=\"summary\">
     <div class=\"stat\" data-tip=\"Mount status of $MOUNT_POINT\"><span class=\"label\">Status</span><span class=\"value $MOUNT_STATUS_CLASS\">$MOUNT_STATUS</span></div>
-    <div class=\"stat\" data-tip=\"Devdrive volumes with 900DEVELOPER\"><span class=\"label\">Volumes</span><span class=\"value\">$VOLUME_COUNT</span></div>
+    <div class=\"stat\" data-tip=\"Devdrive volumes across all profiles\"><span class=\"label\">Volumes</span><span class=\"value\">$VOLUME_COUNT</span></div>
     <div class=\"stat\" data-tip=\"Total projects in symlink forest\"><span class=\"label\">Projects</span><span class=\"value accent\">$PROJECT_COUNT</span></div>
     <div class=\"stat\" data-tip=\"Healthy symlinks\"><span class=\"label\">Healthy</span><span class=\"value good\">$HEALTHY_COUNT</span></div>
     <div class=\"stat\" data-tip=\"Broken symlinks\"><span class=\"label\">Broken</span><span class=\"value''' + (' danger' if $BROKEN_COUNT > 0 else '') + '''\">$BROKEN_COUNT</span></div>

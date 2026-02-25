@@ -87,69 +87,75 @@ if (( CACHE_TOTAL >= 1048576 )); then CACHE_HR=$(awk "BEGIN{printf \"%.1f GB\", 
 elif (( CACHE_TOTAL >= 1024 )); then CACHE_HR=$(awk "BEGIN{printf \"%.1f MB\", $CACHE_TOTAL/1024}")
 else CACHE_HR="${CACHE_TOTAL} KB"; fi
 
-# --- DEVDRIVE: Symlink forest status ---
+# --- DEVDRIVE: Profile-aware volume status ---
 echo "Checking devdrive..."
+source "$LFG_DIR/lib/settings.sh" 2>/dev/null
 DEVDRIVE_DIR_PY="$HOME/tools/yj-devdrive"
-DD_MOUNT_POINT="/Volumes/900DEVELOPER"
-DD_MOUNTED="false"
+DD_PROFILES_JSON=$(lfg_settings_get_profiles 2>/dev/null || echo '[]')
 DD_VOLUME_COUNT=0
 DD_PROJECT_COUNT=0
 DD_HEALTHY_COUNT=0
 DD_BROKEN_COUNT=0
+DD_MOUNTED_COUNT=0
 DD_VOLUME_ROWS=""
 DD_PROJECT_ROWS=""
 
-if [[ -d "$DD_MOUNT_POINT" ]]; then
-    DD_MOUNTED="true"
-fi
-
+# Gather per-profile data
 export PYTHONPATH="${DEVDRIVE_DIR_PY}:${PYTHONPATH:-}"
-DD_DATA=$(python3 -c "
-import json, sys
-sys.path.insert(0, '$DEVDRIVE_DIR_PY')
+DD_PROFILES_DATA=$(DD_PROFILES_JSON="$DD_PROFILES_JSON" python3 << 'DDPY'
+import json, os, sys
 try:
-    from btau.core.volumes import find_devdrive_volumes
-    from btau.core.devdrive import check_forest_health, list_projects
-    from pathlib import Path
-    volumes = find_devdrive_volumes()
-    health = check_forest_health(Path('$DD_MOUNT_POINT'))
-    projects = list_projects(Path('$DD_MOUNT_POINT'))
-    print(json.dumps({
-        'volumes': [{'name':v['name'],'free_gb':round(v.get('free_bytes',0)/(1024**3),1),'projects':len(v.get('projects',[]))} for v in volumes],
-        'health': health,
-        'projects': projects[:10],
-    }))
-except Exception as e:
-    print(json.dumps({'error':str(e),'volumes':[],'health':{'healthy':[],'broken':[],'not_symlink':[],'total':0},'projects':[]}))
-" 2>/dev/null || echo '{"volumes":[],"health":{"healthy":[],"broken":[],"not_symlink":[],"total":0},"projects":[]}')
+    profiles = json.loads(os.environ.get('DD_PROFILES_JSON', '[]'))
+except:
+    profiles = []
+results = []
+for p in profiles:
+    name = p.get('name', '')
+    mount = f"/Volumes/{name}"
+    mounted = os.path.isdir(mount)
+    free_gb = 0; total_gb = 0; used_pct = 0
+    if mounted:
+        try:
+            st = os.statvfs(mount)
+            free_gb = round(st.f_bavail * st.f_frsize / (1024**3), 1)
+            total_gb = round(st.f_blocks * st.f_frsize / (1024**3), 1)
+            used_pct = round(100 * (1 - st.f_bavail / max(st.f_blocks, 1)))
+        except: pass
+    proj_count = 0
+    if mounted:
+        try:
+            proj_count = len([d for d in os.listdir(mount) if os.path.isdir(os.path.join(mount, d)) and not d.startswith('.')])
+        except: pass
+    results.append({
+        'name': name, 'purpose': p.get('purpose', ''), 'color': p.get('color', '#c084fc'),
+        'mounted': mounted, 'free_gb': free_gb, 'total_gb': total_gb, 'used_pct': used_pct,
+        'project_count': proj_count, 'policy': p.get('auto_move_policy', 'manual')
+    })
+print(json.dumps(results))
+DDPY
+)
 
-# Parse devdrive volume rows
+# Parse profile data into shell rows
 while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    dd_vol_name=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name','?'))" 2>/dev/null || echo "?")
-    dd_vol_free=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d.get('free_gb',0):.1f} GB\")" 2>/dev/null || echo "?")
-    dd_vol_projs=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('projects',0))" 2>/dev/null || echo "0")
+    dd_name=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['name'])" 2>/dev/null)
+    dd_mounted=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d['mounted'] else 'false')" 2>/dev/null)
+    dd_free=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d['free_gb']:.1f} GB\")" 2>/dev/null)
+    dd_projs=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['project_count'])" 2>/dev/null)
+    dd_color=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['color'])" 2>/dev/null)
+    dd_purpose=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['purpose'])" 2>/dev/null)
+
     DD_VOLUME_COUNT=$((DD_VOLUME_COUNT + 1))
-    DD_VOLUME_ROWS+="<tr data-tip=\"${dd_vol_name}: ${dd_vol_free} free, ${dd_vol_projs} projects\"><td class=\"name\">${dd_vol_name}</td><td class=\"size\">${dd_vol_free}</td><td class=\"rank\">${dd_vol_projs}</td></tr>"
-done < <(echo "$DD_DATA" | python3 -c "import json,sys; [print(json.dumps(v)) for v in json.load(sys.stdin).get('volumes',[])]" 2>/dev/null)
+    [[ "$dd_mounted" == "true" ]] && DD_MOUNTED_COUNT=$((DD_MOUNTED_COUNT + 1))
+    DD_PROJECT_COUNT=$((DD_PROJECT_COUNT + dd_projs))
 
-# Parse devdrive project rows
-while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    dd_proj_name=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name','?'))" 2>/dev/null || echo "?")
-    dd_proj_alive=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print('true' if d.get('alive') else 'false')" 2>/dev/null || echo "false")
-    dd_proj_vol=$(echo "$line" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_volume','') or '-')" 2>/dev/null || echo "-")
-    DD_PROJECT_COUNT=$((DD_PROJECT_COUNT + 1))
-    if [[ "$dd_proj_alive" == "true" ]]; then
-        dd_status_class="badge-cleaned"; dd_status_text="OK"; DD_HEALTHY_COUNT=$((DD_HEALTHY_COUNT + 1))
-    else
-        dd_status_class="badge-error"; dd_status_text="BROKEN"; DD_BROKEN_COUNT=$((DD_BROKEN_COUNT + 1))
-    fi
-    DD_PROJECT_ROWS+="<tr><td class=\"name\">${dd_proj_name}</td><td>${dd_proj_vol}</td><td><span class=\"status-badge ${dd_status_class}\">${dd_status_text}</span></td></tr>"
-done < <(echo "$DD_DATA" | python3 -c "import json,sys; [print(json.dumps(p)) for p in json.load(sys.stdin).get('projects',[])]" 2>/dev/null)
+    local_status="Not Mounted"; local_class="badge-error"
+    [[ "$dd_mounted" == "true" ]] && local_status="Mounted" && local_class="badge-cleaned"
 
-DD_STATUS="Not Mounted"
-[[ "$DD_MOUNTED" == "true" ]] && DD_STATUS="Mounted"
+    DD_VOLUME_ROWS+="<tr data-tip=\"${dd_name}: ${dd_free} free, ${dd_projs} projects\" style=\"border-left:3px solid ${dd_color}\"><td class=\"name\">${dd_name}<br><span class=\"meta\">${dd_purpose}</span></td><td><span class=\"status-badge ${local_class}\">${local_status}</span></td><td class=\"size\">${dd_free}</td><td class=\"rank\">${dd_projs}</td></tr>"
+done < <(echo "$DD_PROFILES_DATA" | python3 -c "import json,sys; [print(json.dumps(p)) for p in json.load(sys.stdin)]" 2>/dev/null)
+
+DD_STATUS="${DD_MOUNTED_COUNT}/${DD_VOLUME_COUNT} Mounted"
 
 # --- BTAU: Backup status ---
 echo "Checking backups..."
@@ -275,6 +281,9 @@ html = f'''<!DOCTYPE html>
         <button class="action-btn" style="padding:4px 10px;font-size:10px" onclick="var p=document.getElementById('new-path-input').value;if(p)LFG.exec('~/tools/@yj/lfg/lfg settings paths add '+p,function(o){{LFG.toast(o,{{type:'info'}});loadSettings()}})">Add</button>
       </div>
 
+      <div class="section-title">Volume Profiles</div>
+      <div id="volume-profiles-list" style="margin-bottom:8px"></div>
+
       <div class="section-title">Library Namespace</div>
       <div class="setting-row" style="margin-bottom:16px">
         <input id="set-namespace" class="setting-input" value="@jeremiah" style="width:100%" onchange="LFG.exec('~/tools/@yj/lfg/lfg settings set library_namespace '+this.value,function(){{LFG.toast('Namespace updated',{{type:'success'}})}})">
@@ -314,7 +323,7 @@ html = f'''<!DOCTYPE html>
       {{ icon: "\\uD83D\\uDD0D", title: "WTFS - Disk Usage", desc: "See where your disk space is going. Scans ~/Developer by default, showing the biggest directories first.", color: "#4a9eff" }},
       {{ icon: "\\uD83D\\uDDD1", title: "DTF - Cache Cleanup", desc: "Finds reclaimable caches across dev tools, browsers, and system. Dry run by default -- use --force to clean.", color: "#ff8c42" }},
       {{ icon: "\\uD83D\\uDCE6", title: "BTAU - Backup Manager", desc: "Manages backups with sparse images, incremental sync, and integrity verification. Bridges to yj-devdrive.", color: "#06d6a0" }},
-      {{ icon: "\\uD83D\\uDCBE", title: "DEVDRIVE - Developer Drive", desc: "Manages symlink forests across external volumes. Mount, sync, and verify projects from a unified /Volumes/900DEVELOPER view.", color: "#c084fc" }},
+      {{ icon: "\\uD83D\\uDCBE", title: "DEVDRIVE - Developer Drive", desc: "Manages symlink forests across volume profiles. Mount, sync, and verify projects from configured volume profiles.", color: "#c084fc" }},
     ],
     keyHandlers: {{}}
   }});
@@ -449,6 +458,19 @@ html = f'''<!DOCTYPE html>
         if (pathsEl && s.scan_paths) {{
           pathsEl.innerHTML = s.scan_paths.map(function(p) {{
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;margin-bottom:4px;background:#1c1c22;border:1px solid #2a2a34;border-radius:4px"><span style="font-size:11px;color:#d0d0d8;font-family:monospace">' + p + '</span><button class="action-btn-sm" style="padding:2px 6px;font-size:9px;border-color:#ff4d6a;color:#ff4d6a" onclick="LFG.confirm(\\'Remove ' + p + '?\\',\\'~/tools/@yj/lfg/lfg settings paths remove ' + p + '\\',function(){{loadSettings()}})">x</button></div>';
+          }}).join('');
+        }}
+        // Volume profiles
+        var vpEl = document.getElementById('volume-profiles-list');
+        if (vpEl && s.volume_profiles) {{
+          vpEl.innerHTML = s.volume_profiles.map(function(p, i) {{
+            var mounted = p.mounted ? '<span style="color:#06d6a0;font-size:9px">MOUNTED</span>' : '<span style="color:#6b6b78;font-size:9px">NOT MOUNTED</span>';
+            var colorSwatch = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + (p.color||'#c084fc') + ';margin-right:6px"></span>';
+            return '<div style="padding:8px;margin-bottom:6px;background:#1c1c22;border:1px solid #2a2a34;border-radius:6px;border-left:3px solid ' + (p.color||'#c084fc') + '">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' + colorSwatch + '<strong style="font-size:11px;color:#d0d0d8">' + (p.name||'') + '</strong>' + mounted + '</div>' +
+              '<div style="font-size:10px;color:#6b6b78;margin-bottom:2px">' + (p.purpose||'') + '</div>' +
+              '<div style="font-size:10px;color:#6b6b78">' + (p.system_link||'') + '</div>' +
+              '</div>';
           }}).join('');
         }}
         // Namespace

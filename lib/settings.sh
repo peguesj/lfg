@@ -37,13 +37,29 @@ ai:
   endpoint: http://localhost:4000
   temperature: 0.3
   system_override: false
+
+volume_profiles:
+  - name: 900DEVELOPER
+    purpose: Developer projects
+    system_link: ~/Developer
+    file_patterns: []
+    color: "#c084fc"
+    auto_move_policy: largest_to_freest
+  - name: 901LOGIC
+    purpose: Logic Pro sessions
+    system_link: ~/Music/Logic
+    file_patterns:
+      - "*.logicx"
+      - "*.band"
+    color: "#ff6b8a"
+    auto_move_policy: largest_to_freest
 DEFAULTS
 }
 
 _lfg_ensure_settings
 
 # Python helper for YAML-like operations (no external deps)
-# We use a simple key-value parser since our YAML is flat/simple
+# Supports: scalars, simple lists, dicts, and list-of-dicts (volume_profiles)
 _lfg_settings_py() {
     python3 -c "
 import os, sys, re
@@ -51,51 +67,167 @@ import os, sys, re
 SETTINGS = '$LFG_SETTINGS_FILE'
 
 def read_settings():
-    \"\"\"Parse our simple YAML into a dict.\"\"\"
+    \"\"\"Parse LFG YAML into a dict. Handles list-of-dicts (volume_profiles).\"\"\"
     settings = {}
     current_key = None
     current_list = None
+    current_dict_item = None  # for list-of-dicts items
+    current_dict_sub_list = None  # for sub-lists within dict items (e.g. file_patterns)
+    current_dict_sub_key = None
+
     with open(SETTINGS) as f:
         for line in f:
             stripped = line.strip()
             if not stripped or stripped.startswith('#'):
                 continue
-            # List item under a key
-            if stripped.startswith('- ') and current_key:
-                if current_list is None:
-                    current_list = []
-                val = stripped[2:].strip().strip('\"').strip(\"'\")
-                current_list.append(val)
-                settings[current_key] = current_list
+
+            indent = len(line) - len(line.lstrip())
+
+            # Top-level key (no indent)
+            if indent == 0:
+                # Flush any pending dict item
+                if current_dict_item is not None and current_key:
+                    if current_dict_sub_list is not None and current_dict_sub_key:
+                        current_dict_item[current_dict_sub_key] = current_dict_sub_list
+                    if current_list is None:
+                        current_list = []
+                    current_list.append(current_dict_item)
+                    settings[current_key] = current_list
+                    current_dict_item = None
+                    current_dict_sub_list = None
+                    current_dict_sub_key = None
+
+                m = re.match(r'^(\w+):\s*(.*)', line)
+                if m:
+                    current_key = m.group(1)
+                    val = m.group(2).strip().strip('\"').strip(\"'\")
+                    current_list = None
+                    current_dict_item = None
+                    current_dict_sub_list = None
+                    current_dict_sub_key = None
+                    if val:
+                        settings[current_key] = val
                 continue
-            # Nested key under a parent (2-space indent)
-            if line.startswith('  ') and not stripped.startswith('-'):
-                m = re.match(r'\s+(\w+):\s*(.*)', line)
-                if m and current_key:
+
+            # 2-space indent
+            if indent == 2 and current_key:
+                # List item: '  - ...'
+                if stripped.startswith('- '):
+                    rest = stripped[2:].strip()
+                    # Check if this is a dict item (has key: val)
+                    m = re.match(r'^(\w[\w_]*):\s*(.*)', rest)
+                    if m:
+                        # Flush previous dict item
+                        if current_dict_item is not None:
+                            if current_dict_sub_list is not None and current_dict_sub_key:
+                                current_dict_item[current_dict_sub_key] = current_dict_sub_list
+                            if current_list is None:
+                                current_list = []
+                            current_list.append(current_dict_item)
+                        current_dict_item = {}
+                        current_dict_sub_list = None
+                        current_dict_sub_key = None
+                        dk = m.group(1)
+                        dv = m.group(2).strip().strip('\"').strip(\"'\")
+                        if dv == '[]':
+                            current_dict_item[dk] = []
+                        else:
+                            current_dict_item[dk] = dv
+                    else:
+                        # Simple list item
+                        val = rest.strip('\"').strip(\"'\")
+                        if current_list is None:
+                            current_list = []
+                        current_list.append(val)
+                        settings[current_key] = current_list
+                    continue
+                # Nested key: '  key: val'
+                m = re.match(r'\s+(\w[\w_]*):\s*(.*)', line)
+                if m and current_dict_item is None:
                     sub_key = m.group(1)
                     sub_val = m.group(2).strip().strip('\"').strip(\"'\")
                     if not isinstance(settings.get(current_key), dict):
                         settings[current_key] = {}
-                    # Parse 'all' or list
                     settings[current_key][sub_key] = sub_val if sub_val else 'all'
                     current_list = None
                 continue
-            # Top-level key
-            m = re.match(r'^(\w+):\s*(.*)', line)
-            if m:
-                current_key = m.group(1)
-                val = m.group(2).strip().strip('\"').strip(\"'\")
-                current_list = None
-                if val:
-                    settings[current_key] = val
-                # else: will be populated by subsequent lines
+
+            # 4-space indent (inside a dict item of a list-of-dicts)
+            if indent == 4 and current_dict_item is not None:
+                # Sub-list item: '      - ...'
+                if stripped.startswith('- '):
+                    val = stripped[2:].strip().strip('\"').strip(\"'\")
+                    if current_dict_sub_list is None:
+                        current_dict_sub_list = []
+                    current_dict_sub_list.append(val)
+                    if current_dict_sub_key:
+                        current_dict_item[current_dict_sub_key] = current_dict_sub_list
+                    continue
+                # Dict key inside list item: '    key: val'
+                m = re.match(r'\s+(\w[\w_]*):\s*(.*)', line)
+                if m:
+                    # Flush previous sub-list
+                    if current_dict_sub_list is not None and current_dict_sub_key:
+                        current_dict_item[current_dict_sub_key] = current_dict_sub_list
+                    dk = m.group(1)
+                    dv = m.group(2).strip().strip('\"').strip(\"'\")
+                    current_dict_sub_list = None
+                    current_dict_sub_key = dk
+                    if dv == '[]':
+                        current_dict_item[dk] = []
+                        current_dict_sub_key = None
+                    elif dv:
+                        current_dict_item[dk] = dv
+                        current_dict_sub_key = None
+                    else:
+                        # Value will come as sub-list items
+                        current_dict_sub_list = []
+                continue
+
+            # 6-space indent (sub-list items inside dict item properties)
+            if indent >= 6 and current_dict_item is not None and current_dict_sub_key:
+                if stripped.startswith('- '):
+                    val = stripped[2:].strip().strip('\"').strip(\"'\")
+                    if current_dict_sub_list is None:
+                        current_dict_sub_list = []
+                    current_dict_sub_list.append(val)
+                    current_dict_item[current_dict_sub_key] = current_dict_sub_list
+                continue
+
+    # Flush final dict item
+    if current_dict_item is not None and current_key:
+        if current_dict_sub_list is not None and current_dict_sub_key:
+            current_dict_item[current_dict_sub_key] = current_dict_sub_list
+        if current_list is None:
+            current_list = []
+        current_list.append(current_dict_item)
+        settings[current_key] = current_list
+
     return settings
 
 def write_settings(settings):
-    \"\"\"Write settings back as YAML.\"\"\"
+    \"\"\"Write settings back as YAML. Handles list-of-dicts.\"\"\"
     lines = ['# LFG Settings', '# Managed by: lfg settings', '']
     for key, val in settings.items():
-        if isinstance(val, list):
+        if isinstance(val, list) and val and isinstance(val[0], dict):
+            # List of dicts (e.g. volume_profiles)
+            lines.append(f'{key}:')
+            for item in val:
+                first = True
+                for dk, dv in item.items():
+                    prefix = '  - ' if first else '    '
+                    first = False
+                    if isinstance(dv, list):
+                        if not dv:
+                            lines.append(f'{prefix}{dk}: []')
+                        else:
+                            lines.append(f'{prefix}{dk}:')
+                            for sv in dv:
+                                lines.append(f'      - \\\"{sv}\\\"')
+                    else:
+                        dv_str = f'\\\"{dv}\\\"' if isinstance(dv, str) and (dv.startswith('#') or dv.startswith('@')) else dv
+                        lines.append(f'{prefix}{dk}: {dv_str}')
+        elif isinstance(val, list):
             lines.append(f'{key}:')
             for item in val:
                 lines.append(f'  - {item}')
@@ -261,7 +393,21 @@ import json
 s = read_settings()
 # Expand paths
 if 'scan_paths' in s and isinstance(s['scan_paths'], list):
-    s['scan_paths_expanded'] = [os.path.expanduser(p) for p in s['scan_paths']]
+    s['scan_paths_expanded'] = [os.path.expanduser(p) for p in s['scan_paths'] if isinstance(p, str)]
+# Ensure volume_profiles defaults
+defaults = {'name':'','purpose':'','system_link':'','file_patterns':[],'color':'#c084fc','auto_move_policy':'manual'}
+profiles = s.get('volume_profiles', [])
+if isinstance(profiles, list):
+    for p in profiles:
+        if isinstance(p, dict):
+            for dk, dv in defaults.items():
+                if dk not in p:
+                    p[dk] = dv
+            if isinstance(p.get('file_patterns'), str):
+                p['file_patterns'] = [p['file_patterns']] if p['file_patterns'] else []
+            p['system_link_expanded'] = os.path.expanduser(p.get('system_link', ''))
+            p['mounted'] = os.path.isdir(f\"/Volumes/{p.get('name','')}\")
+    s['volume_profiles'] = profiles
 print(json.dumps(s, indent=2))
 "
 }
@@ -271,6 +417,70 @@ lfg_settings_reset() {
     rm -f "$LFG_SETTINGS_FILE"
     _lfg_ensure_settings
     echo "Settings reset to defaults."
+}
+
+# ─── Volume Profile Helpers ──────────────────────────────────────────────────
+
+# Get volume profiles as JSON array
+# Usage: profiles_json=$(lfg_settings_get_profiles)
+lfg_settings_get_profiles() {
+    _lfg_settings_py "
+import json
+s = read_settings()
+profiles = s.get('volume_profiles', [])
+if not isinstance(profiles, list):
+    profiles = []
+# Ensure each profile has all fields with defaults
+defaults = {'name':'','purpose':'','system_link':'','file_patterns':[],'color':'#c084fc','auto_move_policy':'manual'}
+for p in profiles:
+    for dk, dv in defaults.items():
+        if dk not in p:
+            p[dk] = dv
+    if isinstance(p.get('file_patterns'), str):
+        p['file_patterns'] = [p['file_patterns']] if p['file_patterns'] else []
+print(json.dumps(profiles))
+"
+}
+
+# Get profile names as newline-separated list
+lfg_settings_get_profile_names() {
+    _lfg_settings_py "
+s = read_settings()
+profiles = s.get('volume_profiles', [])
+if isinstance(profiles, list):
+    for p in profiles:
+        if isinstance(p, dict):
+            print(p.get('name', ''))
+"
+}
+
+# Get a specific profile by name as JSON
+# Usage: profile_json=$(lfg_settings_get_profile "901LOGIC")
+lfg_settings_get_profile() {
+    local name="$1"
+    _lfg_settings_py "
+import json
+s = read_settings()
+profiles = s.get('volume_profiles', [])
+for p in profiles:
+    if isinstance(p, dict) and p.get('name') == '${name}':
+        print(json.dumps(p))
+        break
+"
+}
+
+# Get list of mounted volume profile names
+lfg_settings_get_mounted_profiles() {
+    _lfg_settings_py "
+s = read_settings()
+profiles = s.get('volume_profiles', [])
+if isinstance(profiles, list):
+    for p in profiles:
+        if isinstance(p, dict):
+            name = p.get('name', '')
+            if name and os.path.isdir(f'/Volumes/{name}'):
+                print(name)
+"
 }
 
 # ─── Module Helpers ──────────────────────────────────────────────────────────

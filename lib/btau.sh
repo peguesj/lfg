@@ -7,6 +7,7 @@ BTAU_DIR="$HOME/tools/yj-devdrive"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+source "$LFG_DIR/lib/settings.sh" 2>/dev/null
 LFG_MODULE="btau"
 HTML_FILE="$LFG_CACHE_DIR/.lfg_btau.html"
 
@@ -73,11 +74,16 @@ except Exception as e:
 " 2>/dev/null)
 fi
 
-# Volumes
+# Volumes -- profile-aware discovery
 VOLUME_ROWS=""
-while IFS= read -r vol; do
-    [[ -z "$vol" ]] && continue
-    vol_name=$(basename "$vol")
+BTAU_PROFILE_NAMES=$(lfg_settings_get_profile_names 2>/dev/null)
+if [[ -z "$BTAU_PROFILE_NAMES" ]]; then
+    BTAU_PROFILE_NAMES="900DEVELOPER"
+fi
+while IFS= read -r prof_name; do
+    [[ -z "$prof_name" ]] && continue
+    vol="/Volumes/$prof_name"
+    [[ ! -d "$vol" ]] && continue
     vol_size_kb=$(du -sk "$vol" 2>/dev/null | awk '{print $1}')
     if (( vol_size_kb >= 1048576 )); then
         vol_size=$(awk "BEGIN{printf \"%.1f GB\", $vol_size_kb/1048576}")
@@ -86,8 +92,10 @@ while IFS= read -r vol; do
     else
         vol_size="${vol_size_kb} KB"
     fi
-    VOLUME_ROWS+="<tr><td class=\"name\">${vol_name}</td><td class=\"size\">${vol_size}</td></tr>"
-done < <(ls -d /Volumes/*[Dd]ev* 2>/dev/null; echo "")
+    prof_color=$(lfg_settings_get_profile "$prof_name" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('color','#06d6a0'))" 2>/dev/null || echo "#06d6a0")
+    prof_purpose=$(lfg_settings_get_profile "$prof_name" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('purpose',''))" 2>/dev/null || echo "")
+    VOLUME_ROWS+="<tr style=\"border-left:3px solid ${prof_color}\"><td class=\"name\">${prof_name}<br><span class=\"meta\">${prof_purpose}</span></td><td class=\"size\">${vol_size}</td></tr>"
+done <<< "$BTAU_PROFILE_NAMES"
 
 if (( TOTAL_SIZE_KB >= 1048576 )); then
     TOTAL_HR=$(awk "BEGIN{printf \"%.1f GB\", $TOTAL_SIZE_KB/1048576}")

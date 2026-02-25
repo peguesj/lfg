@@ -54,7 +54,7 @@ Full-text search across projects, filesystem, and history with SQLite FTS5.
 |-----------|------|
 | Dispatcher | `~/tools/@yj/lfg/lfg` |
 | Modules | `~/tools/@yj/lfg/lib/{scan,clean,btau,devdrive,stfu,splash,dashboard,chat,search}.sh` |
-| Cache HTML | `$LFG_CACHE_DIR` → `/Volumes/900DEVELOPER/.lfg-cache/` (fallback: `~/tools/@yj/lfg/`) |
+| Cache HTML | `$LFG_CACHE_DIR` → first mounted volume profile's `.lfg-cache/` (fallback: `~/tools/@yj/lfg/`) |
 | State | `~/.config/lfg/state.json` |
 | Settings | `~/.config/lfg/settings.yaml` |
 | AI Config | `~/.config/lfg/ai.yaml` |
@@ -193,8 +193,19 @@ LFG supports two themes toggled via `state.json` key `theme` (`"default"` or `"g
 
 ### DevDrive Cache Layer
 All module scripts write HTML output to `$LFG_CACHE_DIR`, resolved by `lib/state.sh`:
-- If `/Volumes/900DEVELOPER` is mounted: `/Volumes/900DEVELOPER/.lfg-cache/`
-- Otherwise: `$LFG_DIR` (backward compatible fallback)
+- Iterates `volume_profiles` from `settings.yaml`, uses first mounted profile's `/Volumes/<name>/.lfg-cache/`
+- Fallback: `$LFG_DIR` (backward compatible)
+
+### Volume Profiles
+Multi-volume architecture defined in `~/.config/lfg/settings.yaml` under `volume_profiles:`. Each profile declares:
+- `name`: Volume directory name (e.g., `900DEVELOPER`, `901LOGIC`)
+- `purpose`: Human description
+- `system_link`: Where it symlinks on system drive (e.g., `~/Developer`)
+- `file_patterns`: Glob patterns to match (e.g., `*.logicx`)
+- `color`: Hex color for UI accent
+- `auto_move_policy`: `largest_to_freest` | `manual` | `disabled`
+
+DevDrive commands accept `--profile=NAME` to target specific profiles. Auto-move with `largest_to_freest` policy moves largest projects from `system_link` to the mounted volume with most free space, skipping in-use directories (detected via `lsof`). In-use projects trigger notification prompts via `~/.config/lfg/prompts/` watched by the menubar app.
 
 ### IPC
 - **JS → Swift**: `window.webkit.messageHandlers.lfg.postMessage()` (navigate, run, badge, quit, home, settings)
