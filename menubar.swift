@@ -1,6 +1,9 @@
 import Cocoa
 import os.log
+import Security
+import ServiceManagement
 import UserNotifications
+import WebKit
 
 private let lfgMenuLog = OSLog(subsystem: "io.pegues.yj-tools.lfg.menubar", category: "menubar")
 
@@ -930,6 +933,23 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         addMenuItem("Refresh", action: #selector(doRefresh), key: "r")
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Launch at Login toggle
+        if #available(macOS 13.0, *) {
+            let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLoginItem), keyEquivalent: "")
+            loginItem.target = self
+            loginItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+            menu.addItem(loginItem)
+        }
+
+        // About
+        let aboutItem = NSMenuItem(title: "About LFG Helper", action: #selector(showAboutPanel), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit LFG Helper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem.menu = menu
@@ -1067,6 +1087,156 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
                 trigger: nil
             )
             center.add(request, withCompletionHandler: nil)
+        }
+    }
+
+    // MARK: - About Panel
+
+    var aboutWindow: NSWindow?
+
+    @objc func showAboutPanel() {
+        if let existing = aboutWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let version = "2.4.0"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        let monitors: [(String, String, String)] = [
+            ("WTFS", "Disk usage", "#4a9eff"),
+            ("DTF", "Cache growth", "#ff8c42"),
+            ("BTAU", "Backup staleness", "#06d6a0"),
+            ("DEVDRIVE", "Volume health", "#c084fc"),
+        ]
+        var monitorRows = ""
+        for (abbr, desc, color) in monitors {
+            monitorRows += "<div class='mod-row'><span class='dot' style='background:\(color)'></span><b>\(abbr)</b> <span class='desc'>\(desc)</span></div>"
+        }
+
+        let helperStatus = helperMonitor.paused ? "Paused" : "Active"
+        let conditions = helperMonitor.activeConditions.isEmpty ? "All clear" : "\(helperMonitor.activeConditions.count) alert(s)"
+
+        let aboutHTML = """
+        <!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"SF Mono",Menlo,monospace;
+          background:#141418;color:#e0e0e6;display:flex;flex-direction:column;
+          align-items:center;padding:28px 24px 20px;-webkit-font-smoothing:antialiased;
+          -webkit-user-select:none;cursor:default}
+        .brand{font-size:48px;font-weight:900;letter-spacing:-3px;color:#fff;margin-bottom:0}
+        .brand span{color:#4a9eff}
+        .subtitle{font-size:10px;font-weight:600;color:#6b6b78;letter-spacing:3px;
+          text-transform:uppercase;margin-bottom:4px}
+        .role{font-size:11px;color:#06d6a0;font-weight:600;margin-bottom:16px}
+        .version{font-size:11px;color:#4a9eff;font-weight:600;margin-bottom:14px}
+        .divider{width:180px;height:1px;background:#1e1e28;margin:0 auto 12px}
+        .section-title{font-size:9px;font-weight:700;color:#4a9eff;letter-spacing:1.5px;
+          text-transform:uppercase;margin-bottom:6px;width:100%;max-width:240px}
+        .monitors{width:100%;max-width:240px;margin-bottom:12px}
+        .mod-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:10px}
+        .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+        .desc{color:#6b6b78}
+        .status-line{font-size:10px;color:#6b6b78;margin-bottom:4px}
+        .status-line b{color:#e0e0e6}
+        .sys-info{font-size:9px;color:#3a3a44;margin-top:12px;text-align:center;line-height:1.5}
+        .copyright{font-size:9px;color:#3a3a44;margin-top:6px}
+        </style></head><body>
+        <div class="brand"><span>L</span>F<span>G</span></div>
+        <div class="subtitle">Helper</div>
+        <div class="role">Proactive System Monitor</div>
+        <div class="version">v\(version)</div>
+        <div class="divider"></div>
+        <div class="section-title">Monitors</div>
+        <div class="monitors">\(monitorRows)</div>
+        <div class="status-line">Status: <b>\(helperStatus)</b> &mdash; \(conditions)</div>
+        <div class="status-line">Disk: <b>\(diskFree)</b> free (\(Int(diskUsedPct))% used)</div>
+        <div class="sys-info">macOS \(osVersion)</div>
+        <div class="copyright">Copyright 2024-2026 MIT License</div>
+        </body></html>
+        """
+
+        let panel = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 380),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "About LFG Helper"
+        panel.titlebarAppearsTransparent = true
+        panel.backgroundColor = NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 1.0)
+        panel.isReleasedWhenClosed = false
+        panel.level = .floating
+        panel.center()
+
+        let config = WKWebViewConfiguration()
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.setValue(false, forKey: "drawsBackground")
+        panel.contentView = wv
+        wv.loadHTMLString(aboutHTML, baseURL: nil)
+
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        aboutWindow = panel
+    }
+
+    // MARK: - Keychain
+
+    static let keychainService = "io.pegues.yj-tools.lfg"
+
+    static func keychainSave(key: String, value: String) -> Bool {
+        keychainDelete(key: key)
+        let data = value.data(using: .utf8)!
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data
+        ]
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    static func keychainLoad(key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func keychainDelete(key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Launch at Login
+
+    @objc func toggleLoginItem() {
+        if #available(macOS 13.0, *) {
+            let service = SMAppService.mainApp
+            do {
+                if service.status == .enabled {
+                    try service.unregister()
+                    sendNotification(title: "LFG Helper", body: "Removed from login items")
+                } else {
+                    try service.register()
+                    sendNotification(title: "LFG Helper", body: "Added to login items")
+                }
+            } catch {
+                os_log("Login item toggle failed: %{public}@", log: lfgMenuLog, type: .error, error.localizedDescription)
+                sendNotification(title: "LFG Helper", body: "Login item toggle failed")
+            }
+            buildMenu()
         }
     }
 

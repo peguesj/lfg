@@ -43,8 +43,8 @@ Full-text search across projects, filesystem, and history with SQLite FTS5.
 
 - **Bash** - Core dispatcher (`lfg`) and module scripts
 - **Swift (AppKit/WebKit)** - Native macOS components:
-  - `viewer.swift` - WebKit viewer app with JS-to-native bridge, dock badge support
-  - `menubar.swift` - LFG Helper: NSStatusBar agent with proactive monitors, disk graph, module actions
+  - `viewer.swift` - WebKit viewer app with JS-to-native bridge, dock badge/menu, Keychain, find-in-page
+  - `menubar.swift` - LFG Helper: NSStatusBar agent with proactive monitors, disk graph, launch-at-login, Keychain
 - **Python3** - HTML templating, AI chat server, search indexer, STFU forensics
 - **HTML/CSS/JS** - WebKit-rendered UI views with shared theme and component library
 
@@ -79,8 +79,8 @@ make icons            # Generate AppIcon.icns from lfg-icon.svg
 make clean            # Remove build artifacts
 
 # Manual compilation (without Makefile)
-swiftc -O -o viewer viewer.swift -framework Cocoa -framework WebKit
-swiftc -O -o lfg-menubar menubar.swift -framework Cocoa -framework UserNotifications
+swiftc -O -o viewer viewer.swift -framework Cocoa -framework WebKit -framework Security
+swiftc -O -o lfg-menubar menubar.swift -framework Cocoa -framework WebKit -framework UserNotifications -framework Security -framework ServiceManagement
 ```
 
 ## Version Matrix
@@ -224,8 +224,20 @@ The menubar agent includes a `HelperMonitor` engine that runs configurable check
 
 Features: quiet hours, per-check cooldowns, pause/resume toggle, persistent state in `~/.config/lfg/helper_state.json`.
 
-### Dock Badge
-`viewer.swift` handles `badge` action from JS bridge, sets `NSApp.dockTile.badgeLabel`. The `ui.js` notifications system posts unread count via webkit message handler.
+### Dock Badge & Dock Menu
+`viewer.swift` handles `badge` action from JS bridge, sets `NSApp.dockTile.badgeLabel`. The `ui.js` notifications system posts unread count via webkit message handler. The Dock menu provides quick-launch shortcuts for all modules and settings.
+
+### Keychain Integration
+Both apps use macOS Keychain (`Security.framework`) under service `io.pegues.yj-tools.lfg` for storing sensitive data (AI API keys). The viewer exposes Keychain ops to JS via `{action:"keychain", op:"get|set|delete", key:"...", value:"..."}` bridge messages.
+
+### Launch at Login
+LFG Helper uses `SMAppService.mainApp` (macOS 13+, `ServiceManagement.framework`) for a native Launch at Login toggle in its menu. No LaunchAgent plist required.
+
+### Find in Page
+Viewer supports Cmd+F find via a JS-injected overlay bar using `window.find()`. Esc or the close button dismisses it.
+
+### System Appearance
+Viewer observes `AppleInterfaceThemeChangedNotification` and sets `data-system-theme="dark|light"` on `document.documentElement`, allowing CSS/JS to respond to system light/dark mode changes.
 
 ## Development Rules
 

@@ -1,5 +1,6 @@
 import Cocoa
 import WebKit
+import Security
 import os.log
 
 private let lfgLog = OSLog(subsystem: "io.pegues.yj-tools.lfg", category: "viewer")
@@ -121,6 +122,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
+        // Observe system appearance changes (light/dark mode)
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(systemAppearanceChanged),
+            name: NSNotification.Name("AppleInterfaceThemeChangedNotification"), object: nil
+        )
+
         // IPC: observe menubar notifications to auto-refresh
         DistributedNotificationCenter.default().addObserver(
             self, selector: #selector(handleMenubarNotification(_:)),
@@ -136,6 +143,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         DispatchQueue.main.async { [weak self] in
             self?.webView.reload()
         }
+    }
+
+    @objc func systemAppearanceChanged() {
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        webView.evaluateJavaScript(
+            "document.documentElement.setAttribute('data-system-theme', '\(isDark ? "dark" : "light")')",
+            completionHandler: nil
+        )
     }
 
     /// Post IPC notification to menubar when viewer changes settings
@@ -406,6 +421,27 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             DispatchQueue.main.async {
                 NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
             }
+        } else if action == "keychain" {
+            // Keychain operations from JS: get/set/delete
+            let op = str("op") ?? ""
+            let key = str("key") ?? ""
+            let reqId = str("id") ?? "kc"
+            if op == "get" {
+                let val = AppDelegate.keychainLoad(key: key) ?? ""
+                func esc(_ s: String) -> String {
+                    s.replacingOccurrences(of: "\\", with: "\\\\")
+                     .replacingOccurrences(of: "'", with: "\\'")
+                     .replacingOccurrences(of: "\n", with: "\\n")
+                }
+                sourceWebView.evaluateJavaScript("LFG._onExecResult('\(reqId)', '\(esc(val))', '', 0)", completionHandler: nil)
+            } else if op == "set" {
+                let val = str("value") ?? ""
+                let ok = AppDelegate.keychainSave(key: key, value: val)
+                sourceWebView.evaluateJavaScript("LFG._onExecResult('\(reqId)', '\(ok ? "saved" : "error")', '', \(ok ? 0 : 1))", completionHandler: nil)
+            } else if op == "delete" {
+                AppDelegate.keychainDelete(key: key)
+                sourceWebView.evaluateJavaScript("LFG._onExecResult('\(reqId)', 'deleted', '', 0)", completionHandler: nil)
+            }
         } else if action == "quit" {
             NSApp.terminate(nil)
         }
@@ -652,6 +688,192 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     }
 
     var settingsWindow: NSWindow?
+    var aboutWindow: NSWindow?
+
+    // MARK: - About Panel
+
+    @objc func showAboutPanel() {
+        if let existing = aboutWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.4.0"
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        let modules: [(String, String, String)] = [
+            ("WTFS", "Where's The Free Space", "#4a9eff"),
+            ("DTF", "Delete Temp Files", "#ff8c42"),
+            ("BTAU", "Back That App Up", "#06d6a0"),
+            ("DEVDRIVE", "Developer Drive", "#c084fc"),
+            ("STFU", "Source Tree Forensics", "#e879f9"),
+            ("Chat", "AI Chat Interface", "#4a9eff"),
+        ]
+        var moduleRows = ""
+        for (abbr, name, color) in modules {
+            moduleRows += "<div class='mod-row'><span class='dot' style='background:\(color)'></span><b>\(abbr)</b> <span class='desc'>\(name)</span></div>"
+        }
+
+        let aboutHTML = """
+        <!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,"SF Mono",Menlo,monospace;
+          background:#141418;color:#e0e0e6;display:flex;flex-direction:column;
+          align-items:center;padding:32px 24px 24px;-webkit-font-smoothing:antialiased;
+          -webkit-user-select:none;cursor:default}
+        .brand{font-size:56px;font-weight:900;letter-spacing:-3px;color:#fff;margin-bottom:0}
+        .brand span{color:#4a9eff}
+        .subtitle{font-size:11px;font-weight:600;color:#6b6b78;letter-spacing:3px;
+          text-transform:uppercase;margin-bottom:4px}
+        .version{font-size:12px;color:#4a9eff;font-weight:600;margin-bottom:20px}
+        .divider{width:200px;height:1px;background:#1e1e28;margin:0 auto 16px}
+        .modules{width:100%;max-width:280px}
+        .mod-row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11px}
+        .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+        .desc{color:#6b6b78}
+        .sys-info{font-size:10px;color:#3a3a44;margin-top:16px;text-align:center;line-height:1.6}
+        .copyright{font-size:10px;color:#3a3a44;margin-top:8px}
+        </style></head><body>
+        <div class="brand"><span>L</span>F<span>G</span></div>
+        <div class="subtitle">Local File Guardian</div>
+        <div class="version">v\(version)</div>
+        <div class="divider"></div>
+        <div class="modules">\(moduleRows)</div>
+        <div class="sys-info">macOS \(osVersion)<br>Disk: \(diskFree)</div>
+        <div class="copyright">Copyright 2024-2026 MIT License</div>
+        </body></html>
+        """
+
+        let panel = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 420),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = "About LFG"
+        panel.titlebarAppearsTransparent = true
+        panel.backgroundColor = NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 1.0)
+        panel.isReleasedWhenClosed = false
+        panel.center()
+
+        let config = WKWebViewConfiguration()
+        let wv = WKWebView(frame: .zero, configuration: config)
+        wv.setValue(false, forKey: "drawsBackground")
+        panel.contentView = wv
+        wv.loadHTMLString(aboutHTML, baseURL: nil)
+
+        panel.makeKeyAndOrderFront(nil)
+        aboutWindow = panel
+    }
+
+    /// Disk free string for About panel (read from state)
+    var diskFree: String {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: NSHomeDirectory() + "/.config/lfg/state.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "Unknown" }
+        return json["disk_free"] as? String ?? "Unknown"
+    }
+
+    // MARK: - Dock Menu
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let dock = NSMenu()
+        let items: [(String, String)] = [
+            ("Dashboard", "dashboard"),
+            ("WTFS - Scan", "wtfs"),
+            ("DTF - Clean", "dtf"),
+            ("BTAU - Backup", "btau"),
+            ("DevDrive", "devdrive"),
+            ("STFU - Forensics", "stfu"),
+            ("Chat", "chat"),
+        ]
+        for (label, mod) in items {
+            let mi = NSMenuItem(title: label, action: #selector(navigateToModule(_:)), keyEquivalent: "")
+            mi.representedObject = mod
+            mi.target = self
+            dock.addItem(mi)
+        }
+        dock.addItem(NSMenuItem.separator())
+        let si = NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
+        si.target = self
+        dock.addItem(si)
+        return dock
+    }
+
+    // MARK: - Keychain
+
+    static let keychainService = "io.pegues.yj-tools.lfg"
+
+    static func keychainSave(key: String, value: String) -> Bool {
+        keychainDelete(key: key)
+        let data = value.data(using: .utf8)!
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data
+        ]
+        return SecItemAdd(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    static func keychainLoad(key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func keychainDelete(key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
+    // MARK: - Force Reload
+
+    @objc func forceReloadPage() {
+        webView.reloadFromOrigin()
+    }
+
+    // MARK: - Find in Page (JS-based)
+
+    @objc func showFindBar() {
+        // Inject a lightweight find overlay into the WebView
+        let js = """
+        (function(){
+          if(document.getElementById('lfg-find-bar')){
+            document.getElementById('lfg-find-bar').style.display='flex';
+            document.getElementById('lfg-find-input').focus();
+            document.getElementById('lfg-find-input').select();
+            return;
+          }
+          var bar=document.createElement('div');
+          bar.id='lfg-find-bar';
+          bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;align-items:center;gap:8px;padding:8px 16px;background:#1e1e28;border-bottom:1px solid #2a2a34;font-family:-apple-system,monospace;font-size:12px';
+          bar.innerHTML='<input id=\"lfg-find-input\" type=\"text\" placeholder=\"Find...\" style=\"flex:1;background:#141418;border:1px solid #3a3a44;border-radius:4px;color:#e0e0e6;padding:4px 8px;font-size:12px;font-family:inherit;outline:none\"><span id=\"lfg-find-count\" style=\"color:#6b6b78;font-size:11px\"></span><button onclick=\"document.getElementById(\\'lfg-find-bar\\').style.display=\\'none\\';window.getSelection().removeAllRanges()\" style=\"background:none;border:none;color:#6b6b78;cursor:pointer;font-size:14px\">&times;</button>';
+          document.body.prepend(bar);
+          var input=document.getElementById('lfg-find-input');
+          input.focus();
+          input.addEventListener('input',function(){
+            window.getSelection().removeAllRanges();
+            if(this.value)window.find(this.value,false,false,true);
+          });
+          input.addEventListener('keydown',function(e){
+            if(e.key==='Escape'){bar.style.display='none';window.getSelection().removeAllRanges()}
+            if(e.key==='Enter'){window.find(this.value,false,false,true)}
+          });
+        })()
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
 
     // MARK: - NSWindowDelegate (frame persistence)
 
@@ -705,7 +927,9 @@ let mainMenu = NSMenu()
 // App menu (LFG)
 let appMenuItem = NSMenuItem()
 let appMenu = NSMenu()
-appMenu.addItem(withTitle: "About LFG", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+let aboutItem = NSMenuItem(title: "About LFG", action: #selector(AppDelegate.showAboutPanel), keyEquivalent: "")
+aboutItem.target = delegate
+appMenu.addItem(aboutItem)
 appMenu.addItem(NSMenuItem.separator())
 appMenu.addItem(withTitle: "Settings...", action: #selector(AppDelegate.openSettings), keyEquivalent: ",")
 appMenu.addItem(NSMenuItem.separator())
@@ -720,10 +944,27 @@ fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performCl
 fileMenuItem.submenu = fileMenu
 mainMenu.addItem(fileMenuItem)
 
+// Edit menu (Find)
+let editMenuItem = NSMenuItem()
+let editMenu = NSMenu(title: "Edit")
+editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+editMenu.addItem(NSMenuItem.separator())
+let findItem = NSMenuItem(title: "Find...", action: #selector(AppDelegate.showFindBar), keyEquivalent: "f")
+findItem.target = delegate
+editMenu.addItem(findItem)
+editMenuItem.submenu = editMenu
+mainMenu.addItem(editMenuItem)
+
 // View menu
 let viewMenuItem = NSMenuItem()
 let viewMenu = NSMenu(title: "View")
 viewMenu.addItem(withTitle: "Reload", action: #selector(AppDelegate.reloadPage), keyEquivalent: "r")
+let forceReloadItem = NSMenuItem(title: "Force Reload", action: #selector(AppDelegate.forceReloadPage), keyEquivalent: "r")
+forceReloadItem.keyEquivalentModifierMask = [.command, .shift]
+forceReloadItem.target = delegate
+viewMenu.addItem(forceReloadItem)
+viewMenu.addItem(NSMenuItem.separator())
 viewMenu.addItem(withTitle: "Actual Size", action: nil, keyEquivalent: "0")
 viewMenu.addItem(withTitle: "Zoom In", action: nil, keyEquivalent: "+")
 viewMenu.addItem(withTitle: "Zoom Out", action: nil, keyEquivalent: "-")
@@ -736,7 +977,10 @@ mainMenu.addItem(viewMenuItem)
 let navMenuItem = NSMenuItem()
 let navMenu = NSMenu(title: "Navigate")
 navMenu.addItem(withTitle: "Back", action: #selector(AppDelegate.navigateBack), keyEquivalent: "[")
-navMenu.addItem(withTitle: "Home", action: #selector(AppDelegate.navigateHome), keyEquivalent: "")
+let homeItem = NSMenuItem(title: "Home", action: #selector(AppDelegate.navigateHome), keyEquivalent: "0")
+homeItem.keyEquivalentModifierMask = [.command, .shift]
+homeItem.target = delegate
+navMenu.addItem(homeItem)
 navMenu.addItem(NSMenuItem.separator())
 let navModules: [(String, String, String)] = [
     ("Dashboard", "dashboard", "1"),

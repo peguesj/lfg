@@ -27,7 +27,7 @@ $(ICNS): assets/brand/lfg-icon.svg scripts/gen-icns.sh
 viewer-app: viewer.swift Info.plist $(ICNS)
 	@mkdir -p "$(VIEWER_APP)/Contents/MacOS" "$(VIEWER_APP)/Contents/Resources"
 	$(SWIFT) -o "$(VIEWER_APP)/Contents/MacOS/LFG" viewer.swift \
-		-framework Cocoa -framework WebKit
+		-framework Cocoa -framework WebKit -framework Security
 	cp Info.plist "$(VIEWER_APP)/Contents/Info.plist"
 	cp $(ICNS) "$(VIEWER_APP)/Contents/Resources/AppIcon.icns"
 	@# Backward-compat symlink so old paths still work
@@ -38,7 +38,7 @@ viewer-app: viewer.swift Info.plist $(ICNS)
 menubar-app: menubar.swift InfoMenubar.plist $(ICNS)
 	@mkdir -p "$(MENUBAR_APP)/Contents/MacOS" "$(MENUBAR_APP)/Contents/Resources"
 	$(SWIFT) -o "$(MENUBAR_APP)/Contents/MacOS/LFG Helper" menubar.swift \
-		-framework Cocoa -framework UserNotifications
+		-framework Cocoa -framework WebKit -framework UserNotifications -framework Security -framework ServiceManagement
 	cp InfoMenubar.plist "$(MENUBAR_APP)/Contents/Info.plist"
 	cp $(ICNS) "$(MENUBAR_APP)/Contents/Resources/AppIcon.icns"
 	@# Backward-compat symlink
