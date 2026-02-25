@@ -3,7 +3,7 @@
 
 SWIFT := swiftc -O
 VIEWER_APP := LFG.app
-MENUBAR_APP := LFG Menubar.app
+MENUBAR_APP := LFG Helper.app
 ICNS := assets/brand/AppIcon.icns
 
 .PHONY: all clean icons
@@ -11,7 +11,7 @@ ICNS := assets/brand/AppIcon.icns
 all:
 	@echo "── Building LFG Viewer ──"
 	@$(MAKE) --no-print-directory viewer-app
-	@echo "── Building LFG Menubar ──"
+	@echo "── Building LFG Helper ──"
 	@$(MAKE) --no-print-directory menubar-app
 	@echo "── All targets built ──"
 
@@ -37,13 +37,13 @@ viewer-app: viewer.swift Info.plist $(ICNS)
 # --- Menubar App Bundle ---
 menubar-app: menubar.swift InfoMenubar.plist $(ICNS)
 	@mkdir -p "$(MENUBAR_APP)/Contents/MacOS" "$(MENUBAR_APP)/Contents/Resources"
-	$(SWIFT) -o "$(MENUBAR_APP)/Contents/MacOS/LFG Menubar" menubar.swift \
+	$(SWIFT) -o "$(MENUBAR_APP)/Contents/MacOS/LFG Helper" menubar.swift \
 		-framework Cocoa -framework UserNotifications
 	cp InfoMenubar.plist "$(MENUBAR_APP)/Contents/Info.plist"
 	cp $(ICNS) "$(MENUBAR_APP)/Contents/Resources/AppIcon.icns"
 	@# Backward-compat symlink
-	@ln -sf "$(MENUBAR_APP)/Contents/MacOS/LFG Menubar" lfg-menubar
-	@echo "  → LFG Menubar.app ready"
+	@ln -sf "$(MENUBAR_APP)/Contents/MacOS/LFG Helper" lfg-menubar
+	@echo "  → LFG Helper.app ready"
 
 clean:
 	@echo "── Clean ──"

@@ -44,7 +44,7 @@ Full-text search across projects, filesystem, and history with SQLite FTS5.
 - **Bash** - Core dispatcher (`lfg`) and module scripts
 - **Swift (AppKit/WebKit)** - Native macOS components:
   - `viewer.swift` - WebKit viewer app with JS-to-native bridge, dock badge support
-  - `menubar.swift` - NSStatusBar agent with LFG wordmark icon, disk graph, module actions
+  - `menubar.swift` - LFG Helper: NSStatusBar agent with proactive monitors, disk graph, module actions
 - **Python3** - HTML templating, AI chat server, search indexer, STFU forensics
 - **HTML/CSS/JS** - WebKit-rendered UI views with shared theme and component library
 
@@ -74,7 +74,7 @@ make all
 
 # Individual targets
 make viewer-app       # Compile LFG.app (WebKit viewer)
-make menubar-app      # Compile LFG Menubar.app (status bar agent)
+make menubar-app      # Compile LFG Helper.app (status bar agent)
 make icons            # Generate AppIcon.icns from lfg-icon.svg
 make clean            # Remove build artifacts
 
@@ -89,7 +89,7 @@ swiftc -O -o lfg-menubar menubar.swift -framework Cocoa -framework UserNotificat
 |-----------|---------|---------|
 | LFG Platform | 2.4.0 | `lfg` (LFG_VERSION), `lib/ui.js`, `lib/theme.css` |
 | LFG.app (Viewer) | 2.4.0 | `Info.plist` (CFBundleVersion) |
-| LFG Menubar.app | 2.4.0 | `InfoMenubar.plist` (CFBundleVersion) |
+| LFG Helper.app | 2.4.0 | `InfoMenubar.plist` (CFBundleVersion) |
 | WTFS module | 2.4.0 | `lib/scan.sh` (moduleVersion) |
 | DTF module | 2.4.0 | `lib/clean.sh` (moduleVersion) |
 | BTAU module | 2.4.0 | `lib/btau.sh` (moduleVersion) |
@@ -114,7 +114,7 @@ LFG is registered as a Claude Code skill at `~/.claude/commands/lfg.md`.
 | `/lfg search <query>` | Semantic search | `/lfg search "docker"` |
 | `/lfg dashboard` | Combined dashboard | `/lfg dashboard` |
 | `/lfg settings [cmd]` | Settings management | `/lfg settings show` |
-| `/lfg menubar` | Launch menubar agent | `/lfg menubar` |
+| `/lfg helper` | Launch LFG Helper (menubar monitor) | `/lfg helper` |
 | `lfg` (no args) | Splash screen | `lfg` |
 
 ## Agent Squadron
@@ -211,6 +211,18 @@ DevDrive commands accept `--profile=NAME` to target specific profiles. Auto-move
 - **JS → Swift**: `window.webkit.messageHandlers.lfg.postMessage()` (navigate, run, badge, quit, home, settings)
 - **Menubar ↔ Viewer**: `DistributedNotificationCenter` (`com.lfg.viewer.*`, `com.lfg.menubar.*`)
 - **Chat**: HTTP on localhost:3033 (POST /chat, GET /health, GET /history, POST /search)
+
+### LFG Helper (Proactive Monitors)
+The menubar agent includes a `HelperMonitor` engine that runs configurable checks at intervals. Configuration via `settings.yaml` `helper:` section:
+
+| Monitor | Module Color | What It Checks | Default Thresholds |
+|---------|-------------|----------------|-------------------|
+| `disk` | WTFS blue | Disk usage % | warn 80%, critical 90%, emergency 95% |
+| `backup_staleness` | BTAU green | Days since last cleanup | warn 7d, critical 30d |
+| `cache_growth` | DTF orange | Reclaimable cache from DTF scan | warn 10GB |
+| `volume_health` | DEVDRIVE purple | Volume mount status | unmounted = alert |
+
+Features: quiet hours, per-check cooldowns, pause/resume toggle, persistent state in `~/.config/lfg/helper_state.json`.
 
 ### Dock Badge
 `viewer.swift` handles `badge` action from JS bridge, sets `NSApp.dockTile.badgeLabel`. The `ui.js` notifications system posts unread count via webkit message handler.

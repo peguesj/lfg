@@ -5,11 +5,11 @@
 	<key>CFBundleIdentifier</key>
 	<string>io.pegues.yj-tools.lfg.menubar</string>
 	<key>CFBundleName</key>
-	<string>LFG Menubar</string>
+	<string>LFG Helper</string>
 	<key>CFBundleDisplayName</key>
-	<string>LFG Menubar</string>
+	<string>LFG Helper</string>
 	<key>CFBundleExecutable</key>
-	<string>LFG Menubar</string>
+	<string>LFG Helper</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>

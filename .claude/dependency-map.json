@@ -31,7 +31,7 @@
 
   "swift_apps": {
     "viewer": {"source": "viewer.swift", "frameworks": ["Cocoa","WebKit","os.log"], "bundle_id": "io.pegues.yj-tools.lfg", "plist": "Info.plist"},
-    "menubar": {"source": "menubar.swift", "frameworks": ["Cocoa","os.log"], "bundle_id": "io.pegues.yj-tools.lfg.menubar", "plist": "InfoMenubar.plist"}
+    "helper": {"source": "menubar.swift", "frameworks": ["Cocoa","UserNotifications","os.log"], "bundle_id": "io.pegues.yj-tools.lfg.menubar", "plist": "InfoMenubar.plist", "app_name": "LFG Helper.app"}
   },
 
   "ipc_channels": {

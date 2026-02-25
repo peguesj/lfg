@@ -87,7 +87,7 @@ SETTINGS:
 COMMANDS:
     lfg                          Splash screen
     lfg dashboard                Combined dashboard
-    lfg menubar                  Menubar status app
+    lfg helper                   LFG Helper (menubar monitor)
     lfg --help / --version
 
 SHORTCUTS (viewer):
@@ -161,16 +161,16 @@ case "${1:-}" in
         shift || true
         exec bash "$LFG_DIR/lib/stfu.sh" "$@"
         ;;
-    menubar)
-        # Build menubar app bundle if needed
-        menubar_bin="$LFG_DIR/LFG Menubar.app/Contents/MacOS/LFG Menubar"
-        if [[ ! -x "$menubar_bin" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$menubar_bin" ]]; then
-            echo "Building LFG Menubar.app..."
-            make -C "$LFG_DIR" "LFG Menubar.app" 2>&1
+    menubar|helper)
+        # Build helper app bundle if needed
+        helper_bin="$LFG_DIR/LFG Helper.app/Contents/MacOS/LFG Helper"
+        if [[ ! -x "$helper_bin" ]] || [[ "$LFG_DIR/menubar.swift" -nt "$helper_bin" ]]; then
+            echo "Building LFG Helper.app..."
+            make -C "$LFG_DIR" "LFG Helper.app" 2>&1
         fi
-        "$menubar_bin" &
+        "$helper_bin" &
         disown
-        echo "LFG menubar started."
+        echo "LFG Helper started."
         exit 0
         ;;
     --help|-h)

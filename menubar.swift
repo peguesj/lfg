@@ -5,7 +5,7 @@ import UserNotifications
 private let lfgMenuLog = OSLog(subsystem: "io.pegues.yj-tools.lfg.menubar", category: "menubar")
 
 // =============================================================================
-// LFG Menubar v2 - Status monitor with actions, disk graph, notifications
+// LFG Helper v2 - Status monitor with actions, disk graph, notifications
 // =============================================================================
 // Watches ~/.config/lfg/state.json for module state changes.
 // Provides actionable submenus for each module, disk usage sparkline,
@@ -92,6 +92,233 @@ func renderDiskGraphImage(dataPoints: [(free: Double, used: Double, timestamp: S
     return image
 }
 
+// MARK: - Helper Monitor Engine
+
+struct HelperConfig {
+    var enabled: Bool = true
+    var checkIntervalMinutes: Int = 5
+    var globalCooldownMinutes: Int = 30
+    var quietHoursStart: String = "22:00"
+    var quietHoursEnd: String = "07:00"
+    struct MonitorConfig {
+        var enabled: Bool = true
+        var cooldownMinutes: Int = 60
+        var warnPct: Int = 80
+        var criticalPct: Int = 90
+        var emergencyPct: Int = 95
+        var warnDays: Int = 7
+        var criticalDays: Int = 30
+        var warnGB: Int = 10
+    }
+    var disk = MonitorConfig()
+    var backupStaleness = MonitorConfig(enabled: true, cooldownMinutes: 1440, warnPct: 0, criticalPct: 0, emergencyPct: 0, warnDays: 7, criticalDays: 30, warnGB: 0)
+    var cacheGrowth = MonitorConfig(enabled: true, cooldownMinutes: 360, warnPct: 0, criticalPct: 0, emergencyPct: 0, warnDays: 0, criticalDays: 0, warnGB: 10)
+    var volumeHealth = MonitorConfig(enabled: true, cooldownMinutes: 120, warnPct: 0, criticalPct: 0, emergencyPct: 0, warnDays: 0, criticalDays: 0, warnGB: 0)
+}
+
+class HelperMonitor {
+    let helperStateFile = NSHomeDirectory() + "/.config/lfg/helper_state.json"
+    let lfgPath = NSHomeDirectory() + "/tools/@yj/lfg/lfg"
+    var config = HelperConfig()
+    var lastAlerts: [String: Date] = [:]
+    var paused = false
+    var activeConditions: [String] = []
+    weak var delegate: LFGMenubar?
+
+    func loadConfig() {
+        let raw = LFGMenubar.shell(NSHomeDirectory() + "/tools/@yj/lfg/lfg settings show --json")
+        guard let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let helper = json["helper"] as? [String: Any] else { return }
+
+        config.enabled = helper["enabled"] as? Bool ?? true
+        config.checkIntervalMinutes = helper["check_interval_minutes"] as? Int ?? 5
+        config.globalCooldownMinutes = helper["global_cooldown_minutes"] as? Int ?? 30
+        config.quietHoursStart = helper["quiet_hours_start"] as? String ?? "22:00"
+        config.quietHoursEnd = helper["quiet_hours_end"] as? String ?? "07:00"
+
+        if let monitors = helper["monitors"] as? [String: Any] {
+            if let d = monitors["disk"] as? [String: Any] {
+                config.disk.enabled = d["enabled"] as? Bool ?? true
+                config.disk.warnPct = d["warn_pct"] as? Int ?? 80
+                config.disk.criticalPct = d["critical_pct"] as? Int ?? 90
+                config.disk.emergencyPct = d["emergency_pct"] as? Int ?? 95
+                config.disk.cooldownMinutes = d["cooldown_minutes"] as? Int ?? 60
+            }
+            if let b = monitors["backup_staleness"] as? [String: Any] {
+                config.backupStaleness.enabled = b["enabled"] as? Bool ?? true
+                config.backupStaleness.warnDays = b["warn_days"] as? Int ?? 7
+                config.backupStaleness.criticalDays = b["critical_days"] as? Int ?? 30
+                config.backupStaleness.cooldownMinutes = b["cooldown_minutes"] as? Int ?? 1440
+            }
+            if let c = monitors["cache_growth"] as? [String: Any] {
+                config.cacheGrowth.enabled = c["enabled"] as? Bool ?? true
+                config.cacheGrowth.warnGB = c["warn_gb"] as? Int ?? 10
+                config.cacheGrowth.cooldownMinutes = c["cooldown_minutes"] as? Int ?? 360
+            }
+            if let v = monitors["volume_health"] as? [String: Any] {
+                config.volumeHealth.enabled = v["enabled"] as? Bool ?? true
+                config.volumeHealth.cooldownMinutes = v["cooldown_minutes"] as? Int ?? 120
+            }
+        }
+    }
+
+    func loadState() {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: helperStateFile)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] else { return }
+        let formatter = ISO8601DateFormatter()
+        for (key, val) in json {
+            if let date = formatter.date(from: val) {
+                lastAlerts[key] = date
+            }
+        }
+    }
+
+    func saveState() {
+        let formatter = ISO8601DateFormatter()
+        let dict = lastAlerts.mapValues { formatter.string(from: $0) }
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: .prettyPrinted) else { return }
+        try? data.write(to: URL(fileURLWithPath: helperStateFile))
+    }
+
+    func isQuietHours() -> Bool {
+        let cal = Calendar.current
+        let now = Date()
+        let hour = cal.component(.hour, from: now)
+        let minute = cal.component(.minute, from: now)
+        let nowMinutes = hour * 60 + minute
+
+        let startParts = config.quietHoursStart.split(separator: ":")
+        let endParts = config.quietHoursEnd.split(separator: ":")
+        guard startParts.count == 2, endParts.count == 2 else { return false }
+        let startMin = (Int(startParts[0]) ?? 22) * 60 + (Int(startParts[1]) ?? 0)
+        let endMin = (Int(endParts[0]) ?? 7) * 60 + (Int(endParts[1]) ?? 0)
+
+        if startMin > endMin {
+            // Wraps midnight: 22:00-07:00
+            return nowMinutes >= startMin || nowMinutes < endMin
+        } else {
+            return nowMinutes >= startMin && nowMinutes < endMin
+        }
+    }
+
+    func shouldAlert(check: String, cooldownMinutes: Int) -> Bool {
+        guard let last = lastAlerts[check] else { return true }
+        return Date().timeIntervalSince(last) >= Double(cooldownMinutes * 60)
+    }
+
+    func recordAlert(check: String) {
+        lastAlerts[check] = Date()
+        saveState()
+    }
+
+    // MARK: - Run All Checks
+
+    func runChecks() {
+        guard config.enabled, !paused, !isQuietHours() else { return }
+        guard let delegate = delegate else { return }
+        activeConditions = []
+
+        checkDisk(delegate: delegate)
+        checkBackupStaleness(delegate: delegate)
+        checkCacheGrowth(delegate: delegate)
+        checkVolumeHealth(delegate: delegate)
+    }
+
+    // MARK: - Disk Usage Monitor (WTFS blue)
+
+    func checkDisk(delegate: LFGMenubar) {
+        guard config.disk.enabled else { return }
+        let pct = Int(delegate.diskUsedPct)
+
+        if pct >= config.disk.emergencyPct {
+            activeConditions.append("Disk: \(pct)% EMERGENCY")
+            if shouldAlert(check: "disk_emergency", cooldownMinutes: config.disk.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG WTFS", body: "EMERGENCY: Disk \(pct)% full! Run: lfg dtf --force")
+                recordAlert(check: "disk_emergency")
+            }
+        } else if pct >= config.disk.criticalPct {
+            activeConditions.append("Disk: \(pct)% critical")
+            if shouldAlert(check: "disk_critical", cooldownMinutes: config.disk.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG WTFS", body: "Disk usage critical: \(pct)%. Consider running cache cleanup.")
+                recordAlert(check: "disk_critical")
+            }
+        } else if pct >= config.disk.warnPct {
+            activeConditions.append("Disk: \(pct)% warning")
+            if shouldAlert(check: "disk_warn", cooldownMinutes: config.disk.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG WTFS", body: "Disk usage at \(pct)%. Monitor or consider cleanup.")
+                recordAlert(check: "disk_warn")
+            }
+        }
+    }
+
+    // MARK: - Backup Staleness Monitor (BTAU green)
+
+    func checkBackupStaleness(delegate: LFGMenubar) {
+        guard config.backupStaleness.enabled else { return }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: NSHomeDirectory() + "/.config/lfg/state.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let lastClean = json["last_clean"] as? String else { return }
+
+        let formatter = ISO8601DateFormatter()
+        guard let lastDate = formatter.date(from: lastClean) else { return }
+        let daysSince = Int(Date().timeIntervalSince(lastDate) / 86400)
+
+        if daysSince >= config.backupStaleness.criticalDays {
+            activeConditions.append("Backup: \(daysSince)d stale")
+            if shouldAlert(check: "backup_critical", cooldownMinutes: config.backupStaleness.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG BTAU", body: "Last cleanup was \(daysSince) days ago. Run: lfg dtf")
+                recordAlert(check: "backup_critical")
+            }
+        } else if daysSince >= config.backupStaleness.warnDays {
+            activeConditions.append("Backup: \(daysSince)d since cleanup")
+            if shouldAlert(check: "backup_warn", cooldownMinutes: config.backupStaleness.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG BTAU", body: "No cleanup in \(daysSince) days. Consider running: lfg dtf")
+                recordAlert(check: "backup_warn")
+            }
+        }
+    }
+
+    // MARK: - Cache Growth Monitor (DTF orange)
+
+    func checkCacheGrowth(delegate: LFGMenubar) {
+        guard config.cacheGrowth.enabled else { return }
+        // Read from state.json if DTF has recent scan data
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: NSHomeDirectory() + "/.config/lfg/state.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let mods = json["modules"] as? [String: [String: Any]],
+              let dtf = mods["dtf"],
+              let reclaimable = dtf["reclaimable"] as? String else { return }
+
+        // Parse reclaimable like "12.3 GB"
+        let parts = reclaimable.split(separator: " ")
+        guard let gb = Double(parts.first ?? "0") else { return }
+
+        if gb >= Double(config.cacheGrowth.warnGB) {
+            activeConditions.append("Cache: \(reclaimable) reclaimable")
+            if shouldAlert(check: "cache_growth", cooldownMinutes: config.cacheGrowth.cooldownMinutes) {
+                delegate.sendNotification(title: "LFG DTF", body: "\(reclaimable) reclaimable. Run: lfg dtf --force")
+                recordAlert(check: "cache_growth")
+            }
+        }
+    }
+
+    // MARK: - Volume Health Monitor (DEVDRIVE purple)
+
+    func checkVolumeHealth(delegate: LFGMenubar) {
+        guard config.volumeHealth.enabled else { return }
+        for profile in delegate.volumeProfiles {
+            if !profile.mounted {
+                activeConditions.append("\(profile.name): unmounted")
+                if shouldAlert(check: "volume_\(profile.name)", cooldownMinutes: config.volumeHealth.cooldownMinutes) {
+                    delegate.sendNotification(title: "LFG DEVDRIVE", body: "\(profile.name) (\(profile.purpose)) is not mounted.")
+                    recordAlert(check: "volume_\(profile.name)")
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Main Application
 
 class LFGMenubar: NSObject, NSApplicationDelegate {
@@ -99,10 +326,12 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
     var menu: NSMenu!
     var refreshTimer: Timer?
     var graphTimer: Timer?
+    var helperTimer: Timer?
     var fileWatchSource: DispatchSourceFileSystemObject?
     var promptsWatchSource: DispatchSourceFileSystemObject?
     var pendingPromptCount: Int = 0
     var previousState: [String: Any] = [:]
+    let helperMonitor = HelperMonitor()
 
     let stateFile = NSHomeDirectory() + "/.config/lfg/state.json"
     let historyFile = NSHomeDirectory() + "/.config/lfg/disk_history.json"
@@ -210,8 +439,22 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         refreshDevdriveConfig()
         refreshVolumeProfiles()
         recordDiskDataPoint()
-        os_log("Menubar launched, state: %{public}@", log: lfgMenuLog, type: .info, stateFile)
-        sendNotification(title: "LFG Menubar", body: "Monitoring active")
+
+        // Initialize Helper Monitor
+        helperMonitor.delegate = self
+        helperMonitor.loadConfig()
+        helperMonitor.loadState()
+        let helperInterval = TimeInterval(helperMonitor.config.checkIntervalMinutes * 60)
+        helperTimer = Timer.scheduledTimer(withTimeInterval: helperInterval, repeats: true) { [weak self] _ in
+            self?.helperMonitor.runChecks()
+        }
+        // Run first check after a brief delay (let stats populate)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
+            self?.helperMonitor.runChecks()
+        }
+
+        os_log("Helper launched, state: %{public}@", log: lfgMenuLog, type: .info, stateFile)
+        sendNotification(title: "LFG Helper", body: "Monitoring active")
     }
 
     // MARK: - State Management
@@ -455,6 +698,38 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(graphItem)
         menu.addItem(NSMenuItem.separator())
 
+        // Helper Monitor status
+        let helperHeader = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        let helperStatus = helperMonitor.paused ? "PAUSED" : (helperMonitor.activeConditions.isEmpty ? "OK" : "\(helperMonitor.activeConditions.count) alert(s)")
+        let helperColor: NSColor = helperMonitor.paused ? .secondaryLabelColor : (helperMonitor.activeConditions.isEmpty ? .systemGreen : .systemOrange)
+        let helperAttr = NSMutableAttributedString()
+        helperAttr.append(NSAttributedString(string: "Helper ",
+            attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .bold),
+                         .foregroundColor: NSColor.labelColor]))
+        helperAttr.append(NSAttributedString(string: helperStatus,
+            attributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
+                         .foregroundColor: helperColor]))
+        helperHeader.attributedTitle = helperAttr
+        helperHeader.isEnabled = false
+        menu.addItem(helperHeader)
+
+        // Show active conditions
+        for condition in helperMonitor.activeConditions {
+            let condItem = NSMenuItem(title: "  \(condition)", action: nil, keyEquivalent: "")
+            condItem.attributedTitle = NSAttributedString(string: "  \(condition)",
+                attributes: [.font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+                             .foregroundColor: NSColor.systemOrange])
+            condItem.isEnabled = false
+            menu.addItem(condItem)
+        }
+
+        // Pause/Resume toggle
+        let toggleTitle = helperMonitor.paused ? "Resume Helper" : "Pause Helper"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleHelper), keyEquivalent: "h")
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+        menu.addItem(NSMenuItem.separator())
+
         // Module status section
         for (name, mod) in modules.sorted(by: { $0.key < $1.key }) {
             let icon: String
@@ -655,7 +930,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         addMenuItem("Refresh", action: #selector(doRefresh), key: "r")
-        menu.addItem(NSMenuItem(title: "Quit LFG Menubar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit LFG Helper", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem.menu = menu
     }
@@ -1004,7 +1279,15 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         refreshDevdriveConfig()
         refreshVolumeProfiles()
         recordDiskDataPoint()
+        helperMonitor.runChecks()
         loadState()
+        buildMenu()
+    }
+
+    @objc func toggleHelper() {
+        helperMonitor.paused = !helperMonitor.paused
+        let status = helperMonitor.paused ? "paused" : "resumed"
+        sendNotification(title: "LFG Helper", body: "Monitoring \(status)")
         buildMenu()
     }
 
@@ -1022,7 +1305,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             try? task.run()
         }
         buildMenu()
-        sendNotification(title: "LFG Menubar", body: "Graph interval: \(sender.title)")
+        sendNotification(title: "LFG Helper", body: "Graph interval: \(sender.title)")
     }
 }
 

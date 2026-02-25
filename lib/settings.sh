@@ -53,6 +53,32 @@ volume_profiles:
       - "*.band"
     color: "#ff6b8a"
     auto_move_policy: largest_to_freest
+
+helper:
+  enabled: true
+  check_interval_minutes: 5
+  global_cooldown_minutes: 30
+  quiet_hours_start: "22:00"
+  quiet_hours_end: "07:00"
+  monitors:
+    disk:
+      enabled: true
+      warn_pct: 80
+      critical_pct: 90
+      emergency_pct: 95
+      cooldown_minutes: 60
+    backup_staleness:
+      enabled: true
+      warn_days: 7
+      critical_days: 30
+      cooldown_minutes: 1440
+    cache_growth:
+      enabled: true
+      warn_gb: 10
+      cooldown_minutes: 360
+    volume_health:
+      enabled: true
+      cooldown_minutes: 120
 DEFAULTS
 }
 
@@ -481,6 +507,92 @@ if isinstance(profiles, list):
             if name and os.path.isdir(f'/Volumes/{name}'):
                 print(name)
 "
+}
+
+# ─── Helper Config ──────────────────────────────────────────────────────────
+
+# Get helper configuration as JSON
+# Usage: helper_json=$(lfg_settings_get_helper)
+lfg_settings_get_helper() {
+    python3 -c "
+import json, os
+SETTINGS = '$LFG_SETTINGS_FILE'
+defaults = {
+    'enabled': True,
+    'check_interval_minutes': 5,
+    'global_cooldown_minutes': 30,
+    'quiet_hours_start': '22:00',
+    'quiet_hours_end': '07:00',
+    'monitors': {
+        'disk': {'enabled': True, 'warn_pct': 80, 'critical_pct': 90, 'emergency_pct': 95, 'cooldown_minutes': 60},
+        'backup_staleness': {'enabled': True, 'warn_days': 7, 'critical_days': 30, 'cooldown_minutes': 1440},
+        'cache_growth': {'enabled': True, 'warn_gb': 10, 'cooldown_minutes': 360},
+        'volume_health': {'enabled': True, 'cooldown_minutes': 120}
+    }
+}
+helper = {}
+if os.path.exists(SETTINGS):
+    with open(SETTINGS) as f:
+        in_helper = False
+        in_monitors = False
+        current_monitor = None
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            indent = len(line) - len(line.lstrip())
+            if indent == 0 and stripped.startswith('helper:'):
+                in_helper = True
+                continue
+            if indent == 0 and in_helper:
+                break
+            if in_helper and indent == 2:
+                if stripped.startswith('monitors:'):
+                    in_monitors = True
+                    helper['monitors'] = {}
+                    continue
+                if not in_monitors:
+                    k, _, v = stripped.partition(':')
+                    v = v.strip().strip('\"').strip(\"'\")
+                    if v.lower() in ('true','false'):
+                        helper[k.strip()] = v.lower() == 'true'
+                    else:
+                        try: helper[k.strip()] = int(v)
+                        except: helper[k.strip()] = v
+            if in_helper and in_monitors and indent == 4:
+                if stripped.endswith(':'):
+                    current_monitor = stripped[:-1].strip()
+                    helper['monitors'][current_monitor] = {}
+                    continue
+                if current_monitor:
+                    k, _, v = stripped.partition(':')
+                    v = v.strip().strip('\"').strip(\"'\")
+                    if v.lower() in ('true','false'):
+                        helper['monitors'][current_monitor][k.strip()] = v.lower() == 'true'
+                    else:
+                        try: helper['monitors'][current_monitor][k.strip()] = int(v)
+                        except: helper['monitors'][current_monitor][k.strip()] = v
+            if in_helper and in_monitors and indent == 6:
+                if current_monitor:
+                    k, _, v = stripped.partition(':')
+                    v = v.strip().strip('\"').strip(\"'\")
+                    if v.lower() in ('true','false'):
+                        helper['monitors'][current_monitor][k.strip()] = v.lower() == 'true'
+                    else:
+                        try: helper['monitors'][current_monitor][k.strip()] = int(v)
+                        except: helper['monitors'][current_monitor][k.strip()] = v
+# Merge with defaults
+result = dict(defaults)
+result.update({k: v for k, v in helper.items() if k != 'monitors'})
+if 'monitors' in helper:
+    result['monitors'] = dict(defaults['monitors'])
+    for mk, mv in helper['monitors'].items():
+        if mk in result['monitors']:
+            result['monitors'][mk].update(mv)
+        else:
+            result['monitors'][mk] = mv
+print(json.dumps(result))
+" 2>/dev/null
 }
 
 # ─── Module Helpers ──────────────────────────────────────────────────────────
