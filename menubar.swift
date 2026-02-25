@@ -14,98 +14,82 @@ private let lfgMenuLog = OSLog(subsystem: "io.pegues.yj-tools.lfg.menubar", cate
 
 // MARK: - Disk Graph View (custom NSView for menu item)
 
-class DiskGraphView: NSView {
-    var dataPoints: [(free: Double, used: Double, timestamp: String)] = [] {
-        didSet { needsDisplay = true }
-    }
+/// Renders disk usage bar graph as an NSImage for use in NSMenuItem
+func renderDiskGraphImage(dataPoints: [(free: Double, used: Double, timestamp: String)]) -> NSImage {
     let maxPoints = 24
     let graphHeight: CGFloat = 48
-    let graphWidth: CGFloat = 280
     let barWidth: CGFloat = 8
     let barGap: CGFloat = 3
+    let pad: CGFloat = 10
+    let top: CGFloat = 20
+    let imgW: CGFloat = 300
+    let imgH: CGFloat = 84
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
+    let image = NSImage(size: NSSize(width: imgW, height: imgH))
+    image.lockFocus()
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        wantsLayer = true
-    }
+    let w = imgW - pad * 2
+    let h = graphHeight
 
-    override var allowsVibrancy: Bool { return false }
+    // Title
+    let titleAttrs: [NSAttributedString.Key: Any] = [
+        .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .bold),
+        .foregroundColor: NSColor.white.withAlphaComponent(0.6)
+    ]
+    ("DISK USAGE" as NSString).draw(at: NSPoint(x: pad, y: imgH - 14), withAttributes: titleAttrs)
 
-    override var intrinsicContentSize: NSSize {
-        return NSSize(width: graphWidth + 20, height: graphHeight + 36)
-    }
+    // Background
+    NSColor(white: 0.12, alpha: 1).setFill()
+    NSRect(x: pad, y: top, width: w, height: h).fill()
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        let pad: CGFloat = 10
-        let top: CGFloat = 20
-        let w = bounds.width - pad * 2
-        let h = graphHeight
-
-        // Title - use NSColor.draw methods for proper appearance handling
-        let titleAttrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .bold),
-            .foregroundColor: NSColor.secondaryLabelColor
+    guard !dataPoints.isEmpty else {
+        let emptyAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.3)
         ]
-        ("DISK USAGE" as NSString).draw(at: NSPoint(x: pad, y: bounds.height - 14), withAttributes: titleAttrs)
-
-        // Background - use NSColor fill for proper compositing
-        NSColor(white: 0.12, alpha: 1).setFill()
-        NSRect(x: pad, y: top, width: w, height: h).fill()
-
-        guard !dataPoints.isEmpty else {
-            let emptyAttrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
-                .foregroundColor: NSColor.tertiaryLabelColor
-            ]
-            ("No data yet" as NSString).draw(at: NSPoint(x: pad + 8, y: top + h/2 - 6), withAttributes: emptyAttrs)
-            return
-        }
-
-        let count = min(dataPoints.count, maxPoints)
-        let recent = Array(dataPoints.suffix(count))
-        let totalW = barWidth + barGap
-        let startX = pad + w - CGFloat(count) * totalW
-
-        for (i, dp) in recent.enumerated() {
-            let x = startX + CGFloat(i) * totalW
-            let usedPct = dp.used / 100.0
-            let barH = CGFloat(usedPct) * h
-
-            // Used portion - use NSColor setFill for proper compositing in menus
-            let usedColor: NSColor
-            if usedPct > 0.90 { usedColor = NSColor(red: 1, green: 0.3, blue: 0.42, alpha: 1) }
-            else if usedPct > 0.80 { usedColor = NSColor(red: 1, green: 0.55, blue: 0.26, alpha: 1) }
-            else if usedPct > 0.70 { usedColor = NSColor(red: 1, green: 0.82, blue: 0.4, alpha: 1) }
-            else { usedColor = NSColor(red: 0.02, green: 0.84, blue: 0.63, alpha: 1) }
-
-            usedColor.setFill()
-            NSRect(x: x, y: top, width: barWidth, height: barH).fill()
-
-            // Free portion
-            NSColor(red: 0.29, green: 0.62, blue: 1, alpha: 0.4).setFill()
-            NSRect(x: x, y: top + barH, width: barWidth, height: h - barH).fill()
-        }
-
-        // Current value label
-        if let last = recent.last {
-            let valStr = String(format: "%.0f%% used", last.used)
-            let valAttrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .medium),
-                .foregroundColor: NSColor.secondaryLabelColor
-            ]
-            (valStr as NSString).draw(at: NSPoint(x: pad + 2, y: 4), withAttributes: valAttrs)
-
-            let freeStr = String(format: "Free: %@", dataPoints.last?.timestamp ?? "?")
-            (freeStr as NSString).draw(at: NSPoint(x: pad + w - 100, y: 4), withAttributes: valAttrs)
-        }
+        ("No data yet" as NSString).draw(at: NSPoint(x: pad + 8, y: top + h/2 - 6), withAttributes: emptyAttrs)
+        image.unlockFocus()
+        return image
     }
+
+    let count = min(dataPoints.count, maxPoints)
+    let recent = Array(dataPoints.suffix(count))
+    let totalW = barWidth + barGap
+    let startX = pad + w - CGFloat(count) * totalW
+
+    for (i, dp) in recent.enumerated() {
+        let x = startX + CGFloat(i) * totalW
+        let usedPct = dp.used / 100.0
+        let barH = CGFloat(usedPct) * h
+
+        let usedColor: NSColor
+        if usedPct > 0.90 { usedColor = NSColor(red: 1, green: 0.3, blue: 0.42, alpha: 1) }
+        else if usedPct > 0.80 { usedColor = NSColor(red: 1, green: 0.55, blue: 0.26, alpha: 1) }
+        else if usedPct > 0.70 { usedColor = NSColor(red: 1, green: 0.82, blue: 0.4, alpha: 1) }
+        else { usedColor = NSColor(red: 0.02, green: 0.84, blue: 0.63, alpha: 1) }
+
+        usedColor.setFill()
+        NSRect(x: x, y: top, width: barWidth, height: barH).fill()
+
+        NSColor(red: 0.29, green: 0.62, blue: 1, alpha: 0.4).setFill()
+        NSRect(x: x, y: top + barH, width: barWidth, height: h - barH).fill()
+    }
+
+    // Labels
+    if let last = recent.last {
+        let valAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 9, weight: .medium),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.6)
+        ]
+        let valStr = String(format: "%.0f%% used", last.used)
+        (valStr as NSString).draw(at: NSPoint(x: pad + 2, y: 4), withAttributes: valAttrs)
+
+        let freeStr = String(format: "Free: %.1f GB", last.free)
+        (freeStr as NSString).draw(at: NSPoint(x: pad + w - 100, y: 4), withAttributes: valAttrs)
+    }
+
+    image.unlockFocus()
+    return image
 }
 
 // MARK: - Main Application
@@ -131,7 +115,6 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     // Disk history for graph
     var diskHistory: [(free: Double, used: Double, timestamp: String)] = []
-    let diskGraphView = DiskGraphView()
 
     // Graph refresh interval (seconds)
     var graphInterval: TimeInterval = 300  // 5 minutes
@@ -333,8 +316,6 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
                     self.diskHistory = Array(self.diskHistory.suffix(24))
                 }
                 self.saveDiskHistory()
-                self.diskGraphView.dataPoints = self.diskHistory
-                self.diskGraphView.needsDisplay = true
             }
         }
     }
@@ -467,11 +448,10 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
         menu.addItem(makeStatItem("Disk Used", value: diskUsed, color: diskUsedPct > 90 ? .systemRed : .secondaryLabelColor))
         menu.addItem(NSMenuItem.separator())
 
-        // Disk graph
-        let graphItem = NSMenuItem()
-        diskGraphView.frame = NSRect(x: 0, y: 0, width: 300, height: 84)
-        diskGraphView.dataPoints = diskHistory
-        graphItem.view = diskGraphView
+        // Disk graph - rendered as NSImage for reliable display in NSMenu
+        let graphItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        graphItem.image = renderDiskGraphImage(dataPoints: diskHistory)
+        graphItem.isEnabled = false
         menu.addItem(graphItem)
         menu.addItem(NSMenuItem.separator())
 
