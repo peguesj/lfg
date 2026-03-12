@@ -421,6 +421,7 @@ td { padding: 7px 8px; vertical-align: middle; }
 .cat-app { color: #06d6a0; background: rgba(6,214,160,0.1); }
 .cat-sys { color: #ff8c42; background: rgba(255,140,66,0.1); }
 .cat-docker { color: #ff4d6a; background: rgba(255,77,106,0.1); }
+.cat-ai { color: #818cf8; background: rgba(129,140,248,0.1); }
 
 /* --- Size & Percentage --- */
 .size { text-align: right; white-space: nowrap; color: #a0a0b0; font-variant-numeric: tabular-nums; }
@@ -718,6 +719,7 @@ tr:has(.cat-build) { --bar-color: #ffd166; }
 tr:has(.cat-app) { --bar-color: #06d6a0; }
 tr:has(.cat-sys) { --bar-color: #ff8c42; }
 tr:has(.cat-docker) { --bar-color: #ff4d6a; }
+tr:has(.cat-ai) { --bar-color: #818cf8; }
 
 /* --- Chat UI (Dashboard Side Panel) --- */
 .chat-panel-messages {
