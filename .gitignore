@@ -1,0 +1,22 @@
+# Claude Code agent directories
+.claude/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+
+# LFG build artifacts
+LFG.app/
+LFG\ Helper.app/
+lfg-menubar
+viewer
+
+# LFG generated HTML cache
+.lfg_*.html
+.lfg-cache/
+
+# Generated icons
+assets/brand/AppIcon.icns

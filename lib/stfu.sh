@@ -2,6 +2,12 @@
 # lfg stfu - Source Tree Forensics & Unification
 # Comprehensive project portfolio analysis: deps, fingerprints, code patterns,
 # shared library candidates, environment consolidation, AI semantic analysis
+#
+# DRTW: Before adding new functionality, check:
+# 1. macOS native: diskutil, hdiutil, du, df, lsof, system_profiler, find, mdls, mdfind
+# 2. Existing LFG lib/: stfu_core.py, stfu_report.py, scan.sh, devdrive.sh, search.sh
+# 3. User skills: ~/.claude/skills/ (run /drtw <task>)
+# 4. Community: https://www.aitmpl.com/skills
 set -uo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
