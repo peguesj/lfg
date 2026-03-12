@@ -202,6 +202,9 @@ def generate_html(data: dict, lfg_dir: str, execute_mode: bool = False) -> str:
     # Project search/filter
     project_count = len(projects)
 
+    # Pre-compute AI link to avoid backslash in f-string expression (Python 3.12+ restriction)
+    ai_nav_link = '<a onclick="showSection(\'ai\', this)">AI Insights</a>' if ai_analysis else ''
+
     html = f'''<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>{theme}
@@ -269,7 +272,7 @@ table th:hover {{ color:#e879f9; }}
     <a onclick="showSection('libs', this)">Libraries ({summary.get('library_candidates', 0)})</a>
     <a onclick="showSection('envs', this)">Environments ({summary.get('env_groups', 0)})</a>
     <a onclick="showSection('templates', this)">Templates</a>
-    {'<a onclick="showSection(\'ai\', this)">AI Insights</a>' if ai_analysis else ''}
+    {ai_nav_link}
   </div>
 
   <div id="sec-dupes" class="stfu-section active">
