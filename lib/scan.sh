@@ -15,7 +15,11 @@ lfg_state_start wtfs
 if [[ -n "${1:-}" ]]; then
     SCAN_PATHS=("$1")
 else
-    mapfile -t SCAN_PATHS < <(lfg_module_paths wtfs 2>/dev/null)
+    # Bash 3.2 compatible (macOS default bash doesn't have mapfile)
+    SCAN_PATHS=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && SCAN_PATHS+=("$line")
+    done < <(lfg_module_paths wtfs 2>/dev/null)
     [[ ${#SCAN_PATHS[@]} -eq 0 ]] && SCAN_PATHS=("$HOME/Developer")
 fi
 
@@ -31,16 +35,19 @@ done | sort -rn > "$TMPFILE"
 # Calculate total from all scan path root entries
 TOTAL_KB=$(awk '{s+=$1} END{print s+0}' "$TMPFILE")
 
-# Build set of scan path roots to skip in output
-declare -A SCAN_ROOT_SET
-for _sp in "${SCAN_PATHS[@]}"; do
-    SCAN_ROOT_SET["$_sp"]=1
-done
+# Function to check if path is a scan root (Bash 3.2 compatible - no associative arrays)
+is_scan_root() {
+    local check_path="$1"
+    for _sp in "${SCAN_PATHS[@]}"; do
+        [[ "$_sp" == "$check_path" ]] && return 0
+    done
+    return 1
+}
 
 ROWS=""
 RANK=0
 while IFS=$'\t' read -r size_kb path; do
-    [[ -n "${SCAN_ROOT_SET[$path]+x}" ]] && continue
+    is_scan_root "$path" && continue
     RANK=$((RANK + 1))
     name=$(basename "$path")
 
