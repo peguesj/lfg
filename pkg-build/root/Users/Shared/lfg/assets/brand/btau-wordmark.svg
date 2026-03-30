@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64" fill="none">
+  <!--
+    BTAU Wordmark — "Back That App Up"
+    Monospace/geometric letterforms. Accent color: #06d6a0.
+    The "B" is constructed as a vault door face (two half-circle bumps
+    on a vertical stem, suggesting the locking-bolt aesthetic).
+    Remaining letters T, A, U are clean geometric strokes.
+    Letters sit on a baseline of y=46, cap-height ~28px, so letters
+    span y=18 to y=46. Total text block ~88px wide, centered in 200px.
+    Left margin: 56px, so text runs 56–144.
+  -->
+
+  <!-- ===== B — vault-door letterform ===== -->
+  <!-- Vertical stem -->
+  <line x1="56" y1="18" x2="56" y2="46" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Top crossbar -->
+  <line x1="56" y1="18" x2="64" y2="18" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Middle bar -->
+  <line x1="56" y1="32" x2="63" y2="32" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Bottom bar -->
+  <line x1="56" y1="46" x2="64" y2="46" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Upper bowl (arc, opens right) -->
+  <path d="M 64 18 A 7 7 0 0 1 63 32" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" fill="none" />
+  <!-- Lower bowl (slightly wider) -->
+  <path d="M 64 32 A 7.5 7 0 0 1 64 46" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" fill="none" />
+  <!-- Bolt dot on upper bowl (vault aesthetic) -->
+  <circle cx="70" cy="25" r="1.5" fill="#06d6a0" />
+  <!-- Bolt dot on lower bowl -->
+  <circle cx="71" cy="39" r="1.5" fill="#06d6a0" />
+
+  <!-- ===== T ===== -->
+  <!-- Top horizontal -->
+  <line x1="80" y1="18" x2="96" y2="18" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Vertical stem -->
+  <line x1="88" y1="18" x2="88" y2="46" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Small foot serifs (technical look) -->
+  <line x1="85" y1="46" x2="91" y2="46" stroke="#06d6a0" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- ===== A ===== -->
+  <!-- Left stroke -->
+  <line x1="100" y1="46" x2="108" y2="18" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Right stroke -->
+  <line x1="116" y1="46" x2="108" y2="18" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Crossbar at ~60% height -->
+  <line x1="103" y1="36" x2="113" y2="36" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+
+  <!-- ===== U ===== -->
+  <!-- Left vertical -->
+  <line x1="122" y1="18" x2="122" y2="38" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Right vertical -->
+  <line x1="136" y1="18" x2="136" y2="38" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" />
+  <!-- Bottom arc -->
+  <path d="M 122 38 Q 129 50 136 38" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" fill="none" />
+
+  <!-- Tagline: "back that app up" in monospace micro-text -->
+  <text
+    x="100"
+    y="58"
+    font-family="'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace"
+    font-size="7"
+    fill="#06d6a0"
+    opacity="0.55"
+    text-anchor="middle"
+    letter-spacing="1.5"
+  >BACK THAT APP UP</text>
+</svg>

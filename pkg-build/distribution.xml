@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>LFG — Local File Guardian</title>
+    <organization>io.pegues.yj</organization>
+    <domains enable_localSystem="false" enable_currentUserHome="true"/>
+    <options customize="never" require-scripts="true" rootVolumeOnly="false"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="13.0"/>
+        </allowed-os-versions>
+    </volume-check>
+    <welcome file="welcome.rtf"/>
+    <license file="license.rtf"/>
+    <background file="background.png" scaling="tofit" alignment="center"/>
+    <choices-outline>
+        <line choice="com.lfg.main"/>
+    </choices-outline>
+    <choice id="com.lfg.main" visible="true" title="LFG Suite"
+            description="Local File Guardian — disk management, devdrive, cache cleanup, backup manager">
+        <pkg-ref id="com.lfg.main"/>
+    </choice>
+    <pkg-ref id="com.lfg.main" version="2.4.0" onConclusion="none">LFG.pkg</pkg-ref>
+</installer-gui-script>

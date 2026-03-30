@@ -1,0 +1,17 @@
+#!/bin/bash
+# LFG preinstall — kill existing processes, unload existing LaunchAgents
+set -euo pipefail
+
+# Kill any running LFG processes
+pkill -x "LFG Helper" 2>/dev/null || true
+pkill -x "LFG"        2>/dev/null || true
+pkill -f "inbox-watcher.sh" 2>/dev/null || true
+
+# Unload existing LaunchAgents (best effort)
+if [[ -n "${HOME:-}" ]]; then
+    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.helper.plist"            2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.inbox-watcher.plist"    2>/dev/null || true
+    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.devdrive-automount.plist" 2>/dev/null || true
+fi
+
+exit 0

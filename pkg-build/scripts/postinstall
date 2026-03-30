@@ -1,0 +1,43 @@
+#!/bin/bash
+# LFG postinstall — install LaunchAgents for the real user, symlink CLI
+set -euo pipefail
+
+# Determine the actual logged-in user (not root)
+REAL_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "${SUDO_USER:-$USER}")
+if [[ -z "$REAL_USER" || "$REAL_USER" == "root" ]]; then
+    # Fallback: first human user in /Users
+    REAL_USER=$(ls /Users | grep -v "^Shared$" | grep -v "^\." | head -1)
+fi
+
+REAL_HOME=$(dscl . -read "/Users/$REAL_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+if [[ -z "$REAL_HOME" ]]; then
+    REAL_HOME="/Users/$REAL_USER"
+fi
+
+echo "LFG postinstall: configuring for user $REAL_USER ($REAL_HOME)"
+
+# --- LaunchAgents ---
+LAUNCH_AGENTS="$REAL_HOME/Library/LaunchAgents"
+mkdir -p "$LAUNCH_AGENTS"
+
+for plist in /Users/Shared/lfg/io.lfg.*.plist; do
+    [[ -f "$plist" ]] || continue
+    BASENAME="$(basename "$plist")"
+    # Substitute hardcoded /Users/Shared/lfg log paths with real user home for log files,
+    # but keep program paths pointing at /Users/Shared/lfg (shared install).
+    sed "s|/Users/jeremiah/.config/lfg|$REAL_HOME/.config/lfg|g" \
+        "$plist" > "$LAUNCH_AGENTS/$BASENAME"
+    chown "$REAL_USER" "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
+    # Load as the real user
+    sudo -u "$REAL_USER" launchctl load "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
+done
+
+# --- CLI symlink ---
+mkdir -p /usr/local/bin
+ln -sf /Users/Shared/lfg/lfg /usr/local/bin/lfg 2>/dev/null || true
+
+# --- DevDrive setup (best effort) ---
+sudo -u "$REAL_USER" /Users/Shared/lfg/lfg devdrive setup 2>/dev/null || true
+
+echo "LFG installed successfully for $REAL_USER."
+exit 0

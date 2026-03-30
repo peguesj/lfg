@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 64" fill="none">
+  <!--
+    STFU Wordmark — Source Tree Forensics & Unification
+    Color: #e879f9
+    Each letterform incorporates the merge/forensics concept:
+      S — interleaved bracket-curves (two paths weaving)
+      T — a tree branch: vertical trunk with two side branches
+      F — a forensic fragment: partial bracket with scan line
+      U — a merge funnel: two lines converging into a unified base
+    Monospace grid, 1.5–2px strokes, geometric.
+    Letter centers (approx): S@28, T@68, F@108, U@152
+    Total width used: ~180px, centered in 200px viewBox.
+  -->
+
+  <!-- ===== S — interleaved bracket curves ===== -->
+  <!-- Top curve of S (outer bracket arc) -->
+  <path d="M18 18 C18 14 22 12 28 12 C34 12 38 15 38 20 C38 25 34 27 28 27" stroke="#e879f9" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- Mid crossbar hint (interleave crossing) -->
+  <line x1="18" y1="27" x2="38" y2="27" stroke="#e879f9" stroke-width="1" stroke-linecap="round" opacity="0.35"/>
+  <!-- Bottom curve of S (inner bracket arc) -->
+  <path d="M38 27 C38 27 38 30 28 32 C22 32 18 35 18 40 C18 45 22 48 28 48 C34 48 38 46 38 42" stroke="#e879f9" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- Interleave tick — left side, top zone -->
+  <line x1="18" y1="21" x2="14" y2="21" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <!-- Interleave tick — right side, bottom zone -->
+  <line x1="38" y1="39" x2="42" y2="39" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- ===== T — source tree branch ===== -->
+  <!-- Vertical trunk -->
+  <line x1="68" y1="16" x2="68" y2="48" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Top horizontal bar -->
+  <line x1="56" y1="16" x2="80" y2="16" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Left branch (git branch fork) -->
+  <path d="M68 30 L60 38" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <circle cx="60" cy="38" r="2" fill="#e879f9" opacity="0.7"/>
+  <!-- Right branch -->
+  <path d="M68 30 L76 38" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <circle cx="76" cy="38" r="2" fill="#e879f9" opacity="0.7"/>
+  <!-- Branch node on trunk -->
+  <circle cx="68" cy="30" r="2" fill="#e879f9"/>
+
+  <!-- ===== F — forensic frame: partial bracket + scan line ===== -->
+  <!-- Vertical spine -->
+  <line x1="98" y1="16" x2="98" y2="48" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Top horizontal -->
+  <line x1="98" y1="16" x2="116" y2="16" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Mid horizontal (shorter — forensic fragment) -->
+  <line x1="98" y1="32" x2="112" y2="32" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Scan line — horizontal ray at 3/4 height, stepped pattern -->
+  <line x1="100" y1="43" x2="104" y2="43" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="107" y1="43" x2="111" y2="43" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <line x1="113" y1="43" x2="116" y2="43" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
+  <!-- Corner bracket mark on top-right of F (forensic overlay) -->
+  <path d="M118 13 L122 13 L122 19" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+  <!-- ===== U — merge funnel: two spines converging ===== -->
+  <!-- Left spine -->
+  <line x1="136" y1="16" x2="136" y2="38" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Right spine -->
+  <line x1="158" y1="16" x2="158" y2="38" stroke="#e879f9" stroke-width="2" stroke-linecap="round"/>
+  <!-- Merge curve at bottom (funnel convergence) -->
+  <path d="M136 38 C136 46 158 46 158 38" stroke="#e879f9" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- Central unification node at base of curve -->
+  <circle cx="147" cy="46" r="2" fill="#e879f9"/>
+  <!-- Unified output stem -->
+  <line x1="147" y1="48" x2="147" y2="53" stroke="#e879f9" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+  <!-- Tick marks on each spine (branch indicators) -->
+  <line x1="136" y1="26" x2="131" y2="26" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <line x1="158" y1="26" x2="163" y2="26" stroke="#e879f9" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+
+  <!-- ===== Baseline descriptor (optional subtle label) ===== -->
+  <!-- Thin underline spanning all letters -->
+  <line x1="14" y1="54" x2="166" y2="54" stroke="#e879f9" stroke-width="0.75" stroke-linecap="round" opacity="0.2"/>
+</svg>

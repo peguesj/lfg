@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-label="LFG App Icon">
+  <!--
+    LFG App Icon — Wordmark on dark background
+    Uses the geometric letterforms from lfg-wordmark.svg, scaled and centered
+    on a dark (#141418) rounded-rect background for macOS app icon.
+  -->
+
+  <!-- Dark rounded background -->
+  <rect width="512" height="512" rx="100" ry="100" fill="#141418"/>
+
+  <!-- Scaled wordmark group: original viewBox 0 0 200 64, scale ~3.6x to fit icon -->
+  <!-- Center: offset to (68, 160) so the ~400px wide mark is centered horizontally,
+       and the ~230px tall mark is centered vertically -->
+  <g transform="translate(68, 142) scale(3.6)">
+    <!-- L -->
+    <line x1="14" y1="8" x2="14" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="14" y1="56" x2="38" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="38" y1="56" x2="38" y2="48" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="14" y1="8" x2="22" y2="8" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+
+    <!-- F -->
+    <line x1="43" y1="8" x2="43" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="43" y1="8" x2="60" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="60" y1="8" x2="67" y2="16" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="67" y1="16" x2="67" y2="20" stroke="#4a9eff" stroke-width="3" stroke-linecap="square"/>
+    <polyline points="60,8 60,16 67,16" stroke="#ffffff" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" stroke-dasharray="2 2" opacity="0.4"/>
+    <line x1="43" y1="32" x2="63" y2="32" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+
+    <!-- G -->
+    <line x1="72" y1="8" x2="72" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="72" y1="56" x2="104" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="104" y1="56" x2="104" y2="38" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="72" y1="8" x2="94" y2="8" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="94" y1="8" x2="94" y2="20" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="94" y1="20" x2="104" y2="20" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="104" y1="20" x2="104" y2="38" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+    <line x1="86" y1="38" x2="104" y2="38" stroke="#4a9eff" stroke-width="4" stroke-linecap="square"/>
+  </g>
+</svg>
