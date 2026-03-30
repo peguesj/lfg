@@ -403,7 +403,7 @@ if __name__ == "__main__":
     output_path = sys.argv[1] if len(sys.argv) > 1 else ""
     execute_mode = "--execute" in sys.argv
     data = json.load(sys.stdin)
-    lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("~/tools/@yj/lfg"))
+    lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("/Users/Shared/lfg"))
     html = generate_html(data, lfg_dir, execute_mode=execute_mode)
     if output_path:
         with open(output_path, "w") as f:

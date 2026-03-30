@@ -208,7 +208,7 @@ export LFG_DIR HTML_FILE
 python3 << 'PYEOF'
 import os
 
-lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("~/tools/@yj/lfg"))
+lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("/Users/Shared/lfg"))
 theme = open(f"{lfg_dir}/lib/theme.css").read()
 uijs = open(f"{lfg_dir}/lib/ui.js").read()
 
@@ -281,8 +281,8 @@ html = f'''<!DOCTYPE html>
     <table><thead><tr><th>Volume</th><th>Status</th><th class="r">Path</th></tr></thead>
     <tbody>SSD_ROWS_PLACEHOLDER</tbody></table>
     <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="action-btn" onclick="LFG.exec('~/tools/@yj/lfg/lfg ssd scan',function(o){{LFG.toast(o||'Scan complete',{{type:'info'}})}})">Scan</button>
-      <button class="action-btn" style="color:#facc15;border-color:#facc15" onclick="LFG.exec('~/tools/@yj/lfg/lfg ssd exclude --force',function(o){{LFG.toast(o||'Done',{{type:'success'}})}})">Exclude All</button>
+      <button class="action-btn" onclick="LFG.exec('/Users/Shared/lfg/lfg ssd scan',function(o){{LFG.toast(o||'Scan complete',{{type:'info'}})}})">Scan</button>
+      <button class="action-btn" style="color:#facc15;border-color:#facc15" onclick="LFG.exec('/Users/Shared/lfg/lfg ssd exclude --force',function(o){{LFG.toast(o||'Done',{{type:'success'}})}})">Exclude All</button>
     </div>
   </div>
   </div><!-- /main-column -->
@@ -313,7 +313,7 @@ html = f'''<!DOCTYPE html>
       <div id="scan-paths-list" style="margin-bottom:8px"></div>
       <div style="display:flex;gap:6px;margin-bottom:16px">
         <input id="new-path-input" class="setting-input" placeholder="/path/to/projects" style="flex:1">
-        <button class="action-btn" style="padding:4px 10px;font-size:10px" onclick="var p=document.getElementById('new-path-input').value;if(p)LFG.exec('~/tools/@yj/lfg/lfg settings paths add '+p,function(o){{LFG.toast(o,{{type:'info'}});loadSettings()}})">Add</button>
+        <button class="action-btn" style="padding:4px 10px;font-size:10px" onclick="var p=document.getElementById('new-path-input').value;if(p)LFG.exec('/Users/Shared/lfg/lfg settings paths add '+p,function(o){{LFG.toast(o,{{type:'info'}});loadSettings()}})">Add</button>
       </div>
 
       <div class="section-title">Volume Profiles</div>
@@ -321,16 +321,16 @@ html = f'''<!DOCTYPE html>
 
       <div class="section-title">Library Namespace</div>
       <div class="setting-row" style="margin-bottom:16px">
-        <input id="set-namespace" class="setting-input" value="@jeremiah" style="width:100%" onchange="LFG.exec('~/tools/@yj/lfg/lfg settings set library_namespace '+this.value,function(){{LFG.toast('Namespace updated',{{type:'success'}})}})">
+        <input id="set-namespace" class="setting-input" value="@jeremiah" style="width:100%" onchange="LFG.exec('/Users/Shared/lfg/lfg settings set library_namespace '+this.value,function(){{LFG.toast('Namespace updated',{{type:'success'}})}})">
       </div>
 
       <div class="section-title">AI Settings</div>
-      <div class="setting-row"><span class="setting-label">Backend</span><select id="set-backend" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg settings set ai.backend '+this.value,function(){{}})"><option value="litellm">LiteLLM Proxy</option><option value="claude">Claude (Anthropic)</option><option value="ollama">Ollama (Local)</option></select></div>
-      <div class="setting-row"><span class="setting-label">Model</span><select id="set-model" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set model '+this.value,function(){{}})"><option>gpt-4o-mini</option><option>gpt-4o</option><option>claude-sonnet-4-5-20250929</option><option>ollama/llama3</option></select></div>
-      <div class="setting-row"><span class="setting-label">Endpoint</span><input id="set-endpoint" class="setting-input" value="http://localhost:4000" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set endpoint '+this.value,function(){{}})"></div>
-      <div class="setting-row"><span class="setting-label">Temperature</span><input id="set-temp" type="range" min="0" max="1" step="0.1" value="0.3" class="setting-input" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set temperature '+this.value,function(){{}})"></div>
-      <div class="setting-row"><span class="setting-label">System Override</span><label class="setting-toggle"><input type="checkbox" id="set-override" onchange="LFG.exec('~/tools/@yj/lfg/lfg ai config set system_override '+(this.checked?'true':'false'),function(){{}})"><span class="toggle-slider"></span></label></div>
-      <button onclick="LFG.exec('~/tools/@yj/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:8px;width:100%" class="action-btn">Test Connection</button>
+      <div class="setting-row"><span class="setting-label">Backend</span><select id="set-backend" class="setting-input" onchange="LFG.exec('/Users/Shared/lfg/lfg settings set ai.backend '+this.value,function(){{}})"><option value="litellm">LiteLLM Proxy</option><option value="claude">Claude (Anthropic)</option><option value="ollama">Ollama (Local)</option></select></div>
+      <div class="setting-row"><span class="setting-label">Model</span><select id="set-model" class="setting-input" onchange="LFG.exec('/Users/Shared/lfg/lfg ai config set model '+this.value,function(){{}})"><option>gpt-4o-mini</option><option>gpt-4o</option><option>claude-sonnet-4-5-20250929</option><option>ollama/llama3</option></select></div>
+      <div class="setting-row"><span class="setting-label">Endpoint</span><input id="set-endpoint" class="setting-input" value="http://localhost:4000" onchange="LFG.exec('/Users/Shared/lfg/lfg ai config set endpoint '+this.value,function(){{}})"></div>
+      <div class="setting-row"><span class="setting-label">Temperature</span><input id="set-temp" type="range" min="0" max="1" step="0.1" value="0.3" class="setting-input" onchange="LFG.exec('/Users/Shared/lfg/lfg ai config set temperature '+this.value,function(){{}})"></div>
+      <div class="setting-row"><span class="setting-label">System Override</span><label class="setting-toggle"><input type="checkbox" id="set-override" onchange="LFG.exec('/Users/Shared/lfg/lfg ai config set system_override '+(this.checked?'true':'false'),function(){{}})"><span class="toggle-slider"></span></label></div>
+      <button onclick="LFG.exec('/Users/Shared/lfg/lfg ai config show',function(out){{LFG.toast(out||'Config loaded',{{type:'info'}})}})" style="margin-top:8px;width:100%" class="action-btn">Test Connection</button>
 
       <div class="section-title" style="margin-top:16px">Graph Interval</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
@@ -343,7 +343,7 @@ html = f'''<!DOCTYPE html>
       <div class="section-title" style="margin-top:16px">Module Access</div>
       <div id="module-access-grid" style="font-size:10px;color:#6b6b78"></div>
 
-      <button onclick="LFG.confirm('Reset all settings to defaults?','~/tools/@yj/lfg/lfg settings reset',function(){{LFG.toast('Settings reset',{{type:'info'}});loadSettings()}})" style="margin-top:16px;width:100%" class="action-btn" style="border-color:#ff4d6a;color:#ff4d6a">Reset Defaults</button>
+      <button onclick="LFG.confirm('Reset all settings to defaults?','/Users/Shared/lfg/lfg settings reset',function(){{LFG.toast('Settings reset',{{type:'info'}});loadSettings()}})" style="margin-top:16px;width:100%" class="action-btn" style="border-color:#ff4d6a;color:#ff4d6a">Reset Defaults</button>
     </div>
   </div>
   </div><!-- /dashboard-layout -->
@@ -363,7 +363,7 @@ html = f'''<!DOCTYPE html>
     keyHandlers: {{}}
   }});
   function setGraphInterval(secs, label) {{
-    LFG.exec('~/tools/@yj/lfg/lfg settings set graph_interval ' + secs, function(out, err, code) {{
+    LFG.exec('/Users/Shared/lfg/lfg settings set graph_interval ' + secs, function(out, err, code) {{
       if (code === 0) LFG.toast('Graph interval set to ' + label, {{type:'success'}});
       else LFG.toast('Failed to set interval', {{type:'error'}});
     }});
@@ -396,14 +396,14 @@ html = f'''<!DOCTYPE html>
       var modelEl = document.getElementById('ai-model');
       if (modelEl && ok && info) modelEl.textContent = info.model || info.backend || '--';
     }});
-    LFG.exec('~/tools/@yj/lfg/lfg ai config get model', function(out) {{
+    LFG.exec('/Users/Shared/lfg/lfg ai config get model', function(out) {{
       var el = document.getElementById('ai-model');
       if (el && out.trim()) el.textContent = out.trim();
     }});
   }}, 1000);
   // STFU scan (populates both main tab and side inspector)
   setTimeout(function() {{
-    LFG.exec('~/tools/@yj/lfg/lfg stfu --json 2>/dev/null || echo "{{}}"', function(out) {{
+    LFG.exec('/Users/Shared/lfg/lfg stfu --json 2>/dev/null || echo "{{}}"', function(out) {{
       try {{
         var data = JSON.parse(out || '{{}}');
 
@@ -486,14 +486,14 @@ html = f'''<!DOCTYPE html>
 
   // Settings panel: load and render scan paths + module access
   function loadSettings() {{
-    LFG.exec('~/tools/@yj/lfg/lfg settings show --json', function(out) {{
+    LFG.exec('/Users/Shared/lfg/lfg settings show --json', function(out) {{
       try {{
         var s = JSON.parse(out);
         // Scan paths
         var pathsEl = document.getElementById('scan-paths-list');
         if (pathsEl && s.scan_paths) {{
           pathsEl.innerHTML = s.scan_paths.map(function(p) {{
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;margin-bottom:4px;background:#1c1c22;border:1px solid #2a2a34;border-radius:4px"><span style="font-size:11px;color:#d0d0d8;font-family:monospace">' + p + '</span><button class="action-btn-sm" style="padding:2px 6px;font-size:9px;border-color:#ff4d6a;color:#ff4d6a" onclick="LFG.confirm(\\'Remove ' + p + '?\\',\\'~/tools/@yj/lfg/lfg settings paths remove ' + p + '\\',function(){{loadSettings()}})">x</button></div>';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;margin-bottom:4px;background:#1c1c22;border:1px solid #2a2a34;border-radius:4px"><span style="font-size:11px;color:#d0d0d8;font-family:monospace">' + p + '</span><button class="action-btn-sm" style="padding:2px 6px;font-size:9px;border-color:#ff4d6a;color:#ff4d6a" onclick="LFG.confirm(\\'Remove ' + p + '?\\',\\'/Users/Shared/lfg/lfg settings paths remove ' + p + '\\',function(){{loadSettings()}})">x</button></div>';
           }}).join('');
         }}
         // Volume profiles

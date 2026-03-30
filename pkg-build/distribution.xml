@@ -13,11 +13,11 @@
     <license file="license.rtf"/>
     <background file="background.png" scaling="tofit" alignment="center"/>
     <choices-outline>
-        <line choice="com.lfg.main"/>
+        <line choice="io.pegues.yj.lfg"/>
     </choices-outline>
-    <choice id="com.lfg.main" visible="true" title="LFG Suite"
+    <choice id="io.pegues.yj.lfg" visible="true" title="LFG Suite"
             description="Local File Guardian — disk management, devdrive, cache cleanup, backup manager">
-        <pkg-ref id="com.lfg.main"/>
+        <pkg-ref id="io.pegues.yj.lfg"/>
     </choice>
-    <pkg-ref id="com.lfg.main" version="2.4.0" onConclusion="none">LFG.pkg</pkg-ref>
+    <pkg-ref id="io.pegues.yj.lfg" version="2.4.0" onConclusion="none">LFG.pkg</pkg-ref>
 </installer-gui-script>

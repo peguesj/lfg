@@ -7,7 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/jeremiah/tools/@yj/lfg/LFG Helper.app/Contents/MacOS/LFG Helper</string>
+        <string>/Users/Shared/lfg/LFG Helper.app/Contents/MacOS/LFG Helper</string>
     </array>
 
     <key>RunAtLoad</key>

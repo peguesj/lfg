@@ -7,7 +7,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/bin/bash</string>
-		<string>/Users/jeremiah/tools/@yj/lfg/scripts/devdrive-automount.sh</string>
+		<string>/Users/Shared/lfg/scripts/devdrive-automount.sh</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

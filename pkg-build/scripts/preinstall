@@ -7,11 +7,24 @@ pkill -x "LFG Helper" 2>/dev/null || true
 pkill -x "LFG"        2>/dev/null || true
 pkill -f "inbox-watcher.sh" 2>/dev/null || true
 
-# Unload existing LaunchAgents (best effort)
-if [[ -n "${HOME:-}" ]]; then
-    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.helper.plist"            2>/dev/null || true
-    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.inbox-watcher.plist"    2>/dev/null || true
-    launchctl unload "$HOME/Library/LaunchAgents/io.lfg.devdrive-automount.plist" 2>/dev/null || true
+# Detect real logged-in user (installer runs as root, so $HOME=/var/root)
+REAL_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "${SUDO_USER:-$USER}")
+if [[ -z "$REAL_USER" || "$REAL_USER" == "root" ]]; then
+    REAL_USER=$(ls /Users | grep -v "^Shared$" | grep -v "^\." | head -1)
 fi
+REAL_HOME=$(dscl . -read "/Users/$REAL_USER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+REAL_HOME="${REAL_HOME:-/Users/$REAL_USER}"
+LAUNCH_AGENTS="$REAL_HOME/Library/LaunchAgents"
+
+# Unload existing LaunchAgents as the real user
+USER_UID=$(id -u "$REAL_USER" 2>/dev/null || echo "")
+for plist in io.lfg.helper.plist io.lfg.inbox-watcher.plist io.lfg.devdrive-automount.plist; do
+    if [[ -f "$LAUNCH_AGENTS/$plist" ]]; then
+        if [[ -n "$USER_UID" ]]; then
+            launchctl bootout "gui/$USER_UID/$plist" 2>/dev/null || true
+        fi
+        sudo -u "$REAL_USER" launchctl unload "$LAUNCH_AGENTS/$plist" 2>/dev/null || true
+    fi
+done
 
 exit 0

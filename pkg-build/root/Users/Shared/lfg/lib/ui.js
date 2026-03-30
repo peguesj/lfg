@@ -846,25 +846,25 @@ const LFG = {
   // --- AI Namespace ---
   ai: {
     analyze(path, cb) {
-      LFG.exec('~/tools/@yj/lfg/lfg ai analyze ' + path, (out, err, code) => {
+      LFG.exec('/Users/Shared/lfg/lfg ai analyze ' + path, (out, err, code) => {
         if (code === 0) { try { cb(JSON.parse(out)); } catch(e) { cb({ error: 'parse', raw: out }); } }
         else cb({ error: err || 'AI unavailable' });
       });
     },
     compare(a, b, cb) {
-      LFG.exec('~/tools/@yj/lfg/lfg ai compare ' + a + ' ' + b, (out, err, code) => {
+      LFG.exec('/Users/Shared/lfg/lfg ai compare ' + a + ' ' + b, (out, err, code) => {
         if (code === 0) { try { cb(JSON.parse(out)); } catch(e) { cb({ error: 'parse', raw: out }); } }
         else cb({ error: err || 'AI unavailable' });
       });
     },
     suggest(path, cb) {
-      LFG.exec('~/tools/@yj/lfg/lfg ai suggest ' + path, (out, err, code) => {
+      LFG.exec('/Users/Shared/lfg/lfg ai suggest ' + path, (out, err, code) => {
         if (code === 0) { try { cb(JSON.parse(out)); } catch(e) { cb({ error: 'parse', raw: out }); } }
         else cb({ error: err || 'AI unavailable' });
       });
     },
     isAvailable(cb) {
-      LFG.exec('~/tools/@yj/lfg/lfg ai config get endpoint', (out, err, code) => {
+      LFG.exec('/Users/Shared/lfg/lfg ai config get endpoint', (out, err, code) => {
         cb(code === 0 && out.trim().length > 0);
       });
     },

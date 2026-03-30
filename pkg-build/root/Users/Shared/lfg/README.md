@@ -84,10 +84,10 @@ Requirements: macOS 13.0+, Swift toolchain, Python 3, `rsvg-convert` (for icon g
 
 ```bash
 # Run directly
-~/tools/@yj/lfg/lfg [command]
+/Users/Shared/lfg/lfg [command]
 
 # Or symlink to ~/bin
-ln -sf ~/tools/@yj/lfg/lfg ~/bin/lfg
+ln -sf /Users/Shared/lfg/lfg ~/bin/lfg
 ```
 
 ---

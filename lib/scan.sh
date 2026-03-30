@@ -59,7 +59,11 @@ while IFS=$'\t' read -r size_kb path; do
         size="${size_kb} KB"
     fi
 
-    pct=$(awk "BEGIN{printf \"%.1f\", ($size_kb/$TOTAL_KB)*100}")
+    if (( TOTAL_KB > 0 )); then
+        pct=$(awk "BEGIN{printf \"%.1f\", ($size_kb/$TOTAL_KB)*100}")
+    else
+        pct="0.0"
+    fi
     bar_w="$pct"
 
     if (( $(echo "$pct > 20" | bc -l) )); then color="#ff4d6a"
@@ -111,10 +115,11 @@ TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 DIR_DISPLAY=$(echo "$TARGET" | sed "s|$HOME|~|")
 
 # Generate HTML via python3 (safe multi-line templating)
-python3 -c "
+LFG_ROWS="$ROWS" python3 -c "
+import os
 theme = open('$LFG_DIR/lib/theme.css').read()
 uijs = open('$LFG_DIR/lib/ui.js').read()
-rows = '''$ROWS'''
+rows = os.environ.get('LFG_ROWS', '')
 
 html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">

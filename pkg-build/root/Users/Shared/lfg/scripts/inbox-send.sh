@@ -5,26 +5,26 @@
 # Usage from any Claude Code session or script:
 #
 #   # Submit a cache relocation request
-#   bash ~/tools/@yj/lfg/scripts/inbox-send.sh \
+#   bash /Users/Shared/lfg/scripts/inbox-send.sh \
 #     --type cache-relocate \
 #     --from "my-project" \
 #     --payload '{"path":"~/.npm","volume":"auto"}' \
 #     --priority high
 #
 #   # Query volumes
-#   bash ~/tools/@yj/lfg/scripts/inbox-send.sh \
+#   bash /Users/Shared/lfg/scripts/inbox-send.sh \
 #     --type volume-query \
 #     --from "viki" \
 #     --wait   # blocks until response arrives
 #
 #   # Protect a path from DTF
-#   bash ~/tools/@yj/lfg/scripts/inbox-send.sh \
+#   bash /Users/Shared/lfg/scripts/inbox-send.sh \
 #     --type dtf-protect \
 #     --from "strategic-thinking" \
 #     --payload '{"path":"~/Developer/strategic-thinking/node_modules"}'
 #
 #   # Request DTF prefetch after cleanup
-#   bash ~/tools/@yj/lfg/scripts/inbox-send.sh \
+#   bash /Users/Shared/lfg/scripts/inbox-send.sh \
 #     --type hook-prefetch \
 #     --from "post-dtf-hook"
 # =============================================================================

@@ -43,12 +43,12 @@ except: pass
     echo "${LFG_DIR:-.}"
 }
 LFG_CACHE_DIR="$(_lfg_resolve_cache_dir)"
-readonly LFG_CACHE_DIR
 
 mkdir -p "$LFG_STATE_DIR" "$LFG_CACHE_DIR" 2>/dev/null || {
     echo "[lfg] WARN: Failed to create dirs, falling back to LFG_DIR" >&2
     LFG_CACHE_DIR="${LFG_DIR:-.}"
 }
+readonly LFG_CACHE_DIR
 
 # Global error trap for module scripts
 _lfg_trap_exit() {
@@ -139,6 +139,7 @@ lfg_state_start() {
 lfg_state_done() {
     local module="$1"
     shift
+    local summary="$*"
     lfg_state_update "$module" "status" "completed"
     lfg_state_update "$module" "completed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     # Write any extra key=value pairs
@@ -147,8 +148,8 @@ lfg_state_done() {
         local k="${kv%%=*}" v="${kv#*=}"
         lfg_state_update "$module" "$k" "$v"
     done
-    lfg_log "$module: completed $*"
-    lfg_notify_apm "LFG $module" "Completed: $*" "success" "lfg-$module"
+    lfg_log "$module: completed $summary"
+    lfg_notify_apm "LFG $module" "Completed: $summary" "success" "lfg-$module"
     # Trigger incremental search index update (non-blocking)
     python3 "$(dirname "$0")/search_index.py" update >/dev/null 2>&1 &
 }

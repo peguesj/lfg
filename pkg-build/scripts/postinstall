@@ -23,13 +23,21 @@ mkdir -p "$LAUNCH_AGENTS"
 for plist in /Users/Shared/lfg/io.lfg.*.plist; do
     [[ -f "$plist" ]] || continue
     BASENAME="$(basename "$plist")"
-    # Substitute hardcoded /Users/Shared/lfg log paths with real user home for log files,
-    # but keep program paths pointing at /Users/Shared/lfg (shared install).
-    sed "s|/Users/jeremiah/.config/lfg|$REAL_HOME/.config/lfg|g" \
+    # Patch all developer-specific paths for the installing user
+    sed \
+        -e "s|/Users/jeremiah/tools/@yj/lfg|/Users/Shared/lfg|g" \
+        -e "s|/Users/jeremiah/.config/lfg|$REAL_HOME/.config/lfg|g" \
+        -e "s|<string>/Users/jeremiah</string>|<string>$REAL_HOME</string>|g" \
         "$plist" > "$LAUNCH_AGENTS/$BASENAME"
     chown "$REAL_USER" "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
-    # Load as the real user
-    sudo -u "$REAL_USER" launchctl load "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
+    # Load via launchctl bootstrap (modern macOS 13+) with fallback
+    USER_UID=$(id -u "$REAL_USER" 2>/dev/null || echo "")
+    if [[ -n "$USER_UID" ]]; then
+        launchctl bootstrap "gui/$USER_UID" "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || \
+            sudo -u "$REAL_USER" launchctl load "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
+    else
+        sudo -u "$REAL_USER" launchctl load "$LAUNCH_AGENTS/$BASENAME" 2>/dev/null || true
+    fi
 done
 
 # --- CLI symlink ---

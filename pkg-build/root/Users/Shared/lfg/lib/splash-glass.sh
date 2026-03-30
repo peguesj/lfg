@@ -22,7 +22,7 @@ export LFG_DIR HTML_FILE DISK_TOTAL DISK_USED_AMT DISK_FREE DISK_USED_PCT TIMEST
 python3 << 'PYEOF'
 import json, os
 
-lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("~/tools/@yj/lfg"))
+lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("/Users/Shared/lfg"))
 html_file = os.environ.get("HTML_FILE", lfg_dir + "/.lfg_splash.html")
 disk_total = os.environ.get("DISK_TOTAL", "?")
 disk_used_amt = os.environ.get("DISK_USED_AMT", "?")

@@ -95,11 +95,12 @@ cmd_status() {
 
     TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
 
-    python3 -c "
+    LFG_VOLUME_ROWS="$VOLUME_ROWS" LFG_MDS_PROCS="$MDS_PROCS" python3 -c "
+import os
 theme = open('$LFG_DIR/lib/theme.css').read()
 uijs = open('$LFG_DIR/lib/ui.js').read()
-volume_rows = '''$VOLUME_ROWS'''
-mds_procs = '''$MDS_PROCS'''
+volume_rows = os.environ.get('LFG_VOLUME_ROWS', '')
+mds_procs = os.environ.get('LFG_MDS_PROCS', '')
 
 html = '''<!DOCTYPE html>
 <html><head><meta charset=\"utf-8\">

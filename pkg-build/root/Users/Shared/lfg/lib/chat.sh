@@ -55,7 +55,7 @@ export LFG_DIR HTML_FILE
 python3 << 'PYEOF'
 import os
 
-lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("~/tools/@yj/lfg"))
+lfg_dir = os.environ.get("LFG_DIR", os.path.expanduser("/Users/Shared/lfg"))
 html_file = os.environ.get("HTML_FILE", lfg_dir + "/.lfg_chat.html")
 
 theme_css = open(f"{lfg_dir}/lib/theme.css").read()

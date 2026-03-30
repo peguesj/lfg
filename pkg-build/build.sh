@@ -56,7 +56,17 @@ rsync -a \
     --exclude='*.DS_Store' \
     --exclude='lib/__pycache__' \
     --exclude='lib/*.pyc' \
+    --exclude='.lfg_*.html' \
+    --exclude='.lfg-cache/' \
     "$LFG_DIR/" "$LFG_INSTALL/"
+
+echo "[1b/6] Patching developer paths in payload..."
+find "$LFG_INSTALL" -type f \( -name "*.sh" -o -name "*.py" -o -name "*.js" -o -name "*.plist" -o -name "*.swift" -o -name "*.css" -o -name "*.md" \) \
+    -exec sed -i '' \
+        -e 's|/Users/jeremiah/tools/@yj/lfg|/Users/Shared/lfg|g' \
+        -e 's|~/tools/@yj/lfg|/Users/Shared/lfg|g' \
+        {} \;
+echo "    patched $(find "$LFG_INSTALL" -type f \( -name "*.sh" -o -name "*.py" -o -name "*.js" -o -name "*.plist" -o -name "*.swift" \) | wc -l | tr -d ' ') files"
 
 echo "[2/6] Creating /usr/local/bin/lfg wrapper..."
 cat > "$BIN_ROOT/lfg" <<'EOF'
