@@ -8,6 +8,10 @@
 __pycache__/
 *.py[cod]
 
+# Swift Package Manager
+.build/
+.swiftpm/
+
 # LFG build artifacts
 LFG.app/
 LFG\ Helper.app/
