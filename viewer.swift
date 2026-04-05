@@ -60,6 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         "dtf": "DTF - Delete Temp Files",
         "btau": "BTAU - Back That App Up",
         "devdrive": "DEVDRIVE - Developer Drive",
+        "ssd": "SSD - Slows Sh*t Down (Spotlight)",
         "stfu": "STFU - Source Tree Forensics",
         "chat": "LFG Chat",
         "dashboard": "LFG Dashboard",
@@ -274,6 +275,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             case "dtf":       targetPath = cacheDir + "/.lfg_clean.html"; moduleCmd = "dtf"
             case "btau":      targetPath = cacheDir + "/.lfg_btau.html"; moduleCmd = "btau"
             case "devdrive":  targetPath = cacheDir + "/.lfg_devdrive.html"; moduleCmd = "devdrive"
+            case "ssd":       targetPath = cacheDir + "/.lfg_ssd.html"; moduleCmd = "ssd"
             case "stfu":      targetPath = cacheDir + "/.lfg_stfu.html"; moduleCmd = "stfu"
             case "chat":      targetPath = cacheDir + "/.lfg_chat.html"; moduleCmd = "chat"
             case "dashboard": targetPath = cacheDir + "/.lfg_dashboard.html"; moduleCmd = "dashboard"
@@ -301,12 +303,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             // Show loading screen inline, then generate in background
             let colors: [String: String] = [
                 "wtfs": "#4a9eff", "dtf": "#ff8c42", "btau": "#06d6a0",
-                "devdrive": "#c084fc", "stfu": "#e879f9", "chat": "#4a9eff", "dashboard": "#4a9eff"
+                "devdrive": "#c084fc", "ssd": "#14b8a6", "stfu": "#e879f9", "chat": "#4a9eff", "dashboard": "#4a9eff"
             ]
             let labels: [String: String] = [
                 "wtfs": "Scanning disk usage...", "dtf": "Discovering caches...",
                 "btau": "Checking backups...", "devdrive": "Loading developer drive...",
-                "stfu": "Analyzing source trees...", "chat": "Starting chat...", "dashboard": "Building dashboard..."
+                "ssd": "Checking Spotlight status...", "stfu": "Analyzing source trees...",
+                "chat": "Starting chat...", "dashboard": "Building dashboard..."
             ]
             let accentColor = colors[target] ?? "#4a9eff"
             let loadingLabel = labels[target] ?? "Loading..."
@@ -642,7 +645,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
           exec('\(lfgDir)/lfg settings set '+key+' "'+val+'"', function(){ toast('Saved'); });
         }
         function renderAccess() {
-          var mods = ['wtfs','dtf','btau','devdrive','stfu'];
+          var mods = ['wtfs','dtf','btau','devdrive','ssd','stfu'];
           var access = settings.module_access || {};
           var el = document.getElementById('access-grid');
           el.innerHTML = mods.map(function(m){
@@ -782,6 +785,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             ("DTF - Clean", "dtf"),
             ("BTAU - Backup", "btau"),
             ("DevDrive", "devdrive"),
+            ("SSD - Spotlight", "ssd"),
             ("STFU - Forensics", "stfu"),
             ("Chat", "chat"),
         ]
@@ -989,6 +993,7 @@ let navModules: [(String, String, String)] = [
     ("STFU", "stfu", "4"),
     ("DevDrive", "devdrive", "5"),
     ("BTAU", "btau", "6"),
+    ("SSD - Spotlight", "ssd", "7"),
 ]
 for (label, mod, key) in navModules {
     let mi = NSMenuItem(title: label, action: #selector(AppDelegate.navigateToModule(_:)), keyEquivalent: key)
