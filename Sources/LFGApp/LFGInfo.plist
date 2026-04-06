@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>io.pegues.yj.lfg</string>
+    <key>CFBundleName</key>
+    <string>LFG</string>
+    <key>CFBundleDisplayName</key>
+    <string>LFG — Local File Guardian</string>
+    <key>CFBundleVersion</key>
+    <string>2.5.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.5.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSFullDiskAccessUsageDescription</key>
+    <string>LFG needs Full Disk Access to scan system caches, manage Spotlight indexing, and monitor volumes.</string>
+</dict>
+</plist>
