@@ -35,6 +35,10 @@ struct LFGApp: App {
                 .environment(appState)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 

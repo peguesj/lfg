@@ -14,7 +14,8 @@ let package = Package(
         .executableTarget(
             name: "LFGApp",
             dependencies: ["LFGKit"],
-            path: "Sources/LFGApp"
+            path: "Sources/LFGApp",
+            exclude: ["LFGInfo.plist", "LFG.entitlements"]
         ),
         .target(
             name: "LFGKit",
