@@ -10,16 +10,13 @@
   <rect x="4" y="4" width="1016" height="1016" rx="218" ry="218" 
         fill="none" stroke="#4a9eff" stroke-opacity="0.2" stroke-width="4"/>
   <ellipse cx="512" cy="820" rx="300" ry="120" fill="#4a9eff" opacity="0.08"/>
-  <text x="512" y="420" text-anchor="middle" dominant-baseline="central"
+  <text x="512" y="480" text-anchor="middle" dominant-baseline="central"
         font-family="system-ui, -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif"
         font-size="340" font-weight="800" letter-spacing="-12">
     <tspan fill="#4a9eff">L</tspan><tspan fill="#ffffff">F</tspan><tspan fill="#4a9eff">G</tspan>
   </text>
-  <text x="512" y="640" text-anchor="middle"
+  <text x="512" y="680" text-anchor="middle"
         font-family="system-ui, -apple-system, sans-serif"
-        font-size="64" font-weight="600" letter-spacing="8" fill="#4a9eff" opacity="0.9">LOCAL FILE</text>
-  <text x="512" y="720" text-anchor="middle"
-        font-family="system-ui, -apple-system, sans-serif"
-        font-size="64" font-weight="600" letter-spacing="8" fill="#4a9eff" opacity="0.9">GUARDIAN</text>
+        font-size="80" font-weight="600" letter-spacing="12" fill="#4a9eff" opacity="0.9">WTFS</text>
   <circle cx="512" cy="800" r="6" fill="#4a9eff" opacity="0.4"/>
 </svg>

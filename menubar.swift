@@ -1090,56 +1090,70 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
     func refreshVolumeProfiles() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            // Scan actual DDRV* + YJ_MORE volumes using df -k for accurate APFS free space
+            // Parse df output — mount paths with spaces need special handling
+            // df -k output columns: Filesystem 512-blocks Used Available Capacity iused ifree %iused Mounted
+            // Mount path is everything after the last numeric/percentage column
             let dfOutput = Self.shell("df -k 2>/dev/null")
             var dfMap: [String: (totalKB: Int64, freeKB: Int64)] = [:]
             for line in dfOutput.split(separator: "\n").dropFirst() {
-                let parts = line.split(separator: " ", omittingEmptySubsequences: true)
-                guard parts.count >= 6 else { continue }
-                let mount = String(parts[parts.count - 1])
+                let str = String(line)
+                // Find mount point: after "% " near end of line (e.g. "0%   /Volumes/YJ_MORE 1")
+                guard let pctRange = str.range(of: #"%\s+/"#, options: .regularExpression) else { continue }
+                let mount = String(str[str.index(after: str.index(pctRange.lowerBound, offsetBy: 1))...]).trimmingCharacters(in: .whitespaces)
                 guard mount.hasPrefix("/Volumes/") else { continue }
+                let parts = str.prefix(upTo: pctRange.lowerBound).split(separator: " ", omittingEmptySubsequences: true)
+                guard parts.count >= 3 else { continue }
                 let totalKB = Int64(parts[1]) ?? 0
                 let freeKB = Int64(parts[3]) ?? 0
                 let name = String(mount.dropFirst("/Volumes/".count))
                 dfMap[name] = (totalKB: totalKB, freeKB: freeKB)
             }
 
-            // Known devdrive volume purposes
-            let purposeMap: [String: String] = [
-                "DDRV900": "Developer projects",
-                "DDRV901": "Developer libraries",
-                "DDRV902": "Build artifacts",
-                "DDRV903": "Cache & temp",
-                "DDRV904": "Backup staging",
-                "YJ_MORE": "Cache target (primary)",
+            // Known devdrive volume purposes — sparse images (virtual)
+            let sparseVolumes: [String: String] = [
+                "DDRV900": "Developer projects (sparse)",
+                "DDRV901": "Developer libraries (sparse)",
+                "DDRV902": "Build artifacts (sparse)",
+                "DDRV903": "Cache & temp (sparse)",
+                "DDRV904": "Backup staging (sparse)",
+                "903LUME": "Lume workspace (sparse)",
+                "920COWORK": "Cowork workspace (sparse)",
+            ]
+
+            // Real physical drives
+            let realDrives: [String: String] = [
+                "YJ_MORE": "External drive (physical)",
             ]
 
             var profiles: [VolumeProfile] = []
-
-            // Scan for DDRV* and YJ_MORE
             let fm = FileManager.default
+
+            // Scan /Volumes for matching volumes
             if let volumes = try? fm.contentsOfDirectory(atPath: "/Volumes") {
                 for vol in volumes.sorted() {
-                    guard vol.hasPrefix("DDRV") || vol == "YJ_MORE" else { continue }
-                    let mounted = fm.fileExists(atPath: "/Volumes/\(vol)")
-                    let purpose = purposeMap[vol] ?? "Devdrive volume"
-                    let color = vol == "YJ_MORE" ? "#22d3ee" : "#c084fc"
-                    var freeGB: Double = 0
-                    if let info = dfMap[vol] {
-                        freeGB = Double(info.freeKB) / (1024 * 1024)
+                    // Match DDRV*, 903LUME, 920COWORK (sparse images)
+                    if let purpose = sparseVolumes[vol] {
+                        var freeGB: Double = 0
+                        if let info = dfMap[vol] { freeGB = Double(info.freeKB) / (1024 * 1024) }
+                        profiles.append(VolumeProfile(name: vol, purpose: purpose, color: "#c084fc", mounted: true, freeGB: freeGB))
+                        continue
                     }
-                    profiles.append(VolumeProfile(name: vol, purpose: purpose, color: color, mounted: mounted, freeGB: freeGB))
+                    // Match YJ_MORE or YJ_MORE 1, YJ_MORE 2, etc. (real drive)
+                    if vol.hasPrefix("YJ_MORE") {
+                        var freeGB: Double = 0
+                        if let info = dfMap[vol] { freeGB = Double(info.freeKB) / (1024 * 1024) }
+                        let purpose = realDrives["YJ_MORE"] ?? "External drive"
+                        profiles.append(VolumeProfile(name: vol, purpose: purpose, color: "#22d3ee", mounted: true, freeGB: freeGB))
+                    }
                 }
             }
 
-            // Ensure YJ_MORE appears even if already added via contentsOfDirectory
-            if !profiles.contains(where: { $0.name == "YJ_MORE" }) {
-                let mounted = fm.fileExists(atPath: "/Volumes/YJ_MORE")
-                var freeGB: Double = 0
-                if let info = dfMap["YJ_MORE"] {
-                    freeGB = Double(info.freeKB) / (1024 * 1024)
-                }
-                profiles.append(VolumeProfile(name: "YJ_MORE", purpose: "Cache target (primary)", color: "#22d3ee", mounted: mounted, freeGB: freeGB))
+            // Sort: real drives first, then sparse images alphabetically
+            profiles.sort { a, b in
+                let aReal = a.color == "#22d3ee"
+                let bReal = b.color == "#22d3ee"
+                if aReal != bReal { return aReal }
+                return a.name < b.name
             }
 
             DispatchQueue.main.async {
