@@ -1111,13 +1111,11 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
 
             // Known devdrive volume purposes — sparse images (virtual)
             let sparseVolumes: [String: String] = [
-                "DDRV900": "Developer projects (sparse)",
-                "DDRV901": "Developer libraries (sparse)",
-                "DDRV902": "Build artifacts (sparse)",
-                "DDRV903": "Cache & temp (sparse)",
-                "DDRV904": "Backup staging (sparse)",
+                "901DEVLIB": "Developer libraries (sparse)",
+                "902DEVENV": "Build environment (sparse)",
                 "903LUME": "Lume workspace (sparse)",
                 "920COWORK": "Cowork workspace (sparse)",
+                "devdrive": "Developer projects (sparse)",
             ]
 
             // Real physical drives
@@ -1131,7 +1129,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             // Scan /Volumes for matching volumes
             if let volumes = try? fm.contentsOfDirectory(atPath: "/Volumes") {
                 for vol in volumes.sorted() {
-                    // Match DDRV*, 903LUME, 920COWORK (sparse images)
+                    // Match 901DEVLIB, 902DEVENV, 903LUME, 920COWORK, devdrive (sparse images)
                     if let purpose = sparseVolumes[vol] {
                         var freeGB: Double = 0
                         if let info = dfMap[vol] { freeGB = Double(info.freeKB) / (1024 * 1024) }
