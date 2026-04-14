@@ -36,11 +36,11 @@ case "${1:-}" in
         echo "Mounting devdrive sparse image..."
         export PYTHONPATH="${DEVDRIVE_DIR}:${PYTHONPATH:-}"
         python3 -c "
-from btau.core.sparse import attach_sparse_image
+from btau.core.sparse import attach
 import json, glob, os
 images = glob.glob(os.path.expanduser('~/.config/btau/$ACTIVE_PROFILE.sparseimage')) + glob.glob('/Volumes/*/$ACTIVE_PROFILE.sparseimage') + glob.glob(os.path.expanduser('~/.config/btau/*.sparseimage'))
 if images:
-    result = attach_sparse_image(images[0])
+    result = attach(images[0])
     print(json.dumps(result, indent=2))
 else:
     print('No sparse image found. Create one with: lfg btau create-image')

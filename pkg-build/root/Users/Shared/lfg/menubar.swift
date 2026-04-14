@@ -1104,15 +1104,53 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
                 dfMap[name] = (totalKB: totalKB, freeKB: freeKB)
             }
 
-            // Known devdrive volume purposes
-            let purposeMap: [String: String] = [
-                "DDRV900": "Developer projects",
-                "DDRV901": "Developer libraries",
-                "DDRV902": "Build artifacts",
-                "DDRV903": "Cache & temp",
-                "DDRV904": "Backup staging",
-                "YJ_MORE": "Cache target (primary)",
-            ]
+            // Known devdrive volume purposes - Load from LFG settings for dynamic config
+            var purposeMap: [String: String] = [:]
+            let settingsPath = NSHomeDirectory() + "/.config/lfg/settings.yaml"
+            if let settingsContent = try? String(contentsOfFile: settingsPath, encoding: .utf8) {
+                // Simple YAML parsing for volume_profiles
+                let lines = settingsContent.components(separatedBy: .newlines)
+                var currentProfile: [String: String] = [:]
+                for line in lines {
+                    let stripped = line.trimmingCharacters(in: .whitespaces)
+                    if stripped.hasPrefix("- name:") {
+                        // Save previous profile
+                        if let name = currentProfile["name"], let purpose = currentProfile["purpose"] {
+                            purposeMap[name] = purpose
+                        }
+                        currentProfile = [:]
+                        // Extract name from "- name: DDRV900"
+                        if let nameRange = stripped.range(of: "name:") {
+                            let nameStr = String(stripped[nameRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            currentProfile["name"] = nameStr.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                        }
+                    } else if stripped.hasPrefix("purpose:") {
+                        // Extract purpose from "    purpose: Developer hooks..."
+                        if let purposeRange = stripped.range(of: "purpose:") {
+                            let purposeStr = String(stripped[purposeRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            currentProfile["purpose"] = purposeStr.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                        }
+                    }
+                }
+                // Save final profile
+                if let name = currentProfile["name"], let purpose = currentProfile["purpose"] {
+                    purposeMap[name] = purpose
+                }
+            }
+            
+            // Fallback to corrected DDRV naming if settings not readable
+            if purposeMap.isEmpty {
+                purposeMap = [
+                    "DDRV900": "Developer hooks (npm, pip)",
+                    "DDRV901": "Developer libraries",
+                    "DDRV902": "APM logs",
+                    "DDRV903": "Claude Code projects/tasks",
+                    "DDRV-903-LUME": "Claude Code projects/tasks",
+                    "DDRV904": "VIKI memory vault",
+                    "DDRV-904-MEMVT": "VIKI memory vault",
+                    "YJ_MORE": "Cache target (primary)",
+                ]
+            }
 
             var profiles: [VolumeProfile] = []
 

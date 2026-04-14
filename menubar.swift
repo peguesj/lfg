@@ -1110,13 +1110,53 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             }
 
             // Known devdrive volume purposes — sparse images (virtual)
-            let sparseVolumes: [String: String] = [
-                "901DEVLIB": "Developer libraries (sparse)",
-                "902DEVENV": "Build environment (sparse)",
-                "903LUME": "Lume workspace (sparse)",
-                "920COWORK": "Cowork workspace (sparse)",
-                "devdrive": "Developer projects (sparse)",
-            ]
+            // Load from LFG settings for dynamic configuration
+            var sparseVolumes: [String: String] = [:]
+            let settingsPath = NSHomeDirectory() + "/.config/lfg/settings.yaml"
+            if let settingsContent = try? String(contentsOfFile: settingsPath, encoding: .utf8) {
+                // Simple YAML parsing for volume_profiles
+                let lines = settingsContent.components(separatedBy: .newlines)
+                var currentProfile: [String: String] = [:]
+                for line in lines {
+                    let stripped = line.trimmingCharacters(in: .whitespaces)
+                    if stripped.hasPrefix("- name:") {
+                        // Save previous profile
+                        if let name = currentProfile["name"], let purpose = currentProfile["purpose"] {
+                            sparseVolumes[name] = purpose
+                        }
+                        currentProfile = [:]
+                        // Extract name from "- name: DDRV900"
+                        if let nameRange = stripped.range(of: "name:") {
+                            let nameStr = String(stripped[nameRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            currentProfile["name"] = nameStr.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                        }
+                    } else if stripped.hasPrefix("purpose:") {
+                        // Extract purpose from "    purpose: Developer hooks..."
+                        if let purposeRange = stripped.range(of: "purpose:") {
+                            let purposeStr = String(stripped[purposeRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            currentProfile["purpose"] = purposeStr.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                        }
+                    }
+                }
+                // Save final profile
+                if let name = currentProfile["name"], let purpose = currentProfile["purpose"] {
+                    sparseVolumes[name] = purpose
+                }
+            }
+            
+            // Fallback to corrected DDRV naming if settings file not readable
+            if sparseVolumes.isEmpty {
+                sparseVolumes = [
+                    "DDRV900": "Developer hooks (npm, pip, hooks)",
+                    "DDRV901": "Developer libraries (Xcode simulators)",
+                    "DDRV902": "APM logs and diagnostics",
+                    "DDRV903": "Claude Code projects and tasks",
+                    "DDRV-903-LUME": "Claude Code projects and tasks",
+                    "DDRV904": "VIKI memory vault",
+                    "DDRV-904-MEMVT": "VIKI memory vault",
+                    "DDRV-920-COWORK": "Claude Code VM workspace (legacy)",
+                ]
+            }
 
             // Real physical drives
             let realDrives: [String: String] = [
@@ -1129,7 +1169,7 @@ class LFGMenubar: NSObject, NSApplicationDelegate {
             // Scan /Volumes for matching volumes
             if let volumes = try? fm.contentsOfDirectory(atPath: "/Volumes") {
                 for vol in volumes.sorted() {
-                    // Match 901DEVLIB, 902DEVENV, 903LUME, 920COWORK, devdrive (sparse images)
+                    // Match DDRV* volumes (sparse images) - names loaded from LFG settings
                     if let purpose = sparseVolumes[vol] {
                         var freeGB: Double = 0
                         if let info = dfMap[vol] { freeGB = Double(info.freeKB) / (1024 * 1024) }
