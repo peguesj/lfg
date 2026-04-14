@@ -6,7 +6,7 @@
   "upm": {
     "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
     "checkpointRange": null,
-    "builtWaves": 0,
+    "builtWaves": 1,
     "verifiedAt": null,
     "shippedAt": null,
     "prUrl": null
@@ -27,8 +27,8 @@
       ],
       "estimatedPoints": 3,
       "dependencies": [],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 1,
       "planeIssueId": "b0b23209-dfdf-4fb9-a7eb-bb492232a195",
       "planeSequenceId": "LFG-32"
@@ -51,8 +51,8 @@
       "dependencies": [
         "US-001"
       ],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 1,
       "planeIssueId": "9c3ec72f-03e0-4f1b-8f4a-2d132e3307aa",
       "planeSequenceId": "LFG-33"
@@ -194,8 +194,8 @@
       ],
       "estimatedPoints": 3,
       "dependencies": [],
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "wave": 1,
       "planeIssueId": "1f049259-ec55-4138-bb8a-9d51da2cf137",
       "planeSequenceId": "LFG-34"
