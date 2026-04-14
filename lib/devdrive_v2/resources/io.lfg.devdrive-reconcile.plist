@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.lfg.devdrive-reconcile</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/python3</string>
+		<string>-m</string>
+		<string>devdrive_v2.reconcile</string>
+	</array>
+
+	<key>StartInterval</key>
+	<integer>300</integer>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>StandardOutPath</key>
+	<string>/Users/Shared/lfg/logs/devdrive-reconcile.log</string>
+
+	<key>StandardErrorPath</key>
+	<string>/Users/Shared/lfg/logs/devdrive-reconcile-err.log</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/var/empty</string>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>PYTHONPATH</key>
+		<string>/Users/Shared/lfg/lib</string>
+	</dict>
+
+	<key>WorkingDirectory</key>
+	<string>/Users/Shared/lfg</string>
+
+	<key>KeepAlive</key>
+	<false/>
+
+	<key>ThrottleInterval</key>
+	<integer>60</integer>
+</dict>
+</plist>
