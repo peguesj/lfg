@@ -88,6 +88,224 @@ print(json.dumps(result, indent=2))
         lfg_state_done devdrive "action=verify"
         exit 0
         ;;
+    repair)
+        shift
+        lfg_state_start devdrive
+        DRY_RUN="true"
+        for arg in "$@"; do
+            case "$arg" in
+                --apply) DRY_RUN="false" ;;
+                --dry-run) DRY_RUN="true" ;;
+            esac
+        done
+        echo "=== LFG DEVDRIVE Repair ==="
+        [[ "$DRY_RUN" == "true" ]] && echo "(dry run — pass --apply to execute repairs)"
+        echo ""
+
+        FLEET_FILE="$HOME/DevDrive/fleet.json"
+        REPAIR_ERRORS=0
+        REPAIR_FIXES=0
+
+        DRY_RUN="$DRY_RUN" FLEET_FILE="$FLEET_FILE" python3 << 'REPAIR_PY'
+import json, os, subprocess, sys
+
+dry_run = os.environ.get('DRY_RUN', 'true') == 'true'
+fleet_file = os.environ.get('FLEET_FILE', '')
+fixes = 0
+errors = 0
+
+# Load fleet config
+fleet = {"drives": []}
+if os.path.isfile(fleet_file):
+    with open(fleet_file) as f:
+        fleet = json.load(f)
+else:
+    print(f"  WARNING: fleet.json not found at {fleet_file}")
+
+# Phase 1: Check for unmounted volumes (attached images with unmounted APFS volumes)
+print("[1/3] Checking for unmounted volumes...")
+for drive in fleet.get("drives", []):
+    mount = drive.get("mount", "")
+    drive_id = drive.get("id", "")
+    image = os.path.expanduser(drive.get("image", ""))
+
+    if os.path.isdir(mount):
+        continue  # Already mounted
+
+    # Check if the image is attached via hdiutil info
+    if not os.path.isfile(image) and not os.path.isdir(image):
+        print(f"  [{drive_id}] Image not found: {image}")
+        errors += 1
+        continue
+
+    # Parse hdiutil info for this image — collect ALL /dev/disk* entries
+    try:
+        info = subprocess.run(["hdiutil", "info"], capture_output=True, text=True, timeout=10)
+        lines = info.stdout.split("\n")
+        found_image = False
+        dev_disks = []
+        for line in lines:
+            if image in line or os.path.basename(image).replace(".dmg.sparseimage", "").replace(".sparsebundle", "") in line:
+                found_image = True
+            elif found_image and line.startswith("==="):
+                break  # Next image block
+            if found_image and line.strip().startswith("/dev/disk"):
+                dev_disks.append(line.strip().split()[0])
+    except Exception as e:
+        print(f"  [{drive_id}] hdiutil info failed: {e}")
+        errors += 1
+        continue
+
+    if not found_image or not dev_disks:
+        print(f"  [{drive_id}] Image not attached — mount with: lfg devdrive mount --profile={drive_id}")
+        continue
+
+    # Image is attached. Find the APFS container disk (highest-numbered disk without 's')
+    # hdiutil lists: disk19 (physical), disk19s1 (EFI), disk19s2 (APFS partition),
+    #                disk22 (APFS container), disk22s1 (APFS volume)
+    container_disks = [d for d in dev_disks if not any(c == 's' for i, c in enumerate(d[8:]) if i > 0 and d[8+i-1].isdigit())]
+    # Simpler: find disks that look like containers (diskNN without slice)
+    container_disks = sorted(
+        [d for d in dev_disks if d.count('s') == 0 or d.endswith(d.split('disk')[-1].split('s')[0])],
+        key=lambda d: int(''.join(c for c in d.replace('/dev/disk','') if c.isdigit()) or '0'),
+        reverse=True
+    )
+    # Try each potential container, starting from highest disk number (APFS container)
+    vol_disk = None
+    for container in dev_disks:
+        try:
+            apfs_out = subprocess.run(
+                ["diskutil", "apfs", "list", container],
+                capture_output=True, text=True, timeout=10
+            )
+            if apfs_out.returncode != 0:
+                continue
+            # Parse for unmounted volumes
+            candidate = None
+            for aline in apfs_out.stdout.split("\n"):
+                if "APFS Volume Disk" in aline:
+                    parts = aline.split()
+                    for p in parts:
+                        if p.startswith("disk") and "s" in p:
+                            candidate = p
+                if candidate and "Not Mounted" in aline:
+                    vol_disk = candidate
+                    break
+                elif candidate and "Mount Point:" in aline and "Not Mounted" not in aline:
+                    candidate = None
+            if vol_disk:
+                break
+        except Exception:
+            continue
+
+    if vol_disk:
+        print(f"  [{drive_id}] Volume {vol_disk} attached but NOT MOUNTED (expected: {mount})")
+        if dry_run:
+            print(f"           Would run: diskutil mount {vol_disk}")
+        else:
+            try:
+                result = subprocess.run(
+                    ["diskutil", "mount", vol_disk],
+                    capture_output=True, text=True, timeout=30
+                )
+                if result.returncode == 0:
+                    print(f"           MOUNTED: {result.stdout.strip()}")
+                    fixes += 1
+                else:
+                    print(f"           FAILED: {result.stderr.strip()}")
+                    errors += 1
+            except Exception as e:
+                print(f"           FAILED: {e}")
+                errors += 1
+    else:
+        print(f"  [{drive_id}] Image attached but no unmounted volume found — may need manual repair")
+
+print()
+
+# Phase 2: Check mount aliases (symlinks in /Volumes for backward compat)
+print("[2/3] Checking mount aliases...")
+for drive in fleet.get("drives", []):
+    alias = drive.get("mount_alias", "")
+    mount = drive.get("mount", "")
+    drive_id = drive.get("id", "")
+    if not alias:
+        continue
+
+    if os.path.isdir(alias) or os.path.islink(alias):
+        target = os.readlink(alias) if os.path.islink(alias) else "(real dir)"
+        print(f"  [{drive_id}] Alias {alias} exists -> {target}")
+        continue
+
+    if not os.path.isdir(mount):
+        print(f"  [{drive_id}] Alias {alias} missing, but source {mount} also not mounted — skip")
+        continue
+
+    print(f"  [{drive_id}] Alias MISSING: {alias} -> {mount}")
+    if dry_run:
+        print(f"           Would create symlink: ln -s {mount} {alias}")
+    else:
+        try:
+            os.symlink(mount, alias)
+            print(f"           CREATED symlink: {alias} -> {mount}")
+            fixes += 1
+        except PermissionError:
+            print(f"           FAILED: needs sudo — run: sudo ln -s {mount} {alias}")
+            errors += 1
+        except Exception as e:
+            print(f"           FAILED: {e}")
+            errors += 1
+
+print()
+
+# Phase 3: Check symlink forest health on all mounted volumes
+print("[3/3] Checking symlink forest health...")
+broken_links = []
+for drive in fleet.get("drives", []):
+    mount = drive.get("mount", "")
+    drive_id = drive.get("id", "")
+    if not os.path.isdir(mount):
+        continue
+    try:
+        for entry in os.scandir(mount):
+            if entry.name.startswith("."):
+                continue
+            if entry.is_symlink():
+                target = os.readlink(entry.path)
+                if not os.path.exists(entry.path):
+                    broken_links.append({
+                        "volume": drive_id,
+                        "link": entry.path,
+                        "target": target,
+                    })
+    except Exception:
+        pass
+
+if broken_links:
+    for bl in broken_links:
+        print(f"  [{bl['volume']}] BROKEN: {bl['link']} -> {bl['target']}")
+        if not dry_run:
+            try:
+                os.unlink(bl["link"])
+                print(f"           REMOVED dead symlink")
+                fixes += 1
+            except Exception as e:
+                print(f"           FAILED to remove: {e}")
+                errors += 1
+        else:
+            print(f"           Would remove dead symlink")
+else:
+    print("  All symlinks healthy.")
+
+print()
+print(f"=== Repair Summary: {fixes} fix(es) applied, {errors} error(s) ===")
+if dry_run and (fixes == 0):
+    # Count would-be fixes
+    print("Run with --apply to execute repairs.")
+REPAIR_PY
+
+        lfg_state_done devdrive "action=repair" "dry_run=$DRY_RUN"
+        exit 0
+        ;;
     config)
         shift
         lfg_state_start devdrive
@@ -724,6 +942,8 @@ html = '''<!DOCTYPE html>
       { label: \"Unmount\", desc: \"Safely eject devdrive\", cli: \"lfg devdrive unmount\", module: \"devdrive\", action: \"run\", args: \"unmount\", color: \"#c084fc\" },
       { label: \"Sync Forest\", desc: \"Rebuild symlink forest\", cli: \"lfg devdrive sync\", module: \"devdrive\", action: \"run\", args: \"sync\", color: \"#c084fc\" },
       { label: \"Verify Links\", desc: \"Audit symlink health\", cli: \"lfg devdrive verify\", module: \"devdrive\", action: \"run\", args: \"verify\", color: \"#c084fc\" },
+      { label: \"Repair (Dry Run)\", desc: \"Detect and report issues\", cli: \"lfg devdrive repair\", module: \"devdrive\", action: \"run\", args: \"repair\", color: \"#22d3ee\" },
+      { label: \"Repair (Apply)\", desc: \"Fix detected issues\", cli: \"lfg devdrive repair --apply\", module: \"devdrive\", action: \"run\", args: \"repair --apply\", color: \"#ffd166\" },
       { label: \"Create Project\", desc: \"New project on devdrive\", cli: \"lfg devdrive create NAME\", module: \"devdrive\", action: \"run\", args: \"create\", color: \"#c084fc\" },
       { label: \"Auto-Move (Dry Run)\", desc: \"Preview auto-move rules\", cli: \"lfg devdrive auto-move --dry-run\", module: \"devdrive\", action: \"run\", args: \"auto-move --dry-run\", color: \"#c084fc\" },
       { label: \"Auto-Move (Execute)\", desc: \"Execute auto-move migrations\", cli: \"lfg devdrive auto-move --force\", module: \"devdrive\", action: \"run\", args: \"auto-move --force\", color: \"#ffd166\" },
