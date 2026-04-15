@@ -18,7 +18,7 @@ log() {
 log "=== Automount starting ==="
 
 # Known volume names to look for
-VOLUME_NAMES=("DDRV900" "DDRV901" "DDRV902" "DDRV903" "DDRV-903-LUME" "DDRV904" "DDRV-904-MEMVT" "YJ_MORE")
+VOLUME_NAMES=("DDRV900" "DDRV901" "DDRV902" "DDRV903" "903LUME" "DDRV904" "DDRV-904-MEMVT" "YJ_MORE")
 
 # Directories to search for sparse images
 SEARCH_DIRS=(

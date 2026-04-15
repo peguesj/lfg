@@ -13,7 +13,7 @@ LFG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$LFG_DIR/lib/state.sh"
 LFG_MODULE="devdrive-sidebar"
 
-VOLUMES=("DDRV900" "DDRV901" "DDRV902" "DDRV903" "DDRV-903-LUME" "DDRV904" "DDRV-904-MEMVT" "YJ_MORE")
+VOLUMES=("DDRV900" "DDRV901" "DDRV902" "DDRV903" "903LUME" "DDRV904" "DDRV-904-MEMVT" "YJ_MORE")
 
 add_via_sfltool() {
     local vol_path="$1"

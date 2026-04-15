@@ -34,7 +34,7 @@ VOLUMES=(
     "DDRV901:#c084fc"
     "DDRV902:#c084fc"
     "DDRV903:#c084fc"
-    "DDRV-903-LUME:#c084fc"
+    "903LUME:#c084fc"
     "DDRV904:#c084fc"
     "DDRV-904-MEMVT:#c084fc"
     "YJ_MORE:#22d3ee"

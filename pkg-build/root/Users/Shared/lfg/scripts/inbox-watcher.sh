@@ -143,7 +143,7 @@ except Exception as e:
 best_volume() {
     python3 -c "
 import subprocess
-eligible = {'DDRV900','DDRV901','DDRV902','DDRV903','DDRV-903-LUME','DDRV904','DDRV-904-MEMVT','903LUME','920COWORK','YJ_MORE'}
+eligible = {'DDRV900','DDRV901','DDRV902','DDRV903','903LUME','DDRV904','DDRV-904-MEMVT','920COWORK','YJ_MORE'}
 lines = subprocess.run(['df', '-k'], capture_output=True, text=True).stdout.strip().split('\n')[1:]
 best_name = 'YJ_MORE'
 best_free = 0
@@ -211,7 +211,7 @@ query_volumes() {
 import subprocess, json, re
 lines = subprocess.run(['df', '-k'], capture_output=True, text=True).stdout.strip().split('\n')[1:]
 volumes = []
-devdrive_names = {'DDRV900','DDRV901','DDRV902','DDRV903','DDRV-903-LUME','DDRV904','DDRV-904-MEMVT','903LUME','920COWORK','YJ_MORE'}
+devdrive_names = {'DDRV900','DDRV901','DDRV902','DDRV903','903LUME','DDRV904','DDRV-904-MEMVT','920COWORK','YJ_MORE'}
 for line in lines:
     parts = line.split()
     if len(parts) < 6: continue
