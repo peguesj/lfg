@@ -123,7 +123,7 @@ else:
     print(f"  WARNING: fleet.json not found at {fleet_file}")
 
 # Phase 1: Check for unmounted volumes (attached images with unmounted APFS volumes)
-print("[1/3] Checking for unmounted volumes...")
+print("[1/4] Checking for unmounted volumes...")
 for drive in fleet.get("drives", []):
     mount = drive.get("mount", "")
     drive_id = drive.get("id", "")
@@ -223,7 +223,7 @@ for drive in fleet.get("drives", []):
 print()
 
 # Phase 2: Check mount aliases (symlinks in /Volumes for backward compat)
-print("[2/3] Checking mount aliases...")
+print("[2/4] Checking mount aliases...")
 for drive in fleet.get("drives", []):
     alias = drive.get("mount_alias", "")
     mount = drive.get("mount", "")
@@ -257,8 +257,8 @@ for drive in fleet.get("drives", []):
 
 print()
 
-# Phase 3: Check symlink forest health on all mounted volumes
-print("[3/3] Checking symlink forest health...")
+# Phase 3: Check symlink forest health on all mounted volumes (forward scan)
+print("[3/4] Checking symlink forest (forward: volume -> links)...")
 broken_links = []
 for drive in fleet.get("drives", []):
     mount = drive.get("mount", "")
@@ -294,7 +294,56 @@ if broken_links:
         else:
             print(f"           Would remove dead symlink")
 else:
-    print("  All symlinks healthy.")
+    print("  Forward links healthy.")
+
+print()
+
+# Phase 4: Reverse symlink check — system paths that point INTO volumes
+print("[4/4] Checking reverse symlinks (system -> volume)...")
+# Known system paths that should point into devdrive volumes
+reverse_paths = [
+    os.path.expanduser("~/.claude/projects"),
+    os.path.expanduser("~/.claude/tasks"),
+]
+# Also check symlinks declared in fleet.json drive entries
+for drive in fleet.get("drives", []):
+    for sl in drive.get("symlinks", []):
+        # Format: "~/path -> /Volumes/DDRV/target"
+        if " -> " in sl or " → " in sl:
+            sep = " -> " if " -> " in sl else " → "
+            system_path = os.path.expanduser(sl.split(sep)[0].strip())
+            reverse_paths.append(system_path)
+
+reverse_ok = 0
+reverse_broken = 0
+for rp in reverse_paths:
+    if not os.path.islink(rp):
+        if os.path.isdir(rp):
+            print(f"  {rp} — real directory (not a symlink, may be intentional)")
+        elif not os.path.exists(rp):
+            print(f"  {rp} — MISSING (path does not exist)")
+            reverse_broken += 1
+        continue
+    target = os.readlink(rp)
+    if os.path.exists(rp):
+        print(f"  {rp} -> {target} — OK")
+        reverse_ok += 1
+    else:
+        # Symlink exists but target is dead — volume likely unmounted
+        print(f"  {rp} -> {target} — BROKEN (target unreachable)")
+        reverse_broken += 1
+        # Identify which volume it should be on
+        for drive in fleet.get("drives", []):
+            if drive.get("mount", "") in target:
+                mount = drive.get("mount", "")
+                if not os.path.isdir(mount):
+                    print(f"           Volume {drive['id']} not mounted — run: lfg devdrive repair --apply")
+                break
+
+if reverse_broken == 0 and reverse_ok > 0:
+    print(f"  All {reverse_ok} reverse symlinks healthy.")
+elif reverse_broken == 0 and reverse_ok == 0:
+    print("  No reverse symlinks configured.")
 
 print()
 print(f"=== Repair Summary: {fixes} fix(es) applied, {errors} error(s) ===")
