@@ -1,0 +1,250 @@
+{
+  "project": "LFG DevDrive v2",
+  "branchName": "devdrive-v2-native",
+  "baseBranch": "main",
+  "description": "Replace sparseimage-backed devdrive with native APFS volumes, FSKit overlay namespace, and self-correcting reconcile loop",
+  "upm": {
+    "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
+    "checkpointRange": null,
+    "builtWaves": 4,
+    "verifiedAt": "2026-04-14T00:00:00Z",
+    "shippedAt": null,
+    "prUrl": null
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Pressure observers \u2014 read-only disk state watchers",
+      "description": "Implement 4 read-only observers (purgeable_watch, clang_cache_watch, band_bloat_watch, docker_watch) that sample disk state every 60s and record to a ring buffer. No repair actions \u2014 pure observation.",
+      "acceptanceCriteria": [
+        "observers.py contains PurgeableWatch, ClangCacheWatch, BandBloatWatch, DockerWatch classes",
+        "Each observer implements observe() -> dict with metrics (free_gb, purgeable_gb, cache_mb, etc.)",
+        "Ring buffer stores 288 samples (24h at 5-min resolution) in devdrive_state.json",
+        "CLI: lfg devdrive pressure prints current snapshot",
+        "CLI: lfg devdrive history prints tabular ring buffer with labeled events",
+        "Tests pass for all 4 observers with mock diskutil/df output",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 3,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "wave": 1,
+      "planeIssueId": "b0b23209-dfdf-4fb9-a7eb-bb492232a195",
+      "planeSequenceId": "LFG-32"
+    },
+    {
+      "id": "US-002",
+      "title": "Reconcile loop \u2014 dry-run drift classifier",
+      "description": "Implement the reconcile loop that classifies 8 drift categories (MISSING_LINK, STALE_TARGET, REAL_DIR_DRIFT, UNMOUNTED_VOL, OVERSIZED, BAND_BLOAT, SNAPSHOT_LOCKED, SWAP_PRESSURE) with NO repair actions \u2014 dry-run only. Runs via LaunchAgent every 5 min.",
+      "acceptanceCriteria": [
+        "reconcile.py implements ReconcileLoop with classify_drift() -> list[DriftEvent]",
+        "8 drift category enum with detection logic for each",
+        "CLI: lfg devdrive reconcile runs one cycle, prints classified drift",
+        "CLI: lfg devdrive doctor shows combined pressure + drift report",
+        "io.lfg.devdrive-reconcile.plist LaunchAgent template created (not installed)",
+        "Reconcile results logged to reconcile_log.jsonl (append-only)",
+        "Tests pass for each drift category with mock filesystem state",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 5,
+      "dependencies": [
+        "US-001"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 1,
+      "planeIssueId": "9c3ec72f-03e0-4f1b-8f4a-2d132e3307aa",
+      "planeSequenceId": "LFG-33"
+    },
+    {
+      "id": "US-003",
+      "title": "Reconcile actions \u2014 idempotent repair with confirmation",
+      "description": "Implement repair actions for each drift category. Each action is idempotent and requires explicit --apply flag. Actions check for active processes (lsof) before relocating.",
+      "acceptanceCriteria": [
+        "actions.py implements fix_missing_link, fix_stale_target, fix_real_dir_drift, fix_unmounted_vol, fix_band_bloat, fix_snapshot_locked",
+        "Every action has dry-run mode that is the default",
+        "CLI: lfg devdrive reconcile --apply executes classified repairs",
+        "fix_real_dir_drift uses rsync + checksum verify before swapping symlink",
+        "fix_band_bloat checks mount state and idle time before compacting",
+        "lsof check prevents relocation of dirs with open file handles",
+        "APM notification emitted for each non-trivial action",
+        "Tests pass for each action with mock filesystem",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 5,
+      "dependencies": [
+        "US-002"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 2,
+      "planeIssueId": "1faca55b-fa2b-4961-b722-ea7ba53a01f6",
+      "planeSequenceId": "LFG-35"
+    },
+    {
+      "id": "US-004",
+      "title": "Native APFS volume backend \u2014 create, delete, quota, snapshot",
+      "description": "Implement apfs_volume.py that wraps diskutil apfs commands for creating volumes in the root container with quota/reserve, deleting volumes, renaming, adjusting quotas, and taking/listing snapshots.",
+      "acceptanceCriteria": [
+        "apfs_volume.py implements create_volume(name, quota_gb, reserve_gb), delete_volume(name), rename_volume(old, new), set_quota(name, gb), list_snapshots(name), take_snapshot(name)",
+        "create_volume calls diskutil apfs addVolume on root container with -quota and -role U",
+        "All operations validate preconditions (container has space, volume exists, etc.)",
+        "CLI: lfg devdrive adopt <path> creates APFS volume and relocates",
+        "Error handling: returns structured result dict, never raises for user-facing operations",
+        "Tests pass with mock diskutil output",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 3,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "wave": 2,
+      "planeIssueId": "c147688b-d10b-45ab-a97b-d13fdbb907a5",
+      "planeSequenceId": "LFG-36"
+    },
+    {
+      "id": "US-005",
+      "title": "v1-to-v2 migration \u2014 sparseimage to APFS volume",
+      "description": "Implement per-volume migration from sparseimage to native APFS volume: preflight checks, rsync with progress, shasum verification, mount-point preservation, 24h rollback window.",
+      "acceptanceCriteria": [
+        "migrate_v1.py implements preflight(volume_name), migrate(volume_name, dry_run=True), rollback(volume_name), cleanup(volume_name)",
+        "preflight checks: container capacity, image currently attached, writes manifest checksum",
+        "migrate: creates APFS vol with -v2 suffix, rsync -aHAX, shasum sample verify, detach old, rename new to original mount point",
+        "rollback: re-attach old sparseimage to shadow mount, rsync back",
+        "CLI: lfg devdrive migrate v1-to-v2 walks user through each volume (smallest first)",
+        "CLI: lfg devdrive migrate rollback <vol> reverses a single migration",
+        "24h grace period before sparseimage deletion (tracked in state file)",
+        "APM notification for each migration step",
+        "Tests pass with mock diskutil/hdiutil",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 5,
+      "dependencies": [
+        "US-004"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 3,
+      "planeIssueId": "9d210b62-47de-4703-87dd-ec0774bdc8b3",
+      "planeSequenceId": "LFG-37"
+    },
+    {
+      "id": "US-006",
+      "title": "LaunchAgent install and reboot verification",
+      "description": "Install the reconcile LaunchAgent, verify APFS volumes auto-mount at boot (no automount plist needed), remove legacy automount plist after confirming.",
+      "acceptanceCriteria": [
+        "io.lfg.devdrive-reconcile.plist installed to ~/Library/LaunchAgents/",
+        "launchctl load/bootstrap loads the agent successfully",
+        "Reconcile loop runs every 5 minutes and logs to reconcile_log.jsonl",
+        "Verification script confirms APFS volumes mount at boot (checks mount table post-reboot)",
+        "Legacy io.lfg.devdrive-automount.plist preserved during migration, removed only after reconcile runs successfully once post-reboot",
+        "CLI: lfg devdrive setup --reconcile installs and starts the agent",
+        "Tests: agent plist validates with plutil",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 2,
+      "dependencies": [
+        "US-003",
+        "US-005"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 4,
+      "planeIssueId": "18b6c73b-dec0-4d4b-8800-40e80f0d33a2",
+      "planeSequenceId": "LFG-39"
+    },
+    {
+      "id": "US-007",
+      "title": "FSKit overlay exploration \u2014 macFUSE 5.2 proof of concept",
+      "description": "Build a proof-of-concept FSKit overlay filesystem using macFUSE 5.2's FSKit backend that presents a unified /Developer namespace routing to underlying APFS volumes based on config rules. This is exploratory \u2014 validate feasibility before committing.",
+      "acceptanceCriteria": [
+        "Python FUSE binding (fusepy or llfuse) installed and working with macFUSE 5.2 FSKit backend",
+        "Proof-of-concept: mount at /tmp/devdrive-overlay that routes reads/writes to /Volumes/DDRV<N> based on path rules",
+        "Routing config in devdrive_state.json maps path prefixes to volumes",
+        "Basic operations work: ls, cat, mkdir, write, stat through the overlay",
+        "Performance measurement: compare latency of overlay vs direct volume access for 1000 file operations",
+        "Document findings: feasibility, performance delta, stability, macOS integration gotchas",
+        "Go/no-go decision documented for full FSKit integration",
+        "Typecheck passes (Python only \u2014 no Swift FSKit yet)"
+      ],
+      "estimatedPoints": 5,
+      "dependencies": [
+        "US-004"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 3,
+      "planeIssueId": "ecda233b-f23e-45dd-a22f-e82eae1a6cd2",
+      "planeSequenceId": "LFG-38"
+    },
+    {
+      "id": "US-008",
+      "title": "State file v2 and devdrive_state.json schema",
+      "description": "Define and implement the v2 state file schema (devdrive_state.json) that replaces devdrive_forest.json with volume inventory, forest topology, pressure metrics ring buffer, and reconcile history.",
+      "acceptanceCriteria": [
+        "devdrive_state.json schema documented with version field, volumes array, forest array, metrics ring buffer",
+        "State migration: reads existing devdrive_forest.json, converts to v2 format, writes devdrive_state.json",
+        "Volume entries include: name, mount_point, device, quota_bytes, used_bytes, role, health, last_reconcile, migrated_from",
+        "Forest entries include: id, system_path, volume, target, expected_kind, last_observed_kind, drift_count, auto_repair",
+        "Metrics ring buffer: 288 samples with ts, df_free_gb, container_free_gb, purgeable_gb",
+        "All modules (observers, reconcile, actions) read/write through state module API",
+        "Tests pass for schema validation and migration",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 3,
+      "dependencies": [],
+      "status": "done",
+      "passes": true,
+      "wave": 1,
+      "planeIssueId": "1f049259-ec55-4138-bb8a-9d51da2cf137",
+      "planeSequenceId": "LFG-34"
+    },
+    {
+      "id": "US-009",
+      "title": "Menubar pressure indicator and history graph",
+      "description": "Add a DevDrive pressure section to the LFG menubar helper showing current df_free with color-coded threshold. Click opens history graph in WebKit viewer.",
+      "acceptanceCriteria": [
+        "Menubar shows disk free with color: green (>10GB), yellow (5-10GB), red (<5GB)",
+        "Click on pressure indicator opens WebKit viewer with D3.js time-series chart",
+        "Chart shows last 24h of ring buffer data: df_free_gb, container_free_gb, purgeable_gb",
+        "Pressure events (SNAPSHOT_LOCKED, etc.) annotated as vertical markers on chart",
+        "Menubar refreshes every 60s from devdrive_state.json",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 3,
+      "dependencies": [
+        "US-001",
+        "US-008"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 4,
+      "planeIssueId": "ea6f200c-db9b-457a-8986-82f14b5d9fe8",
+      "planeSequenceId": "LFG-40"
+    },
+    {
+      "id": "US-010",
+      "title": "Claude Code integration \u2014 eliminate symlink dependency",
+      "description": "After migration, ensure ~/.claude/projects and ~/.claude/tasks point to native APFS volume mount points (not sparseimage-backed paths). Verify mkdir -p works reliably for all project memory directories.",
+      "acceptanceCriteria": [
+        "~/.claude/projects and ~/.claude/tasks symlinks point to APFS volume paths",
+        "mkdir -p succeeds for all existing project memory directories",
+        "New Claude Code sessions create memory dirs without errors",
+        "Reconcile loop monitors ~/.claude symlinks as forest entries with auto_repair: true",
+        "If FSKit overlay is approved (US-007): paths resolve through overlay instead of symlinks",
+        "Typecheck passes"
+      ],
+      "estimatedPoints": 2,
+      "dependencies": [
+        "US-005",
+        "US-006"
+      ],
+      "status": "done",
+      "passes": true,
+      "wave": 5,
+      "planeIssueId": "f2bc00b6-667f-46d8-9a72-a4ae7b50cf03",
+      "planeSequenceId": "LFG-41"
+    }
+  ]
+}
