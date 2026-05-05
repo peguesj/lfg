@@ -59,7 +59,9 @@ BACKUP:
 
 DRIVE:
     devdrive                     Developer Drive (status view)
-    devdrive mount|unmount|sync|verify|create|config|auto-move
+    devdrive mount|unmount|sync|verify|repair|create|config|auto-move
+    devdrive health                       Volume health table (mount, fallback, sync status)
+    devdrive reconnect [volume-id|--all]  Re-attach offline volume(s) and restore symlinks
     devdrive <cmd> --profile=NAME  Target specific volume profile
 
 SPOTLIGHT:

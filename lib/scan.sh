@@ -9,6 +9,230 @@ source "$LFG_DIR/lib/state.sh"
 LFG_MODULE="wtfs"
 HTML_FILE="$LFG_CACHE_DIR/.lfg_scan.html"
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# offload-audit subcommand
+# Usage: lfg wtfs offload-audit
+# Ranks internal home dirs by size, shows DevDrive volume status, and
+# identifies directories >500 MB that are not yet offloaded to a DDRV volume.
+# ---------------------------------------------------------------------------
+if [[ "${1:-}" == "offload-audit" ]]; then
+    FLEET_JSON="$HOME/DevDrive/fleet.json"
+    THRESHOLD_KB=512000   # 500 MB
+
+    # ---- 1. Internal disk stats ----------------------------------------
+    DISK_LINE=$(df -k "$HOME" 2>/dev/null | awk 'NR==2{print}')
+    DISK_TOTAL_KB=$(echo "$DISK_LINE" | awk '{print $2}')
+    DISK_USED_KB=$(echo  "$DISK_LINE" | awk '{print $3}')
+    DISK_FREE_KB=$(echo  "$DISK_LINE" | awk '{print $4}')
+
+    fmt_kb() {
+        local kb="$1"
+        if   (( kb >= 1048576 )); then awk "BEGIN{printf \"%.1f GB\", $kb/1048576}"
+        elif (( kb >= 1024    )); then awk "BEGIN{printf \"%.1f MB\", $kb/1024}"
+        else echo "${kb} KB"; fi
+    }
+
+    DISK_USED_HR=$(fmt_kb "$DISK_USED_KB")
+    DISK_FREE_HR=$(fmt_kb "$DISK_FREE_KB")
+
+    # ---- 2. Collect DDRV mount points and symlink targets via python3 ----
+    #  Outputs lines of the form:
+    #    VOLUME <id> <mount> <size_g> <is_mounted 0|1> <free_kb>
+    #    SYMLINK <src_expanded> <target>
+    FLEET_DATA=$(python3 - "$FLEET_JSON" "$HOME" <<'PYEOF'
+import sys, json, os, subprocess
+
+fleet_file = sys.argv[1]
+home       = sys.argv[2]
+
+try:
+    data = json.loads(open(fleet_file).read())
+except Exception as e:
+    sys.exit(f"fleet.json error: {e}")
+
+for drive in data.get("drives", []):
+    vid   = drive.get("id", "?")
+    mount = drive.get("mount", "")
+    size  = drive.get("size", "?")
+    is_mounted = int(os.path.ismount(mount)) if mount else 0
+    free_kb = 0
+    if is_mounted:
+        try:
+            r = subprocess.run(["df", "-k", mount], capture_output=True, text=True)
+            line = r.stdout.strip().splitlines()
+            if len(line) >= 2:
+                free_kb = int(line[1].split()[3])
+        except Exception:
+            pass
+    print(f"VOLUME {vid} {mount} {size} {is_mounted} {free_kb}")
+
+for drive in data.get("drives", []):
+    for sl in drive.get("symlinks", []):
+        # format: "~/.foo → /Volumes/DDRV-xxx/bar"
+        if " → " not in sl:
+            continue
+        src, tgt = sl.split(" → ", 1)
+        src = src.replace("~", home).strip()
+        tgt = tgt.strip()
+        print(f"SYMLINK {src} {tgt}")
+PYEOF
+)
+
+    # ---- 3. Parse FLEET_DATA into positional arrays (bash 3.2 safe) ------
+    VOL_IDS=(); VOL_MOUNTS=(); VOL_SIZES=(); VOL_MOUNTED=(); VOL_FREE=()
+    SL_SRCS=(); SL_TGTS=()
+
+    while IFS= read -r fline; do
+        case "$fline" in
+            VOLUME\ *)
+                set -- $fline
+                # $1=VOLUME $2=id $3=mount $4=size $5=is_mounted $6=free_kb
+                VOL_IDS+=("$2")
+                VOL_MOUNTS+=("$3")
+                VOL_SIZES+=("$4")
+                VOL_MOUNTED+=("$5")
+                VOL_FREE+=("$6")
+                ;;
+            SYMLINK\ *)
+                # "SYMLINK /path/src /path/tgt" — src/tgt may contain spaces
+                # We stored them space-separated; use python delimiter trick
+                rest="${fline#SYMLINK }"
+                sl_src="${rest%% *}"
+                sl_tgt="${rest#* }"
+                SL_SRCS+=("$sl_src")
+                SL_TGTS+=("$sl_tgt")
+                ;;
+        esac
+    done <<< "$FLEET_DATA"
+
+    # Build a flat string of known DDRV mount prefixes for fast membership test
+    DDRV_MOUNT_LIST=""
+    for _m in "${VOL_MOUNTS[@]:-}"; do
+        DDRV_MOUNT_LIST="${DDRV_MOUNT_LIST}|${_m}"
+    done
+
+    # ---- 4. Top-20 home subdirs on INTERNAL storage ----------------------
+    # Exclude: symlinks, /System /Volumes /private /proc, hidden runtime dirs
+    EXCLUDE_NAMES=".Trash" # always skip Trash from candidates list
+
+    # Collect sizes; skip symlinks (readlink -n) and non-owned dirs
+    SCAN_TMP=$(mktemp)
+    while IFS=$'\t' read -r sz_kb dp; do
+        # Skip the home dir entry itself
+        [[ "$dp" == "$HOME" ]] && continue
+        # Skip if it is a symlink
+        [[ -L "$dp" ]] && continue
+        # Skip dirs we don't own (stat -f %Su on macOS)
+        owner=$(stat -f '%Su' "$dp" 2>/dev/null || echo "?")
+        [[ "$owner" != "$(id -un)" ]] && continue
+        echo "$sz_kb	$dp"
+    done < <(du -d1 -k "$HOME" 2>/dev/null | sort -rn) > "$SCAN_TMP"
+
+    # ---- 5. Print report -------------------------------------------------
+    echo ""
+    echo "=== WTFS Offload Audit ==="
+    echo "Internal storage: ${DISK_USED_HR} used / ${DISK_FREE_HR} free"
+    echo ""
+
+    echo "DevDrive volumes:"
+    i=0
+    while [[ $i -lt ${#VOL_IDS[@]} ]]; do
+        vid="${VOL_IDS[$i]}"
+        vmount="${VOL_MOUNTS[$i]}"
+        vsize="${VOL_SIZES[$i]}"
+        vmounted="${VOL_MOUNTED[$i]}"
+        vfree_kb="${VOL_FREE[$i]}"
+
+        if [[ "$vmounted" == "1" ]]; then
+            status="MOUNTED"
+            free_hr=$(fmt_kb "$vfree_kb")
+            status_detail="  ${free_hr} free"
+        else
+            status="UNMOUNTED"
+            status_detail=""
+        fi
+
+        printf "  %-20s  [%-9s]  %-35s  %-6s%s\n" \
+            "$vid" "$status" "$vmount" "$vsize" "$status_detail"
+        i=$((i + 1))
+    done
+    echo ""
+
+    # ---- 6. Already-offloaded symlinks -----------------------------------
+    echo "Already offloaded (symlinks -> DevDrive):"
+    FOUND_SYMLINKS=0
+    j=0
+    while [[ $j -lt ${#SL_SRCS[@]} ]]; do
+        sl_src="${SL_SRCS[$j]}"
+        sl_tgt="${SL_TGTS[$j]}"
+        src_display=$(echo "$sl_src" | sed "s|$HOME|~|")
+        # Check if symlink actually exists and is live
+        if [[ -L "$sl_src" ]]; then
+            actual_tgt=$(readlink "$sl_src" 2>/dev/null || echo "?")
+            if [[ -e "$sl_src" ]]; then
+                live_status="[LIVE]"
+            else
+                live_status="[BROKEN]"
+            fi
+            printf "  %-35s -> %-45s %s\n" "$src_display" "$sl_tgt" "$live_status"
+            FOUND_SYMLINKS=$((FOUND_SYMLINKS + 1))
+        fi
+        j=$((j + 1))
+    done
+    [[ $FOUND_SYMLINKS -eq 0 ]] && echo "  (none detected)"
+    echo ""
+
+    # ---- 7. Offload candidates -------------------------------------------
+    echo "Internal offload candidates (>500MB, not yet on DevDrive):"
+
+    # Collect symlink src paths into a flat string for membership check
+    SL_SRC_LIST=""
+    k=0
+    while [[ $k -lt ${#SL_SRCS[@]} ]]; do
+        SL_SRC_LIST="${SL_SRC_LIST}|${SL_SRCS[$k]}"
+        k=$((k + 1))
+    done
+
+    RANK=0
+    while IFS=$'\t' read -r sz_kb dp; do
+        [[ -z "$dp" ]] && continue
+        (( sz_kb < THRESHOLD_KB )) && break   # already sorted descending
+
+        # Skip if this path is a known symlink source (already offloaded)
+        case "${SL_SRC_LIST}" in
+            *"|${dp}|"*|*"|${dp}") continue ;;
+        esac
+
+        # Skip if it resolves into a DDRV mount (safety net for unlisted links)
+        real_dp=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$dp" 2>/dev/null || echo "$dp")
+        is_ddrv=0
+        m=0
+        while [[ $m -lt ${#VOL_MOUNTS[@]} ]]; do
+            vm="${VOL_MOUNTS[$m]}"
+            if [[ -n "$vm" ]] && [[ "$real_dp" == "${vm}"* ]]; then
+                is_ddrv=1; break
+            fi
+            m=$((m + 1))
+        done
+        [[ $is_ddrv -eq 1 ]] && continue
+
+        RANK=$((RANK + 1))
+        size_hr=$(fmt_kb "$sz_kb")
+        display=$(echo "$dp" | sed "s|$HOME|~|")
+        printf "  #%-3d %-50s %s\n" "$RANK" "$display" "$size_hr"
+    done < "$SCAN_TMP"
+
+    rm -f "$SCAN_TMP"
+
+    [[ $RANK -eq 0 ]] && echo "  (no candidates above 500 MB found)"
+    echo ""
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Normal WTFS scan (path-based HTML report)
+# ---------------------------------------------------------------------------
 lfg_state_start wtfs
 
 # Use explicit arg, or configured scan paths
