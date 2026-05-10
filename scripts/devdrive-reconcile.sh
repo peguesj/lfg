@@ -180,7 +180,32 @@ for drive in fleet.get('drives', []):
             log(f"[{drive_id}] auto-reconnect error: {e}")
     else:
         if image:
-            log(f"[{drive_id}] Image not accessible at {image} — cannot auto-reconnect")
+            # Image not directly accessible — may be on an external host that just appeared.
+            # Check fleet.json external_hosts: if the host volume is now mounted, run the
+            # automount helper which knows how to attach sparseimages from external hosts.
+            host_name = drive.get('host', 'internal')
+            external_host_map = {h['name']: h for h in fleet.get('external_hosts', [])}
+            if host_name != 'internal' and host_name in external_host_map:
+                host_mount = external_host_map[host_name].get('mount', '')
+                if host_mount and os.path.isdir(host_mount):
+                    log(f"[{drive_id}] Image at {image} not yet accessible but host {host_name} is mounted — triggering automount helper")
+                    automount_script = os.path.join(os.path.dirname(lfg_bin), 'scripts', 'devdrive-automount.sh')
+                    try:
+                        subprocess.run(
+                            ['/bin/bash', automount_script],
+                            capture_output=True, text=True, timeout=90,
+                            env={**os.environ, 'LFG_NO_VIEWER': '1'}
+                        )
+                        # After automount, recheck
+                        if os.path.isdir(mount) or (mount_alias and os.path.isdir(mount_alias)):
+                            new_state[drive_id]['mounted'] = True
+                            log(f"[{drive_id}] automount helper succeeded — volume now at {mount}")
+                    except Exception as e:
+                        log(f"[{drive_id}] automount helper error: {e}")
+                else:
+                    log(f"[{drive_id}] Image not accessible at {image} — host {host_name} not mounted, will retry next poll")
+            else:
+                log(f"[{drive_id}] Image not accessible at {image} — cannot auto-reconnect")
 
 # Persist new state
 try:

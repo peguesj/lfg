@@ -66,11 +66,11 @@ except Exception as e:
     print(f"ERROR: could not read fleet.json: {e}", file=sys.stderr)
     sys.exit(1)
 
-watch_paths = [h['mount'] for h in fleet.get('external_hosts', []) if h.get('mount')]
-if not watch_paths:
-    log("sync-plist: WARN — no external_hosts with mount paths found in fleet.json")
-    print("WARNING: no external_hosts mount paths found — WatchPaths not changed.")
-    sys.exit(0)
+# Always watch /Volumes (the parent directory) rather than individual volume paths.
+# macOS 13+ silently refuses to register WatchPaths on /Volumes/<name> subdirectories
+# for user LaunchAgents, but /Volumes itself fires on any volume appearance/disappearance,
+# which is exactly what we need for post-wake remounting of YJ_MORE sparseimages.
+watch_paths = ['/Volumes']
 
 # Read existing plist (XML format)
 try:
@@ -100,18 +100,34 @@ print(f"sync-plist: WatchPaths updated")
 print(f"  old: {old_watch}")
 print(f"  new: {watch_paths}")
 
-# Reload the LaunchAgent so the new WatchPaths take effect
-unload = subprocess.run(['launchctl', 'unload', PLIST_PATH], capture_output=True, text=True)
-if unload.returncode != 0 and 'Could not find specified service' not in unload.stderr:
-    log(f"sync-plist: WARN launchctl unload returned {unload.returncode}: {unload.stderr.strip()}")
+# Reload the LaunchAgent so the new WatchPaths take effect.
+# Use the modern bootstrap/bootout API (launchctl load/unload is deprecated
+# on macOS 10.15+ and silently fails to register WatchPaths in newer releases).
+import getpass, pwd
+uid = os.getuid()
+domain = f"gui/{uid}"
 
-load = subprocess.run(['launchctl', 'load', PLIST_PATH], capture_output=True, text=True)
-if load.returncode == 0:
-    log("sync-plist: LaunchAgent reloaded successfully")
-    print("sync-plist: LaunchAgent reloaded successfully")
+# bootout — ignore errors if not currently loaded
+bootout = subprocess.run(
+    ['launchctl', 'bootout', domain, PLIST_PATH],
+    capture_output=True, text=True
+)
+if bootout.returncode != 0:
+    stderr = bootout.stderr.strip()
+    # "No such process" / "Could not find service" are expected when not loaded
+    if not any(x in stderr for x in ('No such process', 'Could not find service', '36: Operation')):
+        log(f"sync-plist: WARN launchctl bootout: {stderr}")
+
+bootstrap = subprocess.run(
+    ['launchctl', 'bootstrap', domain, PLIST_PATH],
+    capture_output=True, text=True
+)
+if bootstrap.returncode == 0:
+    log("sync-plist: LaunchAgent bootstrapped successfully")
+    print("sync-plist: LaunchAgent bootstrapped successfully")
 else:
-    log(f"sync-plist: WARN launchctl load returned {load.returncode}: {load.stderr.strip()}")
-    print(f"WARNING: launchctl load exited {load.returncode}: {load.stderr.strip()}", file=sys.stderr)
+    log(f"sync-plist: WARN launchctl bootstrap returned {bootstrap.returncode}: {bootstrap.stderr.strip()}")
+    print(f"WARNING: launchctl bootstrap exited {bootstrap.returncode}: {bootstrap.stderr.strip()}", file=sys.stderr)
 
 SYNCEOF
     return $?
@@ -233,6 +249,32 @@ external_hosts = {name: h['mount'] for name, h in external_host_map.items()}
 mounted_count = 0
 already_count = 0
 failed_count = 0
+
+# When triggered by WatchPaths (a volume just appeared), the APFS container
+# may not be fully registered with diskutil yet.  Wait up to 8 seconds for
+# each external host to become queryable, checking every 2 seconds.
+# This avoids the "not verified (unmounted or UUID mismatch)" false-negative
+# that occurs when the agent fires too quickly after wake.
+SETTLE_TIMEOUT = 8   # seconds total to wait per host
+SETTLE_POLL    = 2   # seconds between checks
+
+for host_entry in fleet.get('external_hosts', []):
+    mount = host_entry.get('mount', '')
+    if not mount:
+        continue
+    if is_mounted(mount):
+        # Host is up — poll until diskutil can read it or timeout expires
+        waited = 0
+        while waited < SETTLE_TIMEOUT:
+            result = subprocess.run(['diskutil', 'info', '-plist', mount],
+                                    capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip():
+                log(f"settle: {mount} ready after {waited}s")
+                break
+            time.sleep(SETTLE_POLL)
+            waited += SETTLE_POLL
+        else:
+            log(f"settle: {mount} still not queryable after {SETTLE_TIMEOUT}s — proceeding anyway")
 
 for drive in fleet.get('drives', []):
     drive_id = drive.get('id', '?')
