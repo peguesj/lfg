@@ -43,12 +43,32 @@ struct LFGApp: App {
 }
 
 struct ContentView: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
         NavigationSplitView {
-            Sidebar()
+            LFGSidebar()
         } detail: {
-            DashboardView()
+            detailView
         }
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(minWidth: 800, minHeight: 540)
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch appState.selectedModule {
+        case .none:
+            DashboardView()
+        case .devdrive:
+            DevDriveView()
+        case .wtfs:
+            WTFSView()
+        case .dtf:
+            DTFView()
+        case .btau:
+            BTAUView()
+        case .ssd:
+            SSDView()
+        }
     }
 }
