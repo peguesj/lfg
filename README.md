@@ -241,3 +241,41 @@ All modules source `lib/state.sh` to write progress to `~/.config/lfg/state.json
 - **CCEM APM bridge**: `~/Developer/ccem/apm/bridges/lfg-devdrive.json`
 - **Plane PM**: Project `6bc05edb-a2b4-44c1-9cfc-2c938edb38a3`
 - **GitHub PR**: https://github.com/peguesj/yj_tools/pull/4
+
+## btau-archive — restic-on-sparsebundle archival tier (US-CCEM-482, ADR-001 D1)
+
+Encrypted archival tier for cold backups. Sparsebundle holds a `restic` repository; mounts on-demand and auto-unmounts when idle.
+
+**Script:** `lib/btau_archive.sh`
+**Default path:** `${LFG_BTAU_PATH:-$HOME/DevDrive/btau-archive.sparsebundle}` (500GB cap, AES-256)
+**Keychain service:** `io.pegues.btau-archive`
+**Fleet entry:** `btau-archive` (tier: `archival`, mount_strategy: `on-demand`)
+
+### Subcommands
+
+| Cmd | Action |
+|-----|--------|
+| `init` | Prompt for passphrase, store in Keychain, prepare sparsebundle target (deferred `hdiutil create` until external SSD mounted). |
+| `mount` | Attach sparsebundle (refcounted via `flock /tmp/btau-archive.lock`); prints mountpoint. |
+| `unmount` | Refcount-release; detaches when count hits zero. |
+| `restic-init` | `restic init` into `<mountpoint>/restic` using Keychain passphrase. |
+| `archive <dir>` | `restic backup --tag claude-code <dir>`. |
+| `verify` | `restic check --read-data --read-data-subset=10%`. |
+| `status` | Bundle existence, mount state, refcount, repo stats. |
+
+### Typical flow (when external SSD is mounted)
+
+```bash
+lib/btau_archive.sh init               # one-time, creates sparsebundle + Keychain entry
+lib/btau_archive.sh mount              # attach
+lib/btau_archive.sh restic-init        # one-time
+lib/btau_archive.sh archive ~/Developer/ccem
+lib/btau_archive.sh verify             # periodic integrity audit
+lib/btau_archive.sh unmount
+```
+
+### Notes
+
+- Idempotent: re-running `init`, `mount`, `restic-init` on already-initialized state is safe.
+- Refcounted mount/unmount is safe for concurrent agent use.
+- `init` does NOT yet run `hdiutil create`; that step is gated until the archival SSD is mounted (ADR-001 D1).
