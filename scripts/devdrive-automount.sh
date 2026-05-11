@@ -4,9 +4,10 @@
 # any external host volume mounts (via WatchPaths in the plist).
 #
 # Subcommands:
-#   (none)         Normal automount run — mounts all fleet volumes.
-#   sync-plist     Re-write WatchPaths in the automount LaunchAgent plist
-#                  from fleet.json external_hosts, then reload the agent.
+#   (none)            Normal automount run — mounts all fleet volumes.
+#   sync-plist        Re-write WatchPaths in the automount LaunchAgent plist
+#                     from fleet.json external_hosts, then reload the agent.
+#   stop-keepawake    Kill any running keep-awake ping loops.
 set -uo pipefail
 
 LOG_DIR="$HOME/.config/lfg"
@@ -14,6 +15,7 @@ LOG="$LOG_DIR/automount.log"
 FLEET_FILE="$HOME/DevDrive/fleet.json"
 DEVDRIVE_HOME="$HOME/DevDrive"
 AUTOMOUNT_PLIST="$HOME/Library/LaunchAgents/io.lfg.devdrive-automount.plist"
+KEEPAWAKE_PID_FILE="$LOG_DIR/keepawake.pid"
 
 mkdir -p "$LOG_DIR" "$DEVDRIVE_HOME" 2>/dev/null
 
@@ -134,10 +136,138 @@ SYNCEOF
 }
 
 # ---------------------------------------------------------------------------
+# stop-keepawake subcommand
+# Kill any running keep-awake ping loops tracked via KEEPAWAKE_PID_FILE.
+# ---------------------------------------------------------------------------
+cmd_stop_keepawake() {
+    if [[ ! -f "$KEEPAWAKE_PID_FILE" ]]; then
+        echo "No keep-awake loop is running (pid file not found)."
+        return 0
+    fi
+    local pid
+    pid=$(cat "$KEEPAWAKE_PID_FILE" 2>/dev/null || echo "")
+    if [[ -z "$pid" ]]; then
+        rm -f "$KEEPAWAKE_PID_FILE"
+        echo "No keep-awake loop is running (empty pid file)."
+        return 0
+    fi
+    if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null && log "keep-awake: stopped loop pid $pid" && echo "Stopped keep-awake loop (pid $pid)."
+    else
+        log "keep-awake: pid $pid no longer running — removing stale pid file"
+        echo "Keep-awake loop (pid $pid) was not running — removed stale pid file."
+    fi
+    rm -f "$KEEPAWAKE_PID_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# cmd_keepawake
+# Start a background keep-awake ping loop for any external host volumes that
+# have "keep_awake": true in fleet.json and are currently mounted.
+#
+# The loop issues `diskutil info <mountpoint>` every 60 seconds.  This is
+# enough I/O to prevent macOS from spinning down an idle USB/Thunderbolt
+# drive without stressing the drive unnecessarily.
+#
+# Only one loop process is kept alive at a time — if a stale PID file exists
+# for a still-running process the loop is not duplicated.
+# ---------------------------------------------------------------------------
+cmd_keepawake() {
+    [[ ! -f "$FLEET_FILE" ]] && return 0
+
+    # Collect mount points of external hosts where keep_awake=true
+    local keep_awake_mounts
+    keep_awake_mounts=$(python3 - <<'KAEOF'
+import json, os, sys
+fleet_path = os.path.join(os.environ['HOME'], 'DevDrive', 'fleet.json')
+try:
+    with open(fleet_path) as f:
+        fleet = json.load(f)
+except Exception:
+    sys.exit(0)
+for host in fleet.get('external_hosts', []):
+    if host.get('keep_awake') and os.path.isdir(host.get('mount', '')):
+        print(host['mount'])
+KAEOF
+)
+
+    if [[ -z "$keep_awake_mounts" ]]; then
+        # No keep_awake hosts are currently mounted — ensure no stale loop
+        if [[ -f "$KEEPAWAKE_PID_FILE" ]]; then
+            local stale_pid
+            stale_pid=$(cat "$KEEPAWAKE_PID_FILE" 2>/dev/null || echo "")
+            if [[ -n "$stale_pid" ]] && ! kill -0 "$stale_pid" 2>/dev/null; then
+                rm -f "$KEEPAWAKE_PID_FILE"
+                log "keep-awake: removed stale pid file ($stale_pid)"
+            fi
+        fi
+        return 0
+    fi
+
+    # Check if a loop is already alive
+    if [[ -f "$KEEPAWAKE_PID_FILE" ]]; then
+        local existing_pid
+        existing_pid=$(cat "$KEEPAWAKE_PID_FILE" 2>/dev/null || echo "")
+        if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            log "keep-awake: loop already running (pid $existing_pid) — skipping"
+            return 0
+        fi
+        rm -f "$KEEPAWAKE_PID_FILE"
+    fi
+
+    # Launch the ping loop as a detached background subshell
+    (
+        log "keep-awake: starting loop for: $(echo "$keep_awake_mounts" | tr '\n' ' ')"
+        while true; do
+            # Re-read fleet.json each iteration so removed keep_awake entries
+            # cause the loop to exit cleanly without needing a restart.
+            local current_mounts
+            current_mounts=$(python3 - <<'INNEREOF'
+import json, os, sys
+fleet_path = os.path.join(os.environ['HOME'], 'DevDrive', 'fleet.json')
+try:
+    with open(fleet_path) as f:
+        fleet = json.load(f)
+except Exception:
+    sys.exit(0)
+for host in fleet.get('external_hosts', []):
+    if host.get('keep_awake') and os.path.isdir(host.get('mount', '')):
+        print(host['mount'])
+INNEREOF
+)
+            if [[ -z "$current_mounts" ]]; then
+                log "keep-awake: no keep_awake hosts mounted — loop exiting"
+                rm -f "$KEEPAWAKE_PID_FILE"
+                exit 0
+            fi
+            while IFS= read -r mount_path; do
+                if [[ -d "$mount_path" ]]; then
+                    if diskutil info "$mount_path" > /dev/null 2>&1; then
+                        log "keep-awake: pinged $mount_path"
+                    else
+                        log "keep-awake: ping failed for $mount_path (unmounted?)"
+                    fi
+                fi
+            done <<< "$current_mounts"
+            sleep 60
+        done
+    ) &
+    local loop_pid=$!
+    disown "$loop_pid"
+    echo "$loop_pid" > "$KEEPAWAKE_PID_FILE"
+    log "keep-awake: loop started (pid $loop_pid)"
+}
+
+# ---------------------------------------------------------------------------
 # Argument dispatch
 # ---------------------------------------------------------------------------
 if [[ "${1:-}" == "sync-plist" ]]; then
     cmd_sync_plist
+    exit $?
+fi
+
+if [[ "${1:-}" == "stop-keepawake" ]]; then
+    cmd_stop_keepawake
     exit $?
 fi
 
@@ -350,3 +480,6 @@ PYEOF
 
 # Keep WatchPaths in sync with fleet.json after every successful automount run.
 cmd_sync_plist
+
+# Start keep-awake loops for any mounted external hosts that request it.
+cmd_keepawake
