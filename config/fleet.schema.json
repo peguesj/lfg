@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lfg:fleet.schema",
+  "title": "DevDrive Fleet Registry Schema",
+  "description": "Schema for ~/DevDrive/fleet.json — the LFG DevDrive volume registry. Runtime file lives at $HOME/DevDrive/fleet.json.",
+  "type": "object",
+  "required": ["version", "external_hosts", "drives"],
+  "properties": {
+    "version": { "type": "string" },
+    "updated": { "type": "string", "format": "date" },
+    "last_drift_resolution": { "type": "string" },
+    "spillover_policy": {
+      "type": "object",
+      "description": "Governs how LFG handles volumes exceeding capacity thresholds.",
+      "properties": {
+        "spill_threshold_pct": { "type": "number" },
+        "critical_threshold_pct": { "type": "number" },
+        "auto_resize_step_gb": { "type": "number" },
+        "auto_resize_requires": { "type": "string" },
+        "overflow_priority": { "type": "array", "items": { "type": "string" } },
+        "capacity_check_script": { "type": "string" },
+        "capacity_check_interval_secs": { "type": "number" }
+      }
+    },
+    "external_hosts": {
+      "type": "array",
+      "description": "Physical external volumes that host sparseimages.",
+      "items": {
+        "type": "object",
+        "required": ["name", "mount"],
+        "properties": {
+          "name": { "type": "string" },
+          "mount": { "type": "string", "description": "Absolute mount path, e.g. /Volumes/YJ_MORE" },
+          "device": { "type": "string" },
+          "parent_disk": { "type": "string" },
+          "volume_uuid": { "type": "string" },
+          "filesystem": { "type": "string" },
+          "role": { "type": "string", "enum": ["external_host"] },
+          "available_gb": { "type": "number" },
+          "status": { "type": "string" },
+          "keep_awake": {
+            "type": "boolean",
+            "description": "When true, devdrive-automount.sh runs a background diskutil ping loop every 60s to prevent macOS from spinning down the drive (CP-107)."
+          }
+        }
+      }
+    },
+    "drives": {
+      "type": "array",
+      "description": "Sparseimage-backed APFS volumes managed by LFG DevDrive.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "image": { "type": "string" },
+          "mount": { "type": "string" },
+          "mount_alias": { "type": "string" },
+          "size": { "type": "string" },
+          "host": { "type": "string", "description": "Name of an external_hosts entry, or 'internal'." },
+          "tier": { "type": "string", "enum": ["hot", "warm", "cold", "always_internal", "archival"] },
+          "purpose": { "type": "string" },
+          "status": { "type": "string" },
+          "symlinks": {
+            "type": "array",
+            "description": "Symlinks managed by automount — format: '~/path/link -> /Volumes/DDRV-NNN/target'.",
+            "items": { "type": "string" }
+          },
+          "fallback_dir": { "type": "string" },
+          "reconnect_policy": { "type": "string", "enum": ["auto", "manual"] },
+          "overflow_accepts": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "known_internal_consumers": {
+      "type": "array",
+      "description": "iCloud-managed or user-owned directories that must NOT be offloaded to DevDrive external volumes. Used by dtf --downloads-audit (CP-105) and the WTFS offload-audit (CP-101) to avoid recommending these paths as offload candidates.",
+      "items": {
+        "type": "string",
+        "description": "Tilde-expanded path, e.g. ~/Library/Mobile Documents"
+      },
+      "examples": [
+        [
+          "~/Library/Mobile Documents",
+          "~/Library/CloudStorage",
+          "~/Desktop",
+          "~/Documents",
+          "~/Pictures",
+          "~/Music",
+          "~/Library/Photos"
+        ]
+      ]
+    }
+  }
+}
