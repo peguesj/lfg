@@ -24,7 +24,8 @@ set -euo pipefail
 readonly LFG_VERSION="2.4.0"
 SELF="$0"
 [[ -L "$SELF" ]] && SELF="$(readlink "$SELF")"
-readonly LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+LFG_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+readonly LFG_DIR
 readonly VIEWER="$LFG_DIR/LFG.app/Contents/MacOS/LFG"
 
 # Ensure LFG Helper (menubar monitor) is running — fire and forget
@@ -52,6 +53,8 @@ CLEAN:
     dtf                          Delete Temp Files (dry run)
     dtf --force                  Execute cache cleanup
     dtf --only <name>            Clean single cache by name
+    dtf --downloads-audit        Scan ~/Downloads for files older than 90 days (ranked)
+    dtf --clean-downloads        Move matched Downloads files to ~/.Trash/ (safe)
 
 BACKUP:
     btau                         Back That App Up (status view)
@@ -191,7 +194,7 @@ case "${1:-}" in
         shift || true
         case "${1:-status}" in
             send)   shift; exec bash "$LFG_DIR/scripts/inbox-send.sh" "$@" ;;
-            status) echo "Inbox: $(ls "$HOME/.config/lfg/inbox/pending/" 2>/dev/null | wc -l | tr -d ' ') pending, $(ls "$HOME/.config/lfg/inbox/processed/" 2>/dev/null | wc -l | tr -d ' ') processed"
+            status) echo "Inbox: $(find "$HOME/.config/lfg/inbox/pending/" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ') pending, $(find "$HOME/.config/lfg/inbox/processed/" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ') processed"
                     pid=$(cat "$HOME/.config/lfg/inbox/watcher.pid" 2>/dev/null || echo "")
                     [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && echo "Watcher: running (pid $pid)" || echo "Watcher: not running" ;;
             log)    tail -20 "$HOME/.config/lfg/inbox/watcher.log" 2>/dev/null || echo "No log yet" ;;
