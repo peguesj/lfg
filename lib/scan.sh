@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # lfg wtfs - Where's The Free Space (disk usage viewer with cross-module integration)
+# shellcheck disable=SC1091  # sourced files resolved at runtime
 set -euo pipefail
 
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VIEWER="$LFG_DIR/viewer"
 
 source "$LFG_DIR/lib/state.sh"
+# shellcheck disable=SC2034  # LFG_MODULE is read by state.sh after sourcing
 LFG_MODULE="wtfs"
 HTML_FILE="$LFG_CACHE_DIR/.lfg_scan.html"
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
@@ -19,12 +21,12 @@ source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 if [[ "${1:-}" == "offload-audit" ]]; then
     FLEET_JSON="$HOME/DevDrive/fleet.json"
     THRESHOLD_KB=512000   # 500 MB
+    TOP_N=20
 
     # ---- 1. Internal disk stats ----------------------------------------
     DISK_LINE=$(df -k "$HOME" 2>/dev/null | awk 'NR==2{print}')
-    DISK_TOTAL_KB=$(echo "$DISK_LINE" | awk '{print $2}')
-    DISK_USED_KB=$(echo  "$DISK_LINE" | awk '{print $3}')
-    DISK_FREE_KB=$(echo  "$DISK_LINE" | awk '{print $4}')
+    DISK_USED_KB=$(echo "$DISK_LINE" | awk '{print $3}')
+    DISK_FREE_KB=$(echo "$DISK_LINE" | awk '{print $4}')
 
     fmt_kb() {
         local kb="$1"
@@ -36,56 +38,22 @@ if [[ "${1:-}" == "offload-audit" ]]; then
     DISK_USED_HR=$(fmt_kb "$DISK_USED_KB")
     DISK_FREE_HR=$(fmt_kb "$DISK_FREE_KB")
 
-    # ---- 2. Collect DDRV mount points and symlink targets via python3 ----
-    #  Outputs lines of the form:
-    #    VOLUME <id> <mount> <size_g> <is_mounted 0|1> <free_kb>
-    #    SYMLINK <src_expanded> <target>
-    FLEET_DATA=$(python3 - "$FLEET_JSON" "$HOME" <<'PYEOF'
-import sys, json, os, subprocess
+    # ---- 2. Parse fleet.json via python3 --------------------------------
+    #  Outputs tagged lines:
+    #    VOLUME <id> <mount> <size> <is_mounted 0|1> <free_kb>
+    #    SYMLINK <src_expanded>|<target>   (pipe delimiter; paths may contain spaces)
+    #    CONSUMER <expanded_path>
+    FLEET_DATA=$(python3 "$LFG_DIR/lib/_offload_audit_parser.py" "$FLEET_JSON" "$HOME")
 
-fleet_file = sys.argv[1]
-home       = sys.argv[2]
-
-try:
-    data = json.loads(open(fleet_file).read())
-except Exception as e:
-    sys.exit(f"fleet.json error: {e}")
-
-for drive in data.get("drives", []):
-    vid   = drive.get("id", "?")
-    mount = drive.get("mount", "")
-    size  = drive.get("size", "?")
-    is_mounted = int(os.path.ismount(mount)) if mount else 0
-    free_kb = 0
-    if is_mounted:
-        try:
-            r = subprocess.run(["df", "-k", mount], capture_output=True, text=True)
-            line = r.stdout.strip().splitlines()
-            if len(line) >= 2:
-                free_kb = int(line[1].split()[3])
-        except Exception:
-            pass
-    print(f"VOLUME {vid} {mount} {size} {is_mounted} {free_kb}")
-
-for drive in data.get("drives", []):
-    for sl in drive.get("symlinks", []):
-        # format: "~/.foo → /Volumes/DDRV-xxx/bar"
-        if " → " not in sl:
-            continue
-        src, tgt = sl.split(" → ", 1)
-        src = src.replace("~", home).strip()
-        tgt = tgt.strip()
-        print(f"SYMLINK {src} {tgt}")
-PYEOF
-)
-
-    # ---- 3. Parse FLEET_DATA into positional arrays (bash 3.2 safe) ------
+    # ---- 3. Parse FLEET_DATA into arrays ----------------------------------
     VOL_IDS=(); VOL_MOUNTS=(); VOL_SIZES=(); VOL_MOUNTED=(); VOL_FREE=()
     SL_SRCS=(); SL_TGTS=()
+    CONSUMERS=()
 
     while IFS= read -r fline; do
         case "$fline" in
             VOLUME\ *)
+                # shellcheck disable=SC2086
                 set -- $fline
                 # $1=VOLUME $2=id $3=mount $4=size $5=is_mounted $6=free_kb
                 VOL_IDS+=("$2")
@@ -95,41 +63,44 @@ PYEOF
                 VOL_FREE+=("$6")
                 ;;
             SYMLINK\ *)
-                # "SYMLINK /path/src /path/tgt" — src/tgt may contain spaces
-                # We stored them space-separated; use python delimiter trick
                 rest="${fline#SYMLINK }"
-                sl_src="${rest%% *}"
-                sl_tgt="${rest#* }"
+                sl_src="${rest%%|*}"
+                sl_tgt="${rest#*|}"
                 SL_SRCS+=("$sl_src")
                 SL_TGTS+=("$sl_tgt")
+                ;;
+            CONSUMER\ *)
+                CONSUMERS+=("${fline#CONSUMER }")
                 ;;
         esac
     done <<< "$FLEET_DATA"
 
-    # Build a flat string of known DDRV mount prefixes for fast membership test
-    DDRV_MOUNT_LIST=""
-    for _m in "${VOL_MOUNTS[@]:-}"; do
-        DDRV_MOUNT_LIST="${DDRV_MOUNT_LIST}|${_m}"
-    done
-
-    # ---- 4. Top-20 home subdirs on INTERNAL storage ----------------------
-    # Exclude: symlinks, /System /Volumes /private /proc, hidden runtime dirs
-    EXCLUDE_NAMES=".Trash" # always skip Trash from candidates list
-
-    # Collect sizes; skip symlinks (readlink -n) and non-owned dirs
+    # ---- 4. Scan home dir; exclude symlinks and unowned dirs --------------
     SCAN_TMP=$(mktemp)
     while IFS=$'\t' read -r sz_kb dp; do
-        # Skip the home dir entry itself
         [[ "$dp" == "$HOME" ]] && continue
-        # Skip if it is a symlink
         [[ -L "$dp" ]] && continue
-        # Skip dirs we don't own (stat -f %Su on macOS)
         owner=$(stat -f '%Su' "$dp" 2>/dev/null || echo "?")
         [[ "$owner" != "$(id -un)" ]] && continue
-        echo "$sz_kb	$dp"
+        printf '%s\t%s\n' "$sz_kb" "$dp"
     done < <(du -d1 -k "$HOME" 2>/dev/null | sort -rn) > "$SCAN_TMP"
 
-    # ---- 5. Print report -------------------------------------------------
+    # ---- 5. Build lookup strings for fast membership checks ---------------
+    SL_SRC_LIST=""
+    k=0
+    while [[ $k -lt ${#SL_SRCS[@]} ]]; do
+        SL_SRC_LIST="${SL_SRC_LIST}|${SL_SRCS[$k]}"
+        k=$((k + 1))
+    done
+
+    CONSUMER_LIST=""
+    c=0
+    while [[ $c -lt ${#CONSUMERS[@]} ]]; do
+        CONSUMER_LIST="${CONSUMER_LIST}|${CONSUMERS[$c]}"
+        c=$((c + 1))
+    done
+
+    # ---- 6. Print header --------------------------------------------------
     echo ""
     echo "=== WTFS Offload Audit ==="
     echo "Internal storage: ${DISK_USED_HR} used / ${DISK_FREE_HR} free"
@@ -145,37 +116,38 @@ PYEOF
         vfree_kb="${VOL_FREE[$i]}"
 
         if [[ "$vmounted" == "1" ]]; then
-            status="MOUNTED"
+            vstatus="MOUNTED"
             free_hr=$(fmt_kb "$vfree_kb")
-            status_detail="  ${free_hr} free"
+            vstatus_detail="  ${free_hr} free"
         else
-            status="UNMOUNTED"
-            status_detail=""
+            vstatus="UNMOUNTED"
+            vstatus_detail=""
         fi
 
         printf "  %-20s  [%-9s]  %-35s  %-6s%s\n" \
-            "$vid" "$status" "$vmount" "$vsize" "$status_detail"
+            "$vid" "$vstatus" "$vmount" "$vsize" "$vstatus_detail"
         i=$((i + 1))
     done
     echo ""
 
-    # ---- 6. Already-offloaded symlinks -----------------------------------
-    echo "Already offloaded (symlinks -> DevDrive):"
+    # ---- 7. Already-offloaded symlinks ------------------------------------
+    echo "Already offloaded (fleet.json symlinks -> DevDrive):"
     FOUND_SYMLINKS=0
+    OFFLOADED_KB=0
     j=0
     while [[ $j -lt ${#SL_SRCS[@]} ]]; do
         sl_src="${SL_SRCS[$j]}"
         sl_tgt="${SL_TGTS[$j]}"
-        src_display=$(echo "$sl_src" | sed "s|$HOME|~|")
-        # Check if symlink actually exists and is live
+        src_display="${sl_src/#$HOME/~}"
         if [[ -L "$sl_src" ]]; then
-            actual_tgt=$(readlink "$sl_src" 2>/dev/null || echo "?")
             if [[ -e "$sl_src" ]]; then
                 live_status="[LIVE]"
             else
                 live_status="[BROKEN]"
             fi
-            printf "  %-35s -> %-45s %s\n" "$src_display" "$sl_tgt" "$live_status"
+            sl_kb=$(du -sk "$sl_src" 2>/dev/null | awk '{print $1}')
+            [[ -n "$sl_kb" ]] && OFFLOADED_KB=$((OFFLOADED_KB + sl_kb))
+            printf "  %-40s -> %-40s %s\n" "$src_display" "$sl_tgt" "$live_status"
             FOUND_SYMLINKS=$((FOUND_SYMLINKS + 1))
         fi
         j=$((j + 1))
@@ -183,49 +155,71 @@ PYEOF
     [[ $FOUND_SYMLINKS -eq 0 ]] && echo "  (none detected)"
     echo ""
 
-    # ---- 7. Offload candidates -------------------------------------------
-    echo "Internal offload candidates (>500MB, not yet on DevDrive):"
-
-    # Collect symlink src paths into a flat string for membership check
-    SL_SRC_LIST=""
-    k=0
-    while [[ $k -lt ${#SL_SRCS[@]} ]]; do
-        SL_SRC_LIST="${SL_SRC_LIST}|${SL_SRCS[$k]}"
-        k=$((k + 1))
-    done
+    # ---- 8. Ranked candidate table (top 20) --------------------------------
+    printf "%-12s  %-55s  %s\n" "SIZE" "PATH" "STATUS"
+    printf "%-12s  %-55s  %s\n" "------------" "-------------------------------------------------------" "--------"
 
     RANK=0
+    CANDIDATE_KB=0
     while IFS=$'\t' read -r sz_kb dp; do
         [[ -z "$dp" ]] && continue
-        (( sz_kb < THRESHOLD_KB )) && break   # already sorted descending
+        (( sz_kb < THRESHOLD_KB )) && break   # sorted descending; everything below threshold is too small
 
-        # Skip if this path is a known symlink source (already offloaded)
+        display="${dp/#$HOME/~}"
+        label="candidate"
+
+        # Check: already offloaded via a fleet.json symlink
         case "${SL_SRC_LIST}" in
-            *"|${dp}|"*|*"|${dp}") continue ;;
+            *"|${dp}"*) label="already-on-devdrive" ;;
         esac
 
-        # Skip if it resolves into a DDRV mount (safety net for unlisted links)
-        real_dp=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$dp" 2>/dev/null || echo "$dp")
-        is_ddrv=0
-        m=0
-        while [[ $m -lt ${#VOL_MOUNTS[@]} ]]; do
-            vm="${VOL_MOUNTS[$m]}"
-            if [[ -n "$vm" ]] && [[ "$real_dp" == "${vm}"* ]]; then
-                is_ddrv=1; break
-            fi
-            m=$((m + 1))
-        done
-        [[ $is_ddrv -eq 1 ]] && continue
+        if [[ "$label" == "candidate" ]]; then
+            # Check: resolves into a DDRV volume (unlisted symlink or bind-mount)
+            real_dp=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$dp" 2>/dev/null || echo "$dp")
+            m=0
+            while [[ $m -lt ${#VOL_MOUNTS[@]} ]]; do
+                vm="${VOL_MOUNTS[$m]}"
+                if [[ -n "$vm" ]] && [[ "$real_dp" == "${vm}"* ]]; then
+                    label="already-on-devdrive"; break
+                fi
+                m=$((m + 1))
+            done
+        fi
+
+        if [[ "$label" == "candidate" ]]; then
+            # Check: iCloud / known internal consumer from fleet.json
+            case "${CONSUMER_LIST}" in
+                *"|${dp}"*) label="icloud" ;;
+            esac
+        fi
+
+        if [[ "$label" == "candidate" ]]; then
+            # Check: is itself a symlink (missed by pre-filter due to du traversal)
+            [[ -L "$dp" ]] && label="symlink"
+        fi
+
+        size_hr=$(fmt_kb "$sz_kb")
+        printf "%-12s  %-55s  [%s]\n" "$size_hr" "$display" "$label"
+
+        if [[ "$label" == "candidate" ]]; then
+            CANDIDATE_KB=$((CANDIDATE_KB + sz_kb))
+        fi
 
         RANK=$((RANK + 1))
-        size_hr=$(fmt_kb "$sz_kb")
-        display=$(echo "$dp" | sed "s|$HOME|~|")
-        printf "  #%-3d %-50s %s\n" "$RANK" "$display" "$size_hr"
+        (( RANK >= TOP_N )) && break
     done < "$SCAN_TMP"
 
     rm -f "$SCAN_TMP"
 
-    [[ $RANK -eq 0 ]] && echo "  (no candidates above 500 MB found)"
+    [[ $RANK -eq 0 ]] && echo "  (no entries above 500 MB found)"
+    echo ""
+
+    # ---- 9. Summary -------------------------------------------------------
+    OFFLOADED_HR=$(fmt_kb "$OFFLOADED_KB")
+    CANDIDATE_HR=$(fmt_kb "$CANDIDATE_KB")
+    echo "Summary:"
+    printf "  Total candidate size (not yet offloaded):  %s\n" "$CANDIDATE_HR"
+    printf "  Total already-offloaded (symlinked):       %s\n" "$OFFLOADED_HR"
     echo ""
     exit 0
 fi
@@ -288,14 +282,7 @@ while IFS=$'\t' read -r size_kb path; do
     else
         pct="0.0"
     fi
-    bar_w="$pct"
 
-    if (( $(echo "$pct > 20" | bc -l) )); then color="#ff4d6a"
-    elif (( $(echo "$pct > 10" | bc -l) )); then color="#ff8c42"
-    elif (( $(echo "$pct > 5" | bc -l) )); then color="#ffd166"
-    elif (( $(echo "$pct > 2" | bc -l) )); then color="#06d6a0"
-    else color="#4a9eff"
-    fi
 
     # Composition breakdown
     deps_kb=0; cache_kb=0
@@ -335,8 +322,7 @@ else
 fi
 
 DISK_FREE=$(df -h "$TARGET" | awk 'NR==2{print $4}')
-TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-DIR_DISPLAY=$(echo "$TARGET" | sed "s|$HOME|~|")
+DIR_DISPLAY="${TARGET/#$HOME/\~}"
 
 # Generate HTML via python3 (safe multi-line templating)
 LFG_ROWS="$ROWS" python3 -c "

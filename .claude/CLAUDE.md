@@ -109,9 +109,9 @@ Squadron Bravo (devdrive-remediation): LFG-49..LFG-58
 - [ ] **CP-101**: WTFS offload-audit command — ranked internal vs DevDrive candidates report (US-DVO-001) (LFG-60)
 - [ ] **CP-102**: Expand DDRV-901 sparseimage to 80GB (US-DVO-002) (LFG-61)
 - [ ] **CP-104**: devdrive-automount sync-plist: auto-generate WatchPaths from fleet.json (US-DVO-004) (LFG-63)
-- [ ] **CP-105**: DTF downloads-audit scan rule for files >90 days (US-DVO-005) (LFG-64)
-- [ ] **CP-106**: fleet.json known_internal_consumers metadata for iCloud dirs (US-DVO-006) (LFG-65)
-- [ ] **CP-107**: YJ_MORE drive stability — investigate disconnect root cause, add keep_awake support (US-DVO-007)
+- [x] **CP-105**: DTF downloads-audit scan rule for files >90 days (US-DVO-005) (LFG-64) — 475b585
+- [x] **CP-106**: fleet.json known_internal_consumers metadata for iCloud dirs (US-DVO-006) (LFG-65) — 68f9013
+- [x] **CP-107**: YJ_MORE drive stability — investigate disconnect root cause, add keep_awake support (US-DVO-007) — c2b0a29
 
 ---
 
