@@ -5,8 +5,8 @@
 #
 # Subcommands:
 #   (none)            Normal automount run — mounts all fleet volumes.
-#   sync-plist        Re-write WatchPaths in the automount LaunchAgent plist
-#                     from fleet.json external_hosts, then reload the agent.
+#   sync-plist [--dry-run]  Re-write WatchPaths in the automount LaunchAgent plist
+#                          from fleet.json external_hosts, then reload the agent.
 #   stop-keepawake    Kill any running keep-awake ping loops.
 set -uo pipefail
 
@@ -16,6 +16,7 @@ FLEET_FILE="$HOME/DevDrive/fleet.json"
 DEVDRIVE_HOME="$HOME/DevDrive"
 AUTOMOUNT_PLIST="$HOME/Library/LaunchAgents/io.lfg.devdrive-automount.plist"
 KEEPAWAKE_PID_FILE="$LOG_DIR/keepawake.pid"
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 mkdir -p "$LOG_DIR" "$DEVDRIVE_HOME" 2>/dev/null
 
@@ -24,11 +25,19 @@ log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [automount] $*" >> "$LOG"; }
 # ---------------------------------------------------------------------------
 # sync-plist subcommand
 # Re-writes the WatchPaths array in the automount LaunchAgent plist so it
-# contains exactly the external_hosts[].mount paths from fleet.json, then
-# reloads the LaunchAgent so the new paths take effect immediately.
+# contains /Volumes plus any host-specific subpaths derived from fleet.json
+# external_hosts entries, then reloads the LaunchAgent.
+#
+# Options:
+#   --dry-run   Print the proposed plist diff without writing or reloading.
 # ---------------------------------------------------------------------------
 cmd_sync_plist() {
-    log "sync-plist: starting"
+    local dry_run=0
+    if [[ "${1:-}" == "--dry-run" ]]; then
+        dry_run=1
+    fi
+
+    log "sync-plist: starting (dry_run=$dry_run)"
 
     if [[ ! -f "$AUTOMOUNT_PLIST" ]]; then
         log "sync-plist: WARN — plist not found at $AUTOMOUNT_PLIST, skipping"
@@ -42,98 +51,10 @@ cmd_sync_plist() {
         return 0
     fi
 
-    python3 << 'SYNCEOF'
-import json, os, plistlib, subprocess, sys
-
-HOME        = os.environ['HOME']
-FLEET_FILE  = os.path.join(HOME, 'DevDrive', 'fleet.json')
-PLIST_PATH  = os.path.join(HOME, 'Library', 'LaunchAgents', 'io.lfg.devdrive-automount.plist')
-LOG_FILE    = os.path.join(HOME, '.config', 'lfg', 'automount.log')
-
-def log(msg):
-    import datetime
-    ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    try:
-        with open(LOG_FILE, 'a') as f:
-            f.write(f"{ts} [automount] {msg}\n")
-    except Exception:
-        pass
-
-# Read fleet.json and extract external host mount paths
-try:
-    with open(FLEET_FILE) as f:
-        fleet = json.load(f)
-except Exception as e:
-    log(f"sync-plist: ERROR reading fleet.json: {e}")
-    print(f"ERROR: could not read fleet.json: {e}", file=sys.stderr)
-    sys.exit(1)
-
-# Always watch /Volumes (the parent directory) rather than individual volume paths.
-# macOS 13+ silently refuses to register WatchPaths on /Volumes/<name> subdirectories
-# for user LaunchAgents, but /Volumes itself fires on any volume appearance/disappearance,
-# which is exactly what we need for post-wake remounting of YJ_MORE sparseimages.
-watch_paths = ['/Volumes']
-
-# Read existing plist (XML format)
-try:
-    with open(PLIST_PATH, 'rb') as f:
-        plist_data = plistlib.load(f)
-except Exception as e:
-    log(f"sync-plist: ERROR reading plist: {e}")
-    print(f"ERROR: could not read plist at {PLIST_PATH}: {e}", file=sys.stderr)
-    sys.exit(1)
-
-old_watch = list(plist_data.get('WatchPaths', []))
-
-# Update WatchPaths in memory
-plist_data['WatchPaths'] = watch_paths
-
-# Write back as XML plist
-try:
-    with open(PLIST_PATH, 'wb') as f:
-        plistlib.dump(plist_data, f, fmt=plistlib.FMT_XML, sort_keys=False)
-except Exception as e:
-    log(f"sync-plist: ERROR writing plist: {e}")
-    print(f"ERROR: could not write plist: {e}", file=sys.stderr)
-    sys.exit(1)
-
-log(f"sync-plist: WatchPaths updated: {old_watch} -> {watch_paths}")
-print(f"sync-plist: WatchPaths updated")
-print(f"  old: {old_watch}")
-print(f"  new: {watch_paths}")
-
-# Reload the LaunchAgent so the new WatchPaths take effect.
-# Use the modern bootstrap/bootout API (launchctl load/unload is deprecated
-# on macOS 10.15+ and silently fails to register WatchPaths in newer releases).
-import getpass, pwd
-uid = os.getuid()
-domain = f"gui/{uid}"
-
-# bootout — ignore errors if not currently loaded
-bootout = subprocess.run(
-    ['launchctl', 'bootout', domain, PLIST_PATH],
-    capture_output=True, text=True
-)
-if bootout.returncode != 0:
-    stderr = bootout.stderr.strip()
-    # "No such process" / "Could not find service" are expected when not loaded
-    if not any(x in stderr for x in ('No such process', 'Could not find service', '36: Operation')):
-        log(f"sync-plist: WARN launchctl bootout: {stderr}")
-
-bootstrap = subprocess.run(
-    ['launchctl', 'bootstrap', domain, PLIST_PATH],
-    capture_output=True, text=True
-)
-if bootstrap.returncode == 0:
-    log("sync-plist: LaunchAgent bootstrapped successfully")
-    print("sync-plist: LaunchAgent bootstrapped successfully")
-else:
-    log(f"sync-plist: WARN launchctl bootstrap returned {bootstrap.returncode}: {bootstrap.stderr.strip()}")
-    print(f"WARNING: launchctl bootstrap exited {bootstrap.returncode}: {bootstrap.stderr.strip()}", file=sys.stderr)
-
-SYNCEOF
+    DRY_RUN="$dry_run" python3 "$SCRIPTS_DIR/devdrive-syncplist.py"
     return $?
 }
+
 
 # ---------------------------------------------------------------------------
 # stop-keepawake subcommand
@@ -262,7 +183,7 @@ INNEREOF
 # Argument dispatch
 # ---------------------------------------------------------------------------
 if [[ "${1:-}" == "sync-plist" ]]; then
-    cmd_sync_plist
+    cmd_sync_plist "${2:-}"
     exit $?
 fi
 
