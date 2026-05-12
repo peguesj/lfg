@@ -3,14 +3,18 @@ import XCTest
 
 final class MockShellRunner: ShellRunnerProtocol, @unchecked Sendable {
     private let result: ProcessRunner.Result
-    private(set) var lastCommand: String = ""
+    private let lock = NSLock()
+    private var _commands: [String] = []
+
+    var lastCommand: String { lock.withLock { _commands.last ?? "" } }
+    var allCommands: [String] { lock.withLock { _commands } }
 
     init(result: ProcessRunner.Result) {
         self.result = result
     }
 
     func shell(_ command: String) async throws -> ProcessRunner.Result {
-        lastCommand = command
+        lock.withLock { _commands.append(command) }
         return result
     }
 }
