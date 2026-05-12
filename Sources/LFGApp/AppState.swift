@@ -2,7 +2,9 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 final class AppState {
+    let fleet = FleetMonitorService()
     var moduleStatuses: [LFGModule: ModuleStatus] = {
         var map: [LFGModule: ModuleStatus] = [:]
         for module in LFGModule.allCases {
