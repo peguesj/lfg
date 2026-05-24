@@ -31,7 +31,7 @@ struct LFGApp: App {
     }()
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: "main") {
             ContentView()
                 .environment(appState)
                 .onAppear {

@@ -8,6 +8,7 @@ import LFGKit
 /// four-state status dots, and section-level drift badges.
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     // MARK: Legacy state (preserved for quick-actions reload path)
     @State private var fleetRows: [MenuBarVolumeRow] = []
@@ -281,6 +282,7 @@ struct MenuBarView: View {
     private var footerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button("Open LFG") {
+                openWindow(id: "main")
                 NSApplication.shared.activate(ignoringOtherApps: true)
             }
             .buttonStyle(.plain)
