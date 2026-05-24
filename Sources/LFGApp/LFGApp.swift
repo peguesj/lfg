@@ -1,9 +1,16 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct LFGApp: App {
     @State private var appState = AppState()
+
+    init() {
+        // UNUserNotificationCenter requires a bundle identifier — skip when running as a bare CLI executable.
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -27,6 +34,9 @@ struct LFGApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .onAppear {
+                    appState.setupMountWatcher()
+                }
         }
         .modelContainer(sharedModelContainer)
 

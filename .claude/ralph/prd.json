@@ -1,202 +1,346 @@
 {
   "project": "LFG",
-  "formationId": "fmt-lfg-yjmore-migrate-20260423",
-  "branchName": "main",
-  "baseBranch": "main",
-  "description": "Migrate DevDrive sparseimages 901/904 from internal to YJ_MORE external volume, update fleet.json, reclaim internal disk",
-  "created": "2026-04-23T06:45:00Z",
-  "userStories": [
+  "formationId": "fmt-lfg-ddrv3-ui-20260524",
+  "branchName": "feature/devdrive-v3",
+  "baseBranch": "feature/devdrive-v3",
+  "description": "DevDrive v3 UI Expansion — 10-iteration sprint adding card/graph views, Source Volumes admin, drive relocation, volume settings, OffloadRule management, capacity dashboard, and admin preferences. Builds on the v3 three-tier model (SourceVolume/VolumeBackend/OffloadRule) completed in fmt-lfg-ddrv3-20260524.",
+  "sizing": "existing",
+  "created": "2026-05-24T00:00:00Z",
+  "harnessMandate": {
+    "tdd": true,
+    "relentless": true,
+    "gateAfterEachWave": true,
+    "gateCommand": "swift build 2>&1 | tail -5",
+    "testCommand": "swift test 2>&1 | tail -10",
+    "coverageTarget": 80,
+    "killCriteria": "3+ agent failures in same wave",
+    "attributionPolicy": "Never include Co-Authored-By, Generated with Claude Code, or any AI attribution in commits or PRs"
+  },
+  "context": {
+    "workingDir": "/Users/jeremiah/tools/@yj/lfg",
+    "branch": "feature/devdrive-v3",
+    "stack": ["Swift 5.9+", "SwiftUI", "AppKit", "LFGKit (internal framework)"],
+    "testBaseline": 126,
+    "completedWork": [
+      "CP-109: SourceVolume, OffloadRule, VolumeBackend, FleetRegistry v3 API",
+      "CP-110: UNUserNotificationCenter integration",
+      "CP-111: NSWorkspace.didMountNotification → MountOrchestrator.attachAll",
+      "CP-112/113/115: DevDriveView three-tier CloudMounter-inspired list with VolumeBackendCard + OffloadRuleRow",
+      "CP-114: MenuBarView source groups + filter + drift alerts",
+      "CP-116: 126 tests, 0 failures",
+      "CP-117: Full documentation refresh"
+    ],
+    "keyFiles": {
+      "devDriveView": "Sources/LFGApp/Views/DevDriveView.swift",
+      "devDriveSubviews": "Sources/LFGApp/Views/DevDrive/ (SourceVolumeSection, VolumeBackendCard, OffloadRuleRow, VolumeStatusDot)",
+      "v3Models": "Sources/LFGKit/SourceVolume.swift, OffloadRule.swift, VolumeBackend.swift, FleetRegistry.swift",
+      "appState": "Sources/LFGApp/AppState.swift",
+      "fleetJson": "~/DevDrive/fleet.json",
+      "tests": "Tests/LFGKitTests/ (126 tests passing)"
+    }
+  },
+  "iterations": [
+    { "version": "v3.1", "name": "View Switcher Toolbar", "wave": 1, "status": "todo" },
+    { "version": "v3.2", "name": "Card Grid View", "wave": 1, "status": "todo" },
+    { "version": "v3.3", "name": "Node Graph View", "wave": 2, "status": "todo" },
+    { "version": "v3.4", "name": "Source Volumes Admin Page", "wave": 2, "status": "todo" },
+    { "version": "v3.5", "name": "Drive Relocation Wizard", "wave": 3, "status": "todo" },
+    { "version": "v3.6", "name": "Volume Settings Panel", "wave": 3, "status": "todo" },
+    { "version": "v3.7", "name": "OffloadRule Management UI", "wave": 4, "status": "todo" },
+    { "version": "v3.8", "name": "Capacity Dashboard", "wave": 4, "status": "todo" },
+    { "version": "v3.9", "name": "Admin Preferences Pane", "wave": 5, "status": "todo" },
+    { "version": "v3.10", "name": "Polish + TDD + Docs", "wave": 5, "status": "todo" }
+  ],
+  "squadrons": [
     {
-      "id": "US-001",
-      "title": "Rename old corrupt 904 on YJ_MORE for preservation",
-      "description": "Rename /Volumes/YJ_MORE/904MEMVT.dmg.sparseimage to 904MEMVT.dmg.sparseimage.corrupt-20260418 so it is preserved but clearly labeled.",
-      "acceptanceCriteria": ["Old file renamed with .corrupt-20260418 suffix", "File still exists and is intact"],
-      "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "wave": 1
-    },
-    {
-      "id": "US-002",
-      "title": "Create DevDrive directory on YJ_MORE and rsync sparseimages",
-      "description": "mkdir -p /Volumes/YJ_MORE/DevDrive, rsync 901DEVLIB (11G) and 904MEMVT (15M) from ~/DevDrive to YJ_MORE/DevDrive with progress and checksum verification.",
-      "acceptanceCriteria": ["Both sparseimages copied to /Volumes/YJ_MORE/DevDrive/", "Checksums match source files"],
-      "estimatedPoints": 3,
-      "dependencies": ["US-001"],
-      "status": "done",
-      "passes": true,
-      "wave": 1
-    },
-    {
-      "id": "US-003",
-      "title": "Unmount, remount from YJ_MORE, verify symlinks",
-      "description": "hdiutil detach volumes 901/904, hdiutil attach from YJ_MORE paths, re-verify CoreSimulator and MemoryVault symlinks point to remounted volumes.",
-      "acceptanceCriteria": ["901 mounted from YJ_MORE sparseimage", "904 mounted from YJ_MORE sparseimage", "CoreSimulator symlink valid", "Volume contents intact"],
-      "estimatedPoints": 2,
-      "dependencies": ["US-002"],
-      "status": "done",
-      "passes": true,
-      "wave": 2
-    },
-    {
-      "id": "US-004",
-      "title": "Update fleet.json with correct mount names and host paths",
-      "description": "Fix fleet.json: mount paths to actual APFS names (DDRV-900-HOOKS, DDRV-901-DEVLIB, DDRV-904-MEMVT), update host_path for 901/904 to /Volumes/YJ_MORE/DevDrive.",
-      "acceptanceCriteria": ["All mount paths match actual APFS volume names", "host_path reflects YJ_MORE for 901/904", "version bumped"],
-      "estimatedPoints": 1,
-      "dependencies": ["US-003"],
-      "status": "done",
-      "passes": true,
-      "wave": 2
-    },
-    {
-      "id": "US-005",
-      "title": "Remove internal sparseimage copies and verify disk reclaimed",
-      "description": "Delete ~/DevDrive/901DEVLIB.dmg.sparseimage and ~/DevDrive/904MEMVT.dmg.sparseimage after confirming volumes are running from YJ_MORE. Verify internal space reclaimed.",
-      "acceptanceCriteria": ["Internal copies deleted", "Volumes still mounted and functional"],
-      "estimatedPoints": 1,
-      "dependencies": ["US-003"],
-      "status": "done",
-      "passes": true,
-      "wave": 3
-    },
-    {
-      "id": "US-DVO-001",
-      "title": "WTFS offload audit: ranked internal vs DevDrive offload candidates report",
-      "description": "The lfg-scan agent derived movable vs iCloud/system-managed paths independently. Codify as a structured offload-audit report in WTFS/DTF module classifying paths as: movable-to-devdrive, movable-to-external, icloud-managed, system-managed.",
-      "acceptanceCriteria": [
-        "lfg wtfs --offload-audit outputs ranked table with estimated savings per category",
-        "iCloud-managed paths clearly separated from movable paths",
-        "Integration with fleet.json known_internal_consumers (US-DVO-006)"
+      "id": "wave-1",
+      "name": "Wave 1 — View Switcher + Card View",
+      "wave": 1,
+      "swarms": [
+        {
+          "id": "w1-switcher",
+          "name": "v3.1 — View Switcher Infrastructure",
+          "agents": [
+            {
+              "id": "W1A1",
+              "checkpoints": ["v3.1"],
+              "title": "View switcher toolbar + DevDriveViewMode enum + UserDefaults persistence",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/DevDriveViewMode.swift",
+                "Sources/LFGApp/Views/DevDriveView.swift"
+              ],
+              "acceptanceCriteria": [
+                "DevDriveViewMode enum: .list, .card, .graph",
+                "DevDriveView has @AppStorage('devDriveViewMode') binding",
+                "Toolbar has a context menu (or segmented control) to switch modes — Picker with .segmented style preferred",
+                "Switching to .list shows existing SourceVolumeSection list (current behaviour)",
+                "Switching to .card shows a placeholder CardGridPlaceholderView ('Card view — coming in v3.2')",
+                "Switching to .graph shows a placeholder GraphPlaceholderView ('Graph view — coming in v3.3')",
+                "Mode persists across app restarts via @AppStorage",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w1-cards",
+          "name": "v3.2 — Card Grid View",
+          "agents": [
+            {
+              "id": "W1A2",
+              "checkpoints": ["v3.2"],
+              "title": "VolumeCardGridView with LazyVGrid + VolumeCard components",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeCardGridView.swift",
+                "Sources/LFGApp/Views/DevDrive/VolumeCard.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeCardGridView: LazyVGrid with adaptive columns (min 200pt), one VolumeCard per VolumeBackend",
+                "VolumeCard shows: VolumeStatusDot (reuse existing), volume id (title), purpose (subtitle), host badge (colored capsule — green for mounted external, gray for internal), offload rule count badge",
+                "VolumeCard has a capacity ring (circular ProgressView or arc shape) showing used/total fraction; unmounted shows ring grayed",
+                "VolumeCard tap opens a detail sheet (VolumeDetailSheet) — just a placeholder sheet for now showing id and all properties in a Form",
+                "VolumeCardGridView accepts registry: FleetRegistry and sections: [SectionModel] — reuse DevDriveView.SectionModel by extracting it to a shared type or passing backends directly",
+                "DevDriveView wires VolumeCardGridView when viewMode == .card (replace the CardGridPlaceholderView)",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
       ],
-      "estimatedPoints": 3,
-      "dependencies": ["US-DVO-006"],
-      "status": "pending",
-      "passes": false,
-      "wave": 4,
-      "planeIssueId": "95e1a4f3-28a8-47f6-9a28-97fc1908f0ad",
-      "checkpointId": "CP-101"
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true,
+        "onFailure": "fix before proceeding to Wave 2"
+      }
     },
     {
-      "id": "US-DVO-002",
-      "title": "Expand DDRV-901 sparseimage to 80GB during next maintenance window",
-      "description": "After home dir offloads, DDRV-901 is at ~30GB in a 40GB container. Must unmount, hdiutil resize to 80g on YJ_MORE, update fleet.json size field, remount.",
-      "acceptanceCriteria": [
-        "DDRV-901 container reports 80GB total",
-        "Container free space > 45GB after resize",
-        "fleet.json 901DEVLIB size field updated to '80g'",
-        "All symlinks (CoreSimulator, npm-cache, asdf, vscode, etc.) still valid after remount"
+      "id": "wave-2",
+      "name": "Wave 2 — Graph View + Source Volumes Admin",
+      "wave": 2,
+      "dependsOn": ["wave-1"],
+      "swarms": [
+        {
+          "id": "w2-graph",
+          "name": "v3.3 — Node Graph View",
+          "agents": [
+            {
+              "id": "W2A1",
+              "checkpoints": ["v3.3"],
+              "title": "VolumeGraphView — static hierarchical node graph (SourceVolume → VolumeBackend → OffloadRule)",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeGraphView.swift",
+                "Sources/LFGApp/Views/DevDrive/GraphNode.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeGraphView renders a static tree layout: SourceVolume nodes at top, VolumeBackend nodes in middle row, OffloadRule nodes at bottom",
+                "Each node is a rounded rectangle with appropriate icon + label; color-coded by type (blue=source, green/orange/red=backend by status, gray=rule)",
+                "Lines/edges drawn between parent and child nodes using Path or Canvas",
+                "Nodes are tappable — show a popover/tooltip with details (id, mount, status)",
+                "ScrollView wraps the graph for large fleets",
+                "DevDriveView wires VolumeGraphView when viewMode == .graph",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w2-sourcevols",
+          "name": "v3.4 — Source Volumes Admin Page",
+          "agents": [
+            {
+              "id": "W2A2",
+              "checkpoints": ["v3.4"],
+              "title": "SourceVolumesAdminView — all mounted APFS/HFS+ volumes via diskutil + register to fleet",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/SourceVolumesAdminView.swift",
+                "Sources/LFGKit/DiskScanner.swift"
+              ],
+              "acceptanceCriteria": [
+                "DiskScanner (LFGKit) runs 'diskutil list -plist' async and returns [MountedVolume] (id, name, mount, filesystem, totalBytes, freeBytes, isDevDriveManaged)",
+                "SourceVolumesAdminView is a new tab/subpage accessible from DevDriveView toolbar — 'Volumes' button or tab",
+                "Shows a List of all mounted volumes grouped: DevDrive-Managed vs Discovered",
+                "Each row shows: volume name, mount path, filesystem, capacity bar, a 'Managed' badge for fleet-registered volumes",
+                "Unmanaged volumes have a '+  Register' button — tapping opens an AddSourceVolumeSheet (name + role fields, writes to fleet.json external_hosts[])",
+                "DevDrive-managed SourceVolumes show their VolumeBackend count as a badge",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
       ],
-      "estimatedPoints": 2,
-      "dependencies": [],
-      "status": "pending",
-      "passes": false,
-      "wave": 4,
-      "planeIssueId": "3c882511-d172-4445-a05d-407eb2f5d247",
-      "checkpointId": "CP-102"
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-DVO-003",
-      "title": "fleet.json v1.9: add symlinks entries for all newly offloaded home dirs",
-      "description": "Six directories moved to DDRV-901 (.npm-cache, .asdf, .vscode, .lmstudio, .continue, .azurelogicapps) but fleet.json 901DEVLIB symlinks not fully tracked. The automount script only restores symlinks listed in fleet.json.",
-      "acceptanceCriteria": [
-        "fleet.json 901DEVLIB symlinks array includes all 6 home dir paths",
-        "devdrive-automount dry-run correctly restores all symlinks",
-        "version bumped to 1.9 (already done this session — verify)"
+      "id": "wave-3",
+      "name": "Wave 3 — Drive Relocation + Volume Settings",
+      "wave": 3,
+      "dependsOn": ["wave-2"],
+      "swarms": [
+        {
+          "id": "w3-relocate",
+          "name": "v3.5 — Drive Relocation Wizard",
+          "agents": [
+            {
+              "id": "W3A1",
+              "checkpoints": ["v3.5"],
+              "title": "DriveRelocationSheet — move VolumeBackend sparseimage from current host to a new host",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/DriveRelocationSheet.swift",
+                "Sources/LFGKit/RelocationCoordinator.swift"
+              ],
+              "acceptanceCriteria": [
+                "DriveRelocationSheet is a sheet presented from VolumeBackendCard context menu ('Move to...')",
+                "Step 1: pick destination SourceVolume from a picker (shows free GB per option)",
+                "Step 2: preflight — checks destination has enough free space; shows warning if tight",
+                "Step 3: execute — uses Process to run 'cp' (or rsync) to copy the sparseimage, shows progress via RelocationCoordinator",
+                "Step 4: on success — updates fleet.json host field and the 'image' path, reloads registry",
+                "Step 5: on failure — shows error with rollback option (delete partial copy)",
+                "RelocationCoordinator is an actor with async func relocate(backend:toHost:registry:) -> RelocationResult",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w3-settings",
+          "name": "v3.6 — Volume Settings Panel",
+          "agents": [
+            {
+              "id": "W3A2",
+              "checkpoints": ["v3.6"],
+              "title": "VolumeSettingsSheet — edit VolumeBackend properties and persist to fleet.json",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeSettingsSheet.swift",
+                "Sources/LFGKit/FleetEditor.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeSettingsSheet is a sheet presented from VolumeBackendCard ('Settings' button or swipe action)",
+                "Form with editable fields: purpose (TextField), tier (Picker: cold/hot/warm/always_internal/archival), reconnect_policy (Picker: auto/manual/none)",
+                "FleetEditor (LFGKit) has func update(backendId: String, purpose: String?, tier: String?, reconnectPolicy: String?) throws — reads fleet.json, patches drives[], writes back atomically via temp file + rename",
+                "Save button writes changes via FleetEditor and dismisses; Cancel discards",
+                "Source volume keep_awake toggle shown for SourceVolume-linked backends",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
       ],
-      "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "wave": 4,
-      "planeIssueId": "95f28940-b049-445f-805a-930f0e706d75",
-      "checkpointId": "CP-103"
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-DVO-004",
-      "title": "devdrive-automount: auto-generate WatchPaths from fleet.json external_hosts",
-      "description": "Currently /Volumes/YJ_MORE and /Volumes/104APPLE are hardcoded in the plist. Adding a new external host to fleet.json does not update WatchPaths. Should generate the plist WatchPaths from fleet.json on any fleet.json change.",
-      "acceptanceCriteria": [
-        "lfg devdrive sync-plist command reads fleet.json external_hosts and rewrites WatchPaths",
-        "Adding a new external_host to fleet.json and running sync-plist updates plist without manual editing",
-        "LaunchAgent reloaded after plist update"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "pending",
-      "passes": false,
+      "id": "wave-4",
+      "name": "Wave 4 — OffloadRule Manager + Capacity Dashboard",
       "wave": 4,
-      "planeIssueId": "ac3f2941-4d41-4a86-b7df-27d78cd59d9a",
-      "checkpointId": "CP-104"
+      "dependsOn": ["wave-3"],
+      "swarms": [
+        {
+          "id": "w4-rules",
+          "name": "v3.7 — OffloadRule Management UI",
+          "agents": [
+            {
+              "id": "W4A1",
+              "checkpoints": ["v3.7"],
+              "title": "OffloadRuleManagerSheet — add/remove symlink rules and create symlinks on demand",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/OffloadRuleManagerSheet.swift"
+              ],
+              "acceptanceCriteria": [
+                "OffloadRuleManagerSheet presented from VolumeBackendCard ('Manage Rules' button)",
+                "Lists all existing OffloadRules for the backend with health dots",
+                "Remove rule: swipe-to-delete with confirmation alert; updates fleet.json via FleetEditor",
+                "Add rule: '+ Add Rule' button opens inline form — source path picker (starts at ~/) + target path field with autocomplete from backend mount point subdirs",
+                "One-click 'Create Symlink' for unhealthy rules (calls FileManager.createSymbolicLink)",
+                "Validation: warns if source already exists as a real dir (not a symlink)",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w4-capacity",
+          "name": "v3.8 — Capacity Dashboard",
+          "agents": [
+            {
+              "id": "W4A2",
+              "checkpoints": ["v3.8"],
+              "title": "CapacityDashboardView — stacked usage bars + rebalance suggestions",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/CapacityDashboardView.swift"
+              ],
+              "acceptanceCriteria": [
+                "CapacityDashboardView accessible from DevDriveView toolbar ('Capacity' button or tab)",
+                "Shows a horizontal stacked bar chart for each VolumeBackend (used vs free vs unallocated in sparseimage)",
+                "Total summary row: sum of all managed sparseimage usage vs host free space",
+                "Rebalance suggestions: if any host is >80% full and another has >20GB free, show a suggestion row with a 'Move →' button (wires to DriveRelocationSheet)",
+                "Auto-resize suggestion: if sparseimage usage >90%, show 'Resize +5GB' button (runs hdiutil resize via Process)",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-DVO-005",
-      "title": "DTF scan rule: flag ~/Downloads files older than 90 days for cleanup",
-      "description": "~/Downloads holds 27GB. A DTF scan rule should surface stale files >90 days old by modification time and report totals by age bucket (30d, 60d, 90d+). Deletion requires confirmation.",
-      "acceptanceCriteria": [
-        "lfg dtf --downloads-audit reports stale files by age bucket with sizes",
-        "lfg dtf --clean-downloads --older-than=90d removes after confirmation prompt",
-        "Integrates with DTF existing clean flow"
+      "id": "wave-5",
+      "name": "Wave 5 — Admin Preferences + Polish + TDD + Docs",
+      "wave": 5,
+      "dependsOn": ["wave-4"],
+      "swarms": [
+        {
+          "id": "w5-prefs",
+          "name": "v3.9 + v3.10 — Admin Prefs + Polish + TDD + Docs",
+          "agents": [
+            {
+              "id": "W5A1",
+              "checkpoints": ["v3.9"],
+              "title": "Admin preferences pane — DevDrive settings tab in Settings scene",
+              "files": [
+                "Sources/LFGApp/Views/Settings/DevDriveSettingsView.swift"
+              ],
+              "acceptanceCriteria": [
+                "DevDriveSettingsView added as a tab in the existing SettingsView",
+                "Sections: Auto-Mount (toggle per SourceVolume keep_awake, global threshold slider 75-95%), Notifications (toggle: mount events, drift alerts, capacity warnings), Display (default view mode picker: list/card/graph)",
+                "All settings persisted via @AppStorage",
+                "swift build passes"
+              ]
+            },
+            {
+              "id": "W5A2",
+              "checkpoints": ["v3.10"],
+              "title": "Polish + TDD for new LFGKit types + CLAUDE.md + README update",
+              "files": [
+                "Tests/LFGKitTests/DiskScannerTests.swift",
+                "Tests/LFGKitTests/FleetEditorTests.swift",
+                "Tests/LFGKitTests/RelocationCoordinatorTests.swift",
+                ".claude/CLAUDE.md",
+                "README.md"
+              ],
+              "acceptanceCriteria": [
+                "DiskScannerTests: mock plist output, verify MountedVolume parsing, isDevDriveManaged flag",
+                "FleetEditorTests: round-trip update (purpose, tier, reconnect_policy), atomic write (temp file + rename), handles missing id gracefully",
+                "RelocationCoordinatorTests: mock Process/FileManager, verify success path updates fleet.json, rollback on failure",
+                "swift test passes with total tests > 126 and 0 failures",
+                "CLAUDE.md: all v3.1–v3.10 iterations marked [x], iteration table updated",
+                "README: DevDrive v3 section updated with new view modes and admin capabilities"
+              ]
+            }
+          ]
+        }
       ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "pending",
-      "passes": false,
-      "wave": 4,
-      "planeIssueId": "4e08d63e-53a2-47ad-af44-92701577e257",
-      "checkpointId": "CP-105"
-    },
-    {
-      "id": "US-DVO-006",
-      "title": "fleet.json metadata: document non-movable iCloud directories as known-internal",
-      "description": "Messages Attachments (43GB), Mail/V10 (29GB), and Music (30GB) are iCloud-managed and cannot be symlinked. Document in fleet.json known_internal_consumers so the WTFS offload-audit excludes them from actionable items.",
-      "acceptanceCriteria": [
-        "fleet.json includes known_internal_consumers array with path, size_estimate, reason, managed_by",
-        "WTFS offload-audit separates movable vs known-fixed usage",
-        "version bumped"
-      ],
-      "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "pending",
-      "passes": false,
-      "wave": 4,
-      "planeIssueId": "4529b3be-9597-412c-a122-668470b85d9d",
-      "checkpointId": "CP-106"
-    },
-    {
-      "id": "US-DVO-007",
-      "title": "YJ_MORE drive stability: prevent repeated disconnect/fallback cycles",
-      "description": "YJ_MORE external drive disconnects repeatedly under normal use, triggering the reconcile agent to redirect home-dir symlinks (npm-cache, asdf, vscode, etc.) to empty internal fallback dirs, which rapidly fills the boot volume. Root causes to investigate: USB power management, macOS drive sleep policy, pmset keepawake, or a missing persistent mount strategy. Immediate fix (reconcile no-fallback for home-dir offloads) applied 2026-05-01.",
-      "acceptanceCriteria": [
-        "Root cause of YJ_MORE disconnect identified (USB power, sleep policy, or hardware)",
-        "pmset or other system policy configured to prevent drive sleep on YJ_MORE",
-        "fleet.json external_hosts entry gains 'keep_awake: true' flag consumed by devdrive-automount",
-        "devdrive-automount adds keepalive touch/ping loop for external hosts flagged keep_awake",
-        "Reconcile log shows zero HOME OFFLOAD dangling events over 24h with YJ_MORE connected"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "pending",
-      "passes": false,
-      "wave": 4,
-      "checkpointId": "CP-107"
-    },
-    {
-      "id": "US-DVO-008",
-      "title": "Reconcile agent: skip fallback redirect for home-dir offload symlinks",
-      "description": "When an external volume goes offline, the reconcile agent was redirecting ALL symlinks (including home-dir offloads like ~/.npm-cache, ~/.asdf) to empty internal fallback dirs. This caused silent internal disk writes filling the boot volume. Fix: for symlinks whose source path is outside ~/DevDrive/, leave them dangling rather than redirecting to fallback. Applied as a direct patch to devdrive-reconcile.sh on 2026-05-01.",
-      "acceptanceCriteria": [
-        "devdrive-reconcile.sh logs HOME OFFLOAD dangling for home-dir symlinks when volume offline",
-        "No writes occur to ~/DevDrive/901DEVLIB-fallback/ for home-dir offload paths during offline",
-        "Internal disk usage does not spike when YJ_MORE disconnects"
-      ],
-      "estimatedPoints": 1,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "wave": 4,
-      "checkpointId": "CP-108"
+      "gate": {
+        "command": "swift test 2>&1 | tail -10",
+        "mustPass": true
+      }
     }
   ]
 }

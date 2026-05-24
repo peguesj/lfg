@@ -43,22 +43,47 @@ public struct FleetDrive: Codable, Sendable, Equatable {
 
 /// Parses and indexes `fleet.json`, providing host-based lookups for the daemon.
 ///
-/// Usage:
+/// The registry exposes two parallel APIs:
+/// - **v2 API** (`FleetDrive`-based): used by `MountOrchestrator` — preserved unchanged.
+/// - **v3 API** (`SourceVolume` / `VolumeBackend`-based): richer three-tier model
+///   that also exposes `OffloadRule` values parsed from the `symlinks` arrays.
+///
+/// Usage (v2):
 /// ```swift
 /// let registry = try FleetRegistry(url: URL(fileURLWithPath: "/Users/jeremiah/DevDrive/fleet.json"))
 /// let drives = registry.drives(forHost: "YJ_MORE")
 /// ```
+///
+/// Usage (v3):
+/// ```swift
+/// let registry = try FleetRegistry(url: fleetURL)
+/// let host = registry.sourceVolume(named: "YJ_MORE")
+/// let backends = registry.volumeBackends(forHost: "YJ_MORE")
+/// let autoBackends = registry.autoBackends(forHost: "YJ_MORE")
+/// ```
 public final class FleetRegistry: @unchecked Sendable {
 
-    // MARK: Private state
+    // MARK: Private state — v2
 
     private var drivesByHost: [String: [FleetDrive]] = [:]
     private var drivesById: [String: FleetDrive] = [:]
 
-    // MARK: Nested raw model
+    // MARK: Private state — v3
+
+    private var sourceVolumesByName: [String: SourceVolume] = [:]
+    private var backendsByHost: [String: [VolumeBackend]] = [:]
+    private var backendsById: [String: VolumeBackend] = [:]
+
+    // MARK: Nested raw models
 
     private struct RawFleet: Codable {
         let drives: [FleetDriveCodable]
+        let externalHosts: [SourceVolume]?
+
+        private enum CodingKeys: String, CodingKey {
+            case drives
+            case externalHosts = "external_hosts"
+        }
     }
 
     private struct FleetDriveCodable: Codable {
@@ -84,6 +109,8 @@ public final class FleetRegistry: @unchecked Sendable {
 
     private func load(from data: Data) throws {
         let raw = try JSONDecoder().decode(RawFleet.self, from: data)
+
+        // v2: parse drives into FleetDrive index
         for entry in raw.drives {
             guard
                 let id = entry.id, !id.isEmpty,
@@ -102,9 +129,27 @@ public final class FleetRegistry: @unchecked Sendable {
             drivesById[id] = drive
             drivesByHost[host, default: []].append(drive)
         }
+
+        // v3: index SourceVolumes
+        for host in raw.externalHosts ?? [] {
+            sourceVolumesByName[host.name] = host
+        }
+
+        // v3: parse drives into VolumeBackend index (best-effort — skip malformed entries)
+        let v3Decoder = JSONDecoder()
+        if let drivesArray = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let rawDrives = drivesArray["drives"] as? [[String: Any]] {
+            for driveDict in rawDrives {
+                guard let driveData = try? JSONSerialization.data(withJSONObject: driveDict),
+                      let backend = try? v3Decoder.decode(VolumeBackend.self, from: driveData)
+                else { continue }
+                backendsById[backend.id] = backend
+                backendsByHost[backend.host, default: []].append(backend)
+            }
+        }
     }
 
-    // MARK: Public API
+    // MARK: Public API — v2 (unchanged, MountOrchestrator dependency)
 
     /// All drives whose `host` field matches the given volume name (e.g. "YJ_MORE").
     public func drives(forHost host: String) -> [FleetDrive] {
@@ -134,5 +179,36 @@ public final class FleetRegistry: @unchecked Sendable {
     /// Whether `host` is a known external host.
     public func isKnownHost(_ host: String) -> Bool {
         drivesByHost[host] != nil
+    }
+
+    // MARK: Public API — v3
+
+    /// All `SourceVolume` entries parsed from `external_hosts[]` in fleet.json.
+    public var allSourceVolumes: [SourceVolume] {
+        Array(sourceVolumesByName.values)
+    }
+
+    /// All `VolumeBackend` entries parsed from `drives[]` in fleet.json.
+    public var allVolumeBackends: [VolumeBackend] {
+        Array(backendsById.values)
+    }
+
+    /// All `VolumeBackend` entries whose `host` matches the given source volume name.
+    ///
+    /// - Parameter host: The `SourceVolume.name` to filter by (e.g. `"YJ_MORE"`).
+    public func volumeBackends(forHost host: String) -> [VolumeBackend] {
+        backendsByHost[host] ?? []
+    }
+
+    /// Look up a `SourceVolume` by its `name` field (e.g. `"YJ_MORE"`).
+    public func sourceVolume(named name: String) -> SourceVolume? {
+        sourceVolumesByName[name]
+    }
+
+    /// All `VolumeBackend` entries for a given host whose `reconnect_policy` is `"auto"`.
+    ///
+    /// - Parameter host: The `SourceVolume.name` to filter by.
+    public func autoBackends(forHost host: String) -> [VolumeBackend] {
+        volumeBackends(forHost: host).filter(\.isAutoReconnect)
     }
 }

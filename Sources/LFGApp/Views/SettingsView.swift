@@ -8,9 +8,10 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             generalTab.tabItem { Label("General", systemImage: "gear") }
+            DevDriveSettingsView().tabItem { Label("DevDrive", systemImage: "externaldrive.fill") }
             aboutTab.tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 450, height: 300)
+        .frame(width: 520, height: 420)
         .onAppear { checkFDA() }
     }
 
