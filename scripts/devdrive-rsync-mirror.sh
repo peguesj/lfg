@@ -30,7 +30,7 @@ mkdir -p "$(dirname "$LOG")"
 
 # volume_path|fallback_path|priority(volume_authoritative=v, fallback_authoritative=f, newer_wins=n)
 MIRRORS=(
-  "/Volumes/DDRV-904-MEMVT/claude-tasks|$HOME/DevDrive/904MEMVT-fallback/claude-tasks|n"
+  "/Volumes/DDRV-904-MEMVT-v2/claude-tasks|$HOME/DevDrive/904MEMVT-fallback/claude-tasks|n"
   "/Volumes/903LUME/projects|$HOME/DevDrive/903CLAUD-fallback/projects|n"
   "/Volumes/903LUME/tasks|$HOME/DevDrive/903CLAUD-fallback/tasks|n"
   "/Volumes/903LUME/claude-projects|$HOME/DevDrive/.claude-projects-fallback|n"
