@@ -122,9 +122,9 @@ public final class DevDriveHealthService {
             content.title = "LFG — Broken symlinks"
             content.body = "\(mountedDangling.count) offload symlink(s) are dangling. Open LFG to restore."
             content.sound = .default
-            UNUserNotificationCenter.current().add(
+            try? await UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: "lfg.devdrive.dangling", content: content, trigger: nil)
-            ) { _ in }
+            )
         }
     }
 }

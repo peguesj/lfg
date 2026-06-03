@@ -129,7 +129,7 @@ final class VolumeDetectWindowController: NSWindowController, WKScriptMessageHan
             guard let self else { return }
             guard let name = notification.userInfo?[NSWorkspace.localizedVolumeNameUserInfoKey] as? String,
                   name == self.hostName else { return }
-            self.handleHostMounted()
+            Task { @MainActor [weak self] in self?.handleHostMounted() }
         }
     }
 

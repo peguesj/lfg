@@ -245,6 +245,15 @@ Squadron Bravo (devdrive-remediation): LFG-49..LFG-58
 
 ---
 
+## Implementation Checkpoints — DevDrive Availability Detection (2026-06-03)
+
+### Sprint: DevDrive Availability — Proactive health monitoring + actionable notifications (formation-12306)
+
+- [x] **CP-119**: Foundation — `FallbackPolicy`, `SymlinkHealthReport`/`Scanner`, `DevDriveHealthService`, `DevDriveNotificationCategories`, `NotificationActionHandler`, `VolumeDetectWindowController`, `FallbackVolumeWindowController`, `assets/devdrive-detect.html`, `assets/devdrive-fallback-mgmt.html` — 3e7cc4c
+- [x] **CP-120**: Wire into LFGApp v3 — `healthService.start()` in `setupMountWatcher()`, post-attach `healthService.scan()` in `handleAttachResults()`, `registerCategories()` + `NotificationActionHandler.shared` delegate at app launch — 49a2c50
+
+---
+
 ## Stack
 
 - **Bash** 5+ (modules, dispatcher)
