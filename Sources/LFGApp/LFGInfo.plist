@@ -18,5 +18,13 @@
     <true/>
     <key>NSFullDiskAccessUsageDescription</key>
     <string>LFG needs Full Disk Access to scan system caches, manage Spotlight indexing, and monitor volumes.</string>
+    <key>CFBundleExecutable</key>
+    <string>LFG</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 </dict>
 </plist>
