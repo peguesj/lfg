@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LFG — Waiting for drive</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #22d3ee;
+    --success: #3fb950;
+    --danger: #f85149;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 0;
+    overflow: hidden;
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+
+  /* ── Orbit ring ── */
+  .orbit-wrap {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin-bottom: 28px;
+  }
+
+  .orbit-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+  }
+
+  .orbit-ring::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--accent);
+    animation: orbit 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes orbit {
+    to { transform: rotate(360deg); }
+  }
+
+  .drive-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    opacity: 0.4;
+    transition: opacity 0.4s ease;
+  }
+
+  /* ── Connected state ── */
+  .orbit-ring.connected::after { animation: none; border-top-color: var(--success); }
+  .orbit-ring.connected { border-color: var(--success); transition: border-color 0.4s ease; }
+  .drive-icon.connected { opacity: 1; }
+
+  /* ── Pulse dots ── */
+  .dots {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    height: 6px;
+    align-items: center;
+  }
+  .dot {
+    width: 5px; height: 5px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1.4s ease-in-out infinite;
+    opacity: 0.2;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+  .dots.hidden { opacity: 0; }
+
+  /* ── Text ── */
+  .label-wrap { text-align: center; margin-bottom: 24px; }
+
+  h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    max-width: 320px;
+    line-height: 1.5;
+  }
+
+  /* ── Success badge ── */
+  .success-badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--success);
+    font-weight: 500;
+  }
+  .success-badge.visible { display: flex; }
+  .check-circle {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--success);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: #000; font-weight: 700;
+  }
+
+  /* ── Action buttons ── */
+  .actions {
+    display: flex;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+  }
+
+  button {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: #21262d; border-color: #6e7681; }
+  button.primary {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #fff;
+  }
+  button.primary:hover { background: #2563eb; border-color: #2563eb; }
+
+  /* ── Volume list ── */
+  .vol-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .vol-pill {
+    padding: 2px 8px;
+    background: #1e2937;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: "SF Mono", ui-monospace, monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="orbit-wrap">
+  <div class="orbit-ring" id="orbitRing"></div>
+  <div class="drive-icon" id="driveIcon">🔌</div>
+</div>
+
+<div class="label-wrap">
+  <h2 id="mainLabel">Waiting for {{HOST_NAME}}…</h2>
+  <p class="subtitle" id="subLabel">Connect the drive to automatically mount your DevDrive volumes</p>
+</div>
+
+<div class="dots" id="dots">
+  <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+</div>
+
+<div class="success-badge" id="successBadge">
+  <div class="check-circle">✓</div>
+  <span>Drive connected — mounting volumes…</span>
+</div>
+
+<div class="vol-list" id="volList"></div>
+
+<div class="actions">
+  <button onclick="openFallback()">Use Different Volume</button>
+  <button onclick="dismiss()">Dismiss</button>
+</div>
+
+<script>
+  const HOST = "{{HOST_NAME}}";
+  const VOLS = "{{VOLUME_IDS}}".split(",").map(s => s.trim()).filter(Boolean);
+
+  // Render volume pills
+  const list = document.getElementById("volList");
+  VOLS.forEach(v => {
+    const pill = document.createElement("div");
+    pill.className = "vol-pill";
+    pill.textContent = v;
+    list.appendChild(pill);
+  });
+
+  // Called by Swift when the host drive mounts
+  window.lfgHostConnected = function () {
+    document.getElementById("orbitRing").classList.add("connected");
+    document.getElementById("driveIcon").classList.add("connected");
+    document.getElementById("driveIcon").textContent = "💿";
+    document.getElementById("dots").classList.add("hidden");
+    document.getElementById("mainLabel").textContent = HOST + " connected!";
+    document.getElementById("subLabel").textContent = "Mounting volumes — you'll be notified when ready.";
+    document.getElementById("successBadge").classList.add("visible");
+    document.querySelector(".actions").style.display = "none";
+  };
+
+  function dismiss() {
+    webkit.messageHandlers.lfgDetect.postMessage("dismiss");
+  }
+  function openFallback() {
+    webkit.messageHandlers.lfgDetect.postMessage("openFallback");
+  }
+</script>
+</body>
+</html>

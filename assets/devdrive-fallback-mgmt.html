@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LFG — Fallback Volume</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2130;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #818cf8;
+    --success: #3fb950;
+    --warning: #d29922;
+    --danger: #f85149;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    font-size: 13px;
+    padding: 24px;
+    min-height: 100vh;
+    overflow-y: auto;
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+
+  .no-drag { -webkit-app-region: no-drag; }
+
+  /* ── Header ── */
+  header {
+    margin-bottom: 20px;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Target volumes ── */
+  .target-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 18px;
+  }
+  .pill {
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-family: "SF Mono", ui-monospace, monospace;
+    background: #1a2436;
+    border: 1px solid #2d3c52;
+    color: #93c5fd;
+  }
+
+  /* ── Section cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card h2 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge {
+    padding: 1px 5px;
+    background: #1e2a3a;
+    border: 1px solid #2d3c52;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #60a5fa;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+
+  /* ── Form controls ── */
+  label.field-label {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  select, input[type="text"] {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 10px;
+    -webkit-app-region: no-drag;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+  .check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    -webkit-app-region: no-drag;
+  }
+  .check-row input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
+  .check-row label { color: var(--text); cursor: pointer; font-size: 13px; }
+  .check-row .desc { color: var(--muted); font-size: 11px; margin-top: 1px; }
+
+  /* ── Conditional sub-sections ── */
+  .conditional {
+    display: none;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+  }
+  .conditional.visible { display: block; }
+
+  .radio-group { display: flex; flex-direction: column; gap: 6px; }
+  .radio-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    -webkit-app-region: no-drag;
+  }
+  .radio-row input[type="radio"] { margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
+  .radio-row .opt-label { font-size: 13px; }
+  .radio-row .opt-desc { font-size: 11px; color: var(--muted); }
+
+  /* ── Status/info bar ── */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #0d2818;
+    border: 1px solid #1a4731;
+    border-radius: 6px;
+    color: var(--success);
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .status-bar.visible { display: flex; }
+
+  /* ── Footer actions ── */
+  footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 4px;
+    -webkit-app-region: no-drag;
+  }
+  button {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  button:hover { background: #21262d; border-color: #6e7681; }
+  button.primary {
+    background: #312e81;
+    border-color: #4338ca;
+    color: #c7d2fe;
+  }
+  button.primary:hover { background: #3730a3; border-color: var(--accent); }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Volume mount indicator ── */
+  .mount-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .mount-dot.mounted { background: var(--success); }
+  .mount-dot.unmounted { background: var(--border); }
+</style>
+</head>
+<body class="no-drag">
+
+<header>
+  <h1>DevDrive — Fallback Volume</h1>
+  <p>Configure how LFG handles volumes that can't be mounted</p>
+</header>
+
+<!-- Target volumes being configured -->
+<div class="target-pills" id="targetPills"></div>
+
+<!-- Status bar (shown on save) -->
+<div class="status-bar" id="statusBar">
+  <span>✓</span><span>Settings saved</span>
+</div>
+
+<!-- Section 1: Fallback volume -->
+<div class="card">
+  <h2>Fallback Volume</h2>
+
+  <label class="field-label">When unavailable, use this volume instead</label>
+  <select id="fallbackVol" onchange="onFallbackChange()">
+    <option value="">— on-disk fallback directory (default) —</option>
+  </select>
+
+  <div class="check-row">
+    <input type="checkbox" id="setDefault">
+    <div>
+      <label for="setDefault">Set as default for all unavailable volumes</label>
+      <div class="desc">New volumes without an explicit override will use this volume</div>
+    </div>
+  </div>
+
+  <!-- Migrate option — shown when a fallback volume is selected -->
+  <div class="conditional" id="migrateSection">
+    <div class="check-row">
+      <input type="checkbox" id="migrateOnReconnect">
+      <div>
+        <label for="migrateOnReconnect" id="migrateLabel">Migrate data once original drive reconnects</label>
+        <div class="desc">Copies data from this fallback volume to the original, then switches back</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Secondary devdrive -->
+<div class="card">
+  <h2>Secondary DevDrive <span class="badge">Optional</span></h2>
+
+  <div class="check-row">
+    <input type="checkbox" id="makeSecondary" onchange="onSecondaryChange()">
+    <div>
+      <label for="makeSecondary">Make selected volume a secondary devdrive</label>
+      <div class="desc">LFG treats it as a persistent co-host, not just a temporary fallback</div>
+    </div>
+  </div>
+
+  <div class="conditional" id="syncSection">
+    <label class="field-label" style="margin-bottom:8px">When both volumes are available</label>
+    <div class="radio-group">
+      <div class="radio-row">
+        <input type="radio" name="syncMode" id="syncPrimary" value="syncToPrimary" checked>
+        <div>
+          <div class="opt-label"><label for="syncPrimary">Sync to primary</label></div>
+          <div class="opt-desc">Secondary is a read replica — primary always wins on conflict</div>
+        </div>
+      </div>
+      <div class="radio-row">
+        <input type="radio" name="syncMode" id="syncCombine" value="combineContents">
+        <div>
+          <div class="opt-label"><label for="syncCombine">Combine contents</label></div>
+          <div class="opt-desc">Files from both volumes merged; conflicts prefer primary</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <button onclick="dismiss()">Cancel</button>
+  <button class="primary" id="saveBtn" onclick="save()">Save</button>
+</footer>
+
+<script>
+  // ── Runtime data injected by Swift ──
+  const AVAILABLE_VOLUMES = {{AVAILABLE_VOLUMES_JSON}};
+  const EXISTING_POLICY   = {{EXISTING_POLICY_JSON}};
+  const TARGET_IDS        = {{TARGET_VOLUME_IDS_JSON}};
+
+  // ── Populate target pills ──
+  TARGET_IDS.forEach(id => {
+    const pill = document.createElement("div");
+    pill.className = "pill";
+    pill.textContent = id;
+    document.getElementById("targetPills").appendChild(pill);
+  });
+
+  // ── Populate volume selector ──
+  const sel = document.getElementById("fallbackVol");
+  AVAILABLE_VOLUMES.forEach(v => {
+    const opt = document.createElement("option");
+    opt.value = v.id;
+    const dot = v.mounted === "true" ? "●" : "○";
+    opt.textContent = `${dot}  ${v.id}  —  ${v.purpose}`;
+    sel.appendChild(opt);
+  });
+
+  // ── Pre-fill from existing policy (use first target volume as reference) ──
+  const firstOverride = (EXISTING_POLICY.volumeOverrides || {})[TARGET_IDS[0]];
+  if (firstOverride) {
+    if (firstOverride.fallbackVolumeId) {
+      sel.value = firstOverride.fallbackVolumeId;
+      document.getElementById("migrateSection").classList.add("visible");
+    }
+    document.getElementById("setDefault").checked = firstOverride.action === "useDefaultFallback";
+    document.getElementById("migrateOnReconnect").checked = !!firstOverride.migrateOnReconnect;
+    document.getElementById("makeSecondary").checked = !!firstOverride.isSecondary;
+    if (firstOverride.isSecondary) {
+      document.getElementById("syncSection").classList.add("visible");
+    }
+    if (firstOverride.secondarySyncMode === "combineContents") {
+      document.getElementById("syncCombine").checked = true;
+    }
+  }
+
+  // ── Reactive controls ──
+  function onFallbackChange() {
+    const hasSel = !!sel.value;
+    document.getElementById("migrateSection").classList.toggle("visible", hasSel);
+    if (!hasSel) document.getElementById("migrateOnReconnect").checked = false;
+  }
+
+  function onSecondaryChange() {
+    const on = document.getElementById("makeSecondary").checked;
+    document.getElementById("syncSection").classList.toggle("visible", on);
+  }
+
+  // ── Actions ──
+  function save() {
+    const btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+
+    const syncMode = document.querySelector('input[name="syncMode"]:checked')?.value || "syncToPrimary";
+    const payload = {
+      type: "save",
+      volumeIds: TARGET_IDS,
+      fallbackVolumeId: sel.value || null,
+      setAsDefault: document.getElementById("setDefault").checked,
+      migrateOnReconnect: document.getElementById("migrateOnReconnect").checked,
+      makeSecondary: document.getElementById("makeSecondary").checked,
+      syncMode
+    };
+    webkit.messageHandlers.lfgFallback.postMessage(JSON.stringify(payload));
+  }
+
+  function dismiss() {
+    webkit.messageHandlers.lfgFallback.postMessage(JSON.stringify({ type: "dismiss" }));
+  }
+
+  // Called by Swift on successful save
+  window.lfgSaveAck = function () {
+    document.getElementById("statusBar").classList.add("visible");
+    document.getElementById("saveBtn").textContent = "Saved ✓";
+    setTimeout(() => {
+      webkit.messageHandlers.lfgFallback.postMessage(JSON.stringify({ type: "dismiss" }));
+    }, 900);
+  };
+</script>
+</body>
+</html>

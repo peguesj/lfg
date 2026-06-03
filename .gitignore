@@ -25,3 +25,5 @@ viewer
 # Generated icons
 assets/brand/AppIcon.icns
 dist/
+ruvector.db
+.worktrees
