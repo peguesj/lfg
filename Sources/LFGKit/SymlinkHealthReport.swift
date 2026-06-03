@@ -36,6 +36,14 @@ public struct SymlinkHealthReport: Sendable {
     public let missingHostVolumes: [MissingHostVolume]
     public let scannedAt: Date
 
+    // MARK: Init
+
+    public init(danglingRules: [DanglingRule], missingHostVolumes: [MissingHostVolume], scannedAt: Date) {
+        self.danglingRules = danglingRules
+        self.missingHostVolumes = missingHostVolumes
+        self.scannedAt = scannedAt
+    }
+
     // MARK: Convenience
 
     public var isHealthy: Bool {

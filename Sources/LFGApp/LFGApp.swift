@@ -10,6 +10,8 @@ struct LFGApp: App {
         // UNUserNotificationCenter requires a bundle identifier — skip when running as a bare CLI executable.
         guard Bundle.main.bundleIdentifier != nil else { return }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        DevDriveNotificationCategories.registerCategories()
+        UNUserNotificationCenter.current().delegate = NotificationActionHandler.shared
     }
 
     var sharedModelContainer: ModelContainer = {

@@ -8,6 +8,11 @@ import LFGKit
 @MainActor
 final class AppState {
     let fleet = FleetMonitorService()
+    // MARK: - Health service (LFG-DDAV CP-120)
+    // NOTE: 903LUME hosts ~/.claude/projects (conversation history) and 900HOOKS hosts
+    // Claude Code hooks (npm, pip, system). Health failures here directly cause
+    // tool-level breakage — missing JCC conversations and silent hook failures.
+    var healthService = DevDriveHealthService()
     var moduleStatuses: [LFGModule: ModuleStatus] = {
         var map: [LFGModule: ModuleStatus] = [:]
         for module in LFGModule.allCases {
@@ -86,6 +91,9 @@ final class AppState {
         let newOrchestrator = MountOrchestrator(registry: registry)
         orchestrator = newOrchestrator
 
+        // Start periodic symlink health scanning (covers 903LUME/900HOOKS/901DEVLIB offload rules)
+        healthService.start()
+
         let token = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didMountNotification,
             object: nil,
@@ -135,6 +143,9 @@ final class AppState {
             body: notifBody,
             identifier: "lfg.devdrive.attach.\(host)"
         )
+
+        // Re-scan health after attach — a newly mounted volume may heal dangling symlinks
+        Task { await healthService.scan() }
     }
 
     // MARK: - Notification helper (CP-110)
