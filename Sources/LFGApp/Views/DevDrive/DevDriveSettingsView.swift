@@ -19,6 +19,9 @@ struct DevDriveSettingsView: View {
     @AppStorage("devDrive.notifyOnMount")     private var notifyOnMount = true
     @AppStorage("devDrive.notifyOnFail")      private var notifyOnFail = true
     @AppStorage("devDrive.defaultViewMode")   private var defaultViewMode: DevDriveViewMode = .list
+    /// Persistence + autoconnect: on app launch, automatically attach all auto-policy
+    /// sparseimages whose host volume is currently mounted. Default ON.
+    @AppStorage("lfg.autoAttachOnLaunch")     private var autoAttachOnLaunch = true
 
     // MARK: Transient state
 
@@ -69,6 +72,10 @@ struct DevDriveSettingsView: View {
         Section("Auto-Mount") {
             Toggle("Attach sparseimages when host volume connects", isOn: $autoMountEnabled)
             Text("When enabled, LFG watches NSWorkspace for mount events and calls `hdiutil attach` for all auto-policy volumes on the connecting host.")
+                .font(.caption).foregroundStyle(.secondary)
+
+            Toggle("Auto-attach known volumes on launch", isOn: $autoAttachOnLaunch)
+            Text("On app launch (including login auto-launch), scan all SourceVolumes in fleet.json and attach auto-policy sparseimages for any host that is already mounted. Recommended for menubar-only sessions.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

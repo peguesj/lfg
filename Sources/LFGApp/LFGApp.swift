@@ -6,6 +6,11 @@ import UserNotifications
 struct LFGApp: App {
     @State private var appState = AppState()
 
+    /// Auto-attach all auto-policy sparseimages whose host volume is already mounted
+    /// when LFG launches. Default ON so that the menubar app re-establishes the
+    /// DevDrive fabric automatically on every login.
+    @AppStorage("lfg.autoAttachOnLaunch") private var autoAttachOnLaunch = true
+
     init() {
         // UNUserNotificationCenter requires a bundle identifier — skip when running as a bare CLI executable.
         guard Bundle.main.bundleIdentifier != nil else { return }
@@ -38,6 +43,9 @@ struct LFGApp: App {
                 .environment(appState)
                 .onAppear {
                     appState.setupMountWatcher()
+                    if autoAttachOnLaunch {
+                        Task { await appState.attachAllMountedHosts() }
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -45,6 +53,16 @@ struct LFGApp: App {
         MenuBarExtra("LFG", systemImage: "externaldrive.fill") {
             MenuBarView()
                 .environment(appState)
+                .onAppear {
+                    // MenuBarExtra is the canonical launch surface for LSUIElement apps;
+                    // the WindowGroup may never appear if the user never opens the main
+                    // window. Wire mount watcher + auto-attach here so persistence works
+                    // for menubar-only sessions.
+                    appState.setupMountWatcher()
+                    if autoAttachOnLaunch {
+                        Task { await appState.attachAllMountedHosts() }
+                    }
+                }
         }
         .menuBarExtraStyle(.window)
 

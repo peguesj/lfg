@@ -30,11 +30,13 @@ final class AppState {
     /// Retained to keep the orchestrator alive between notifications.
     var orchestrator: MountOrchestrator?
 
+    /// Retained registry for launch-time auto-attach scans.
+    var registry: FleetRegistry?
+
     /// NSWorkspace notification observer token — removed on deinit.
-    /// `nonisolated(unsafe)` allows deinit (which is nonisolated) to read this
-    /// without a concurrency error; the value is only written once on the main
-    /// actor during `setupMountWatcher()`.
-    nonisolated(unsafe) private var mountObserverToken: (any NSObjectProtocol)?
+    /// `nonisolated` allows deinit (which is nonisolated) to read this; the
+    /// value is only written once on the main actor during `setupMountWatcher()`.
+    nonisolated private var mountObserverToken: (any NSObjectProtocol)?
 
     deinit {
         if let token = mountObserverToken {
@@ -90,6 +92,7 @@ final class AppState {
 
         let newOrchestrator = MountOrchestrator(registry: registry)
         orchestrator = newOrchestrator
+        self.registry = registry
 
         // Start periodic symlink health scanning (covers 903LUME/900HOOKS/901DEVLIB offload rules)
         healthService.start()
@@ -167,5 +170,27 @@ final class AppState {
             trigger: nil          // deliver immediately
         )
         UNUserNotificationCenter.current().add(request) { _ in }
+    }
+
+    // MARK: - Launch-time auto-attach (persistence + autoconnect)
+
+    /// Iterates all known SourceVolumes and triggers `MountOrchestrator.attachAll`
+    /// for any host that is currently mounted at app launch. Intended to be invoked
+    /// once during `applicationDidFinishLaunching`-equivalent (`.onAppear` of the root
+    /// scene) so that a relaunched app immediately reconnects auto-policy sparseimages
+    /// without waiting for an `NSWorkspace.didMountNotification` (which fires only on
+    /// transitions, not the steady state).
+    ///
+    /// Gated behind `@AppStorage("lfg.autoAttachOnLaunch")` upstream — callers should
+    /// check that preference before invoking. Safe to call multiple times.
+    func attachAllMountedHosts() async {
+        guard let orchestrator, let registry else { return }
+        let mountedHosts = registry.allSourceVolumes.filter(\.isMounted)
+        for host in mountedHosts {
+            let results = await orchestrator.attachAll(forHost: host.name)
+            await MainActor.run {
+                self.handleAttachResults(results, host: host.name)
+            }
+        }
     }
 }

@@ -26,5 +26,11 @@
     <string>AppIcon</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <!-- Menubar agent: no Dock icon, no main menu. Activated via MenuBarExtra. -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Allow login-item registration via SMAppService (macOS 13+). -->
+    <key>LSBackgroundOnly</key>
+    <false/>
 </dict>
 </plist>
