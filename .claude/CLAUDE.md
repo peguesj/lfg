@@ -147,6 +147,12 @@ Run from the package root `~/tools/@yj/lfg/`. The suite currently contains 126 t
 
 ---
 
+## DevDrive Recovery Runbook
+
+When a sparseimage fails to mount and the standard `lfg-devdrive` detach+reattach pattern does not resolve it, see `~/.claude/agents/lfg/devdrive-recovery-agent.md`. Triggers: APFS superblock errno 5 at block 0, `hdiutil DIHLDiskImageAttach error 112` ("no mountable file systems"), sparsebundle band damage, persistent `diskutil mount` failures after detach+reattach. The recovery agent handles failure-class diagnosis, idempotent recovery procedures (Info.plist swap, `fsck_apfs -yn`, readonly shadow attach for exfil), and writes a recovery log at `~/tools/@yj/lfg/.claude/recovery-log/YYYY-MM-DD-<VOLUME_IDS>.md`. It hands state back to `lfg-devdrive` after verification. Destructive actions (`fsck -y`, reformat, `rm` on images) are gated behind explicit user confirmation.
+
+---
+
 ## Key Files
 
 | Path | Purpose |
