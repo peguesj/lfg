@@ -25,6 +25,16 @@ private final class V3MockHdiutil: HdiutilInterface, @unchecked Sendable {
         if shouldThrow { throw NSError(domain: "v3mock", code: 2) }
         return detachResult
     }
+
+    func detachDevice(_ devNode: String, force: Bool) async throws -> ProcessRunner.Result {
+        // Stub: returns success (empty plist means no stale device found).
+        return .init(exitCode: 0, stdout: "", stderr: "")
+    }
+
+    func info() async throws -> ProcessRunner.Result {
+        // Stub: returns empty plist (no images currently attached).
+        return .init(exitCode: 0, stdout: "", stderr: "")
+    }
 }
 
 // MARK: - Fixtures
