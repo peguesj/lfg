@@ -8,6 +8,13 @@ returned ActionResult describes what *would* happen.
 All subprocess calls are routed through the module-level ``_run()`` helper so
 tests can patch it without spawning real processes.
 
+``FALLBACK_PENDING_RECLAIM`` is handled by ``fix_fallback_pending_reclaim``,
+which runs the same rsync → verify → symlink-swap sequence as
+``fix_real_dir_drift`` but operates on the ``<system_path>-fallback`` source
+rather than the live ``system_path``.  After a successful swap it advances the
+lifecycle state from ``backend_rebuilt → sync_in_progress`` and then
+``sync_verifying → reclaimed`` via the Phoenix BackendLifecycleStore.
+
 Typical usage::
 
     from devdrive_v2.actions import dispatch_action
@@ -23,7 +30,7 @@ from __future__ import annotations
 import os
 import subprocess
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from devdrive_v2.reconcile import DriftCategory, DriftEvent
 
@@ -388,6 +395,172 @@ def fix_real_dir_drift(event: DriftEvent, *, dry_run: bool = True) -> ActionResu
     )
 
 
+def fix_fallback_pending_reclaim(
+    event: DriftEvent, *, dry_run: bool = True
+) -> ActionResult:
+    """Reclaim a lingering fallback directory for a now-healthy volume.
+
+    When a volume that previously triggered a fallback is back online and all
+    its symlinks are healthy, a ``<system_path>-fallback`` directory may still
+    occupy internal storage from the offline period.  This action:
+
+    1. ``lsof +D <fallback_path>`` — abort if any process holds open handles.
+    2. ``rsync -av --checksum <fallback_path>/ <target>/`` to sync any writes
+       made to the fallback back to the primary volume target.
+    3. ``diff -rq <fallback_path> <target>`` checksum verification.
+    4. ``rm -rf <fallback_path>`` to reclaim internal storage.
+
+    Lifecycle transitions emitted (non-blocking, best-effort via outbox):
+    - ``backend_rebuilt → sync_in_progress`` before rsync.
+    - ``sync_in_progress → sync_verifying`` before diff.
+    - ``sync_verifying → reclaimed`` after successful removal.
+
+    The ``backend_id`` for lifecycle transitions is taken from the volume name
+    embedded in ``event.detail`` (same field as REAL_DIR_DRIFT).
+
+    Args:
+        event: A DriftEvent with category ``FALLBACK_PENDING_RECLAIM``.
+            ``event.source`` is the healthy system path (symlink); the fallback
+            directory is ``event.source + "-fallback"``.
+        dry_run: When True, no filesystem or subprocess side-effects occur.
+
+    Returns:
+        ActionResult describing the outcome.  Returns failure if lsof detects
+        open handles (regardless of dry_run mode) to prevent data loss.
+    """
+    action = "fix_fallback_pending_reclaim"
+    system_path = event.source
+    fallback_path = system_path + "-fallback"
+    target = _extract_target_from_detail(event.detail)
+
+    if not target:
+        return ActionResult(
+            success=False,
+            action=action,
+            source=system_path,
+            detail=(
+                f"Cannot determine rsync target from event detail: {event.detail!r}"
+            ),
+            dry_run=dry_run,
+        )
+
+    # Open-handle check on the fallback dir — always run, even in dry-run.
+    if lsof_check(fallback_path):
+        return ActionResult(
+            success=False,
+            action=action,
+            source=system_path,
+            detail=(
+                f"Aborting: lsof detected open file handles under "
+                f"{fallback_path!r}. "
+                "Close all processes accessing the fallback directory before retrying."
+            ),
+            dry_run=dry_run,
+        )
+
+    # Resolve backend_id from the volume name embedded in the detail string.
+    # Falls back to the source path if no volume name can be extracted.
+    backend_id = _extract_backend_id_from_detail(event.detail) or system_path
+
+    if dry_run:
+        return ActionResult(
+            success=True,
+            action=action,
+            source=system_path,
+            detail=(
+                f"[dry-run] Would rsync {fallback_path!r}/ → {target!r}/, "
+                "verify with diff --checksum, then remove "
+                f"{fallback_path!r} to reclaim internal storage."
+            ),
+            dry_run=True,
+        )
+
+    # --- Apply mode ---------------------------------------------------------
+
+    # 1. Advance lifecycle: backend_rebuilt → sync_in_progress.
+    _emit_lifecycle(
+        backend_id=backend_id,
+        from_state="backend_rebuilt",
+        to_state="sync_in_progress",
+        evidence={"fallback_path": fallback_path, "target": target},
+    )
+
+    # 2. Rsync fallback → primary volume target.
+    rsync_result = _run(
+        ["rsync", "-av", "--checksum", fallback_path + "/", target + "/"],
+        timeout=300,
+    )
+    if rsync_result.returncode != 0:
+        return ActionResult(
+            success=False,
+            action=action,
+            source=system_path,
+            detail=(
+                f"rsync fallback→target failed (rc={rsync_result.returncode}): "
+                f"{rsync_result.stderr.strip()}"
+            ),
+            dry_run=False,
+        )
+
+    # 3. Advance lifecycle: sync_in_progress → sync_verifying.
+    _emit_lifecycle(
+        backend_id=backend_id,
+        from_state="sync_in_progress",
+        to_state="sync_verifying",
+        evidence={"fallback_path": fallback_path, "target": target},
+    )
+
+    # 4. Verify: recursive diff.
+    diff_result = _run(
+        ["diff", "-rq", fallback_path, target],
+        timeout=120,
+    )
+    if diff_result.returncode != 0:
+        return ActionResult(
+            success=False,
+            action=action,
+            source=system_path,
+            detail=(
+                "Checksum verification failed — fallback and target differ "
+                f"after rsync. diff output: {diff_result.stdout.strip()}"
+            ),
+            dry_run=False,
+        )
+
+    # 5. Remove the fallback directory.
+    rm_result = _run(["rm", "-rf", fallback_path], timeout=120)
+    if rm_result.returncode != 0:
+        return ActionResult(
+            success=False,
+            action=action,
+            source=system_path,
+            detail=(
+                f"rsync + verify succeeded but rm -rf {fallback_path!r} "
+                f"failed (rc={rm_result.returncode}): {rm_result.stderr.strip()}"
+            ),
+            dry_run=False,
+        )
+
+    # 6. Advance lifecycle: sync_verifying → reclaimed.
+    _emit_lifecycle(
+        backend_id=backend_id,
+        from_state="sync_verifying",
+        to_state="reclaimed",
+        evidence={"fallback_path": fallback_path, "reclaimed": True},
+    )
+
+    return ActionResult(
+        success=True,
+        action=action,
+        source=system_path,
+        detail=(
+            f"Reclaim complete: rsync OK, diff OK, removed {fallback_path!r}. "
+            f"Primary target '{target}' is the sole live copy."
+        ),
+        dry_run=False,
+    )
+
+
 def fix_unmounted_vol(event: DriftEvent, *, dry_run: bool = True) -> ActionResult:
     """Attempt to mount the volume using ``diskutil mount <volume_name>``.
 
@@ -583,6 +756,7 @@ def dispatch_action(event: DriftEvent, *, dry_run: bool = True) -> ActionResult:
         DriftCategory.MISSING_LINK: fix_missing_link,
         DriftCategory.STALE_TARGET: fix_stale_target,
         DriftCategory.REAL_DIR_DRIFT: fix_real_dir_drift,
+        DriftCategory.FALLBACK_PENDING_RECLAIM: fix_fallback_pending_reclaim,
         DriftCategory.UNMOUNTED_VOL: fix_unmounted_vol,
         DriftCategory.BAND_BLOAT: fix_band_bloat,
         DriftCategory.SNAPSHOT_LOCKED: fix_snapshot_locked,
@@ -656,6 +830,63 @@ def _extract_target_from_detail(detail: str) -> Optional[str]:
     if matches:
         return matches[-1]
 
+    return None
+
+
+def _emit_lifecycle(
+    backend_id: str,
+    from_state: str,
+    to_state: str,
+    evidence: dict[str, Any],
+) -> None:
+    """Emit a lifecycle transition to the Phoenix BackendLifecycleStore.
+
+    Import is deferred so this module remains importable without the full
+    ``devdrive`` package present.  Failures are logged at DEBUG level and
+    swallowed — lifecycle telemetry must never crash a repair action.
+
+    Args:
+        backend_id: fleet.json ``drives[].id`` value.
+        from_state: Current lifecycle state string.
+        to_state: Target lifecycle state string.
+        evidence: Observation data to include in the POST body.
+    """
+    try:
+        from devdrive.lifecycle_store import LifecycleState  # noqa: PLC0415
+        from devdrive.lifecycle_store import transition as _lc_transition
+
+        _lc_transition(
+            backend_id=backend_id,
+            from_state=LifecycleState(from_state),
+            to_state=LifecycleState(to_state),
+            evidence=evidence,
+            metadata={"producer_pipeline": "python.devdrive_v2.actions"},
+        )
+    except Exception as exc:  # noqa: BLE001
+        import logging as _logging
+
+        _logging.getLogger(__name__).debug(
+            "_emit_lifecycle %s→%s for %s: %s", from_state, to_state, backend_id, exc
+        )
+
+
+def _extract_backend_id_from_detail(detail: str) -> Optional[str]:
+    """Extract the volume/backend id from a reconcile event detail string.
+
+    Looks for the ``volume=<name>`` annotation written by the reconcile loop
+    into FALLBACK_PENDING_RECLAIM and REAL_DIR_DRIFT detail strings.
+
+    Args:
+        detail: The ``DriftEvent.detail`` string.
+
+    Returns:
+        The extracted backend id, or None if not found.
+    """
+    import re
+
+    match = re.search(r"\bvolume[=:]([A-Za-z0-9_\-]{1,64})", detail)
+    if match:
+        return match.group(1)
     return None
 
 

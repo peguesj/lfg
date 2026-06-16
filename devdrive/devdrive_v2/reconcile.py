@@ -5,6 +5,11 @@ typed DriftEvent objects for every anomaly detected.  All filesystem and
 subprocess calls are injected through thin callables so the entire module is
 testable without real mounts.
 
+State transitions are reported to the Phoenix BackendLifecycleStore via
+``devdrive.lifecycle_store.transition()`` on each volume-level state change.
+When Phoenix is unreachable the call silently enqueues to the APM outbox
+(ADR-002 §Negative consequences).
+
 Default log path: ~/.config/lfg/reconcile_log.jsonl
 Default LaunchAgent interval: 300 s (see resources/io.lfg.devdrive-reconcile.plist)
 """
@@ -22,6 +27,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from devdrive_v2.state import ForestEntryKind, StateManager, VolumeHealth
+
+# Lifecycle store is imported lazily inside _emit_transition to avoid hard
+# coupling when the devdrive package is used without the APM runtime present.
+# Tests may monkeypatch devdrive_v2.reconcile._emit_transition directly.
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +73,19 @@ class DriftCategory(str, Enum):
 
     SWAP_PRESSURE = "swap_pressure"
     """System swap usage exceeds the configured threshold."""
+
+    FALLBACK_PENDING_RECLAIM = "fallback_pending_reclaim"
+    """A fallback directory exists for a volume that is now healthy.
+
+    The volume's primary mount is online and all symlinks resolve, but a
+    ``<system_path>-fallback`` directory from a prior unavailability event
+    is still present on the internal drive.  This signals that the reclaim
+    workflow (rsync → verify → delete fallback) has not yet completed.
+
+    Lifecycle routing: emits ``fallback_active → backend_rebuilt`` transition
+    to the Phoenix BackendLifecycleStore so the orchestrator can advance
+    the state machine and schedule the reclaim sweep.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +174,56 @@ class ReconcileLoop:
         self._isdir = _isdir
         self._readlink = _readlink
         self._run = _run
+
+    # ------------------------------------------------------------------
+    # Lifecycle store integration
+    # ------------------------------------------------------------------
+
+    def _emit_transition(
+        self,
+        backend_id: str,
+        from_state_str: str,
+        to_state_str: str,
+        evidence: dict[str, Any],
+    ) -> None:
+        """Post a lifecycle transition to the Phoenix BackendLifecycleStore.
+
+        Import is deferred so this module remains importable without the full
+        ``devdrive`` package on ``PYTHONPATH`` (e.g. during unit tests that
+        monkeypatch this method).
+
+        Args:
+            backend_id: fleet.json ``drives[].id`` value.
+            from_state_str: Current lifecycle state string (e.g. ``"healthy"``).
+            to_state_str: Target lifecycle state string.
+            evidence: Observation data dict included in the POST body.
+        """
+        try:
+            from devdrive.lifecycle_store import LifecycleState  # noqa: PLC0415
+            from devdrive.lifecycle_store import transition as _lc_transition
+
+            from_state = LifecycleState(from_state_str)
+            to_state = LifecycleState(to_state_str)
+            ok, err = _lc_transition(
+                backend_id=backend_id,
+                from_state=from_state,
+                to_state=to_state,
+                evidence=evidence,
+                metadata={"producer_pipeline": "python.devdrive_v2.reconcile"},
+            )
+            if not ok:
+                logger.debug(
+                    "_emit_transition %s→%s for %s: %s",
+                    from_state_str,
+                    to_state_str,
+                    backend_id,
+                    err,
+                )
+        except Exception as exc:  # noqa: BLE001
+            # Never let lifecycle telemetry crash the reconcile loop.
+            logger.warning(
+                "_emit_transition failed for %s: %s", backend_id, exc
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -250,6 +322,38 @@ class ReconcileLoop:
                         severity="warning",
                     )
                 )
+                return events
+
+            # Symlink is healthy — check for a lingering fallback directory.
+            # A ``<path>-fallback`` directory left from a prior unavailability
+            # event means the reclaim workflow has not completed.
+            fallback_path = path + "-fallback"
+            if self._isdir(fallback_path):
+                events.append(
+                    DriftEvent(
+                        category=DriftCategory.FALLBACK_PENDING_RECLAIM,
+                        source=path,
+                        detail=(
+                            f"Symlink '{path}' is healthy (target='{target}') "
+                            f"but fallback directory '{fallback_path}' still "
+                            "exists. Reclaim workflow pending."
+                        ),
+                        severity="warning",
+                    )
+                )
+                # Advance lifecycle: fallback_active → backend_rebuilt so the
+                # orchestrator knows the primary is back and reclaim can begin.
+                self._emit_transition(
+                    backend_id=entry.volume,
+                    from_state_str="fallback_active",
+                    to_state_str="backend_rebuilt",
+                    evidence={
+                        "fallback_path": fallback_path,
+                        "symlink_target": target,
+                        "classifier": "FALLBACK_PENDING_RECLAIM",
+                    },
+                )
+
             return events
 
         # Path exists but is NOT a symlink.
@@ -288,6 +392,18 @@ class ReconcileLoop:
                     ),
                     severity="critical",
                 )
+            )
+            # Transition healthy → degraded so the lifecycle store records the
+            # first observation of the volume going offline.
+            self._emit_transition(
+                backend_id=vol.name,
+                from_state_str="healthy",
+                to_state_str="degraded",
+                evidence={
+                    "mount_point": vol.mount_point,
+                    "classifier": "UNMOUNTED_VOL",
+                    "volume_health": getattr(vol, "health", "unknown"),
+                },
             )
             # Cannot do quota or band checks if the volume is not mounted.
             return events
