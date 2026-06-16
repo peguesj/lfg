@@ -5,7 +5,7 @@ public protocol ShellRunnerProtocol: Sendable {
     func shell(_ command: String) async throws -> ProcessRunner.Result
 }
 
-extension ProcessRunner: ShellRunnerProtocol {
+extension ProcessRunner {
     public func shell(_ command: String) async throws -> ProcessRunner.Result {
         try await ProcessRunner.shell(command)
     }

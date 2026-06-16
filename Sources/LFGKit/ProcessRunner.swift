@@ -2,7 +2,7 @@ import Foundation
 
 /// Shared async Process wrapper for LFGKit consumers.
 /// Mirrors the LFGApp version for use by lfg-cli and tests.
-public struct ProcessRunner {
+public struct ProcessRunner: ShellRunnerProtocol {
     public struct Result: Sendable {
         public let exitCode: Int32
         public let stdout: String

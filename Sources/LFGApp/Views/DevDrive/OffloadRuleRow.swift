@@ -22,19 +22,43 @@ struct OffloadRuleRow: View {
 
     let rule: OffloadRule
 
+    /// Optional corruption class for the parent backend. When non-nil, the health dot
+    /// color reflects the LFG-93 severity mapping instead of the binary green/red.
+    ///
+    /// | Class | Color  | Rationale                                |
+    /// |-------|--------|------------------------------------------|
+    /// | A     | Orange | Transient; autonomous-reclaimable        |
+    /// | B     | Red    | Superblock; recovery agent required       |
+    /// | C     | Red    | Metadata destroyed; data at risk          |
+    /// | D     | Red    | Band damage; partial data loss possible   |
+    /// | E     | Yellow | Permission ghost; data intact             |
+    var corruptionClass: CorruptionClass? = nil
+
     // MARK: State
 
     @State private var isRestoring = false
     @State private var restoreError: String?
+
+    // MARK: Health dot color
+
+    private var healthDotColor: Color {
+        if rule.isHealthy { return .green }
+        switch corruptionClass {
+        case .classA: return .orange
+        case .classB, .classC, .classD: return .red
+        case .classE: return .yellow
+        case nil: return .red  // unknown / legacy
+        }
+    }
 
     // MARK: Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                // Health indicator
+                // Health indicator — uses corruption-class color when available
                 Circle()
-                    .fill(rule.isHealthy ? Color.green : Color.red)
+                    .fill(healthDotColor)
                     .frame(width: 7, height: 7)
 
                 // Source path

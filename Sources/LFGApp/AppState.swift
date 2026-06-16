@@ -34,9 +34,9 @@ final class AppState {
     var registry: FleetRegistry?
 
     /// NSWorkspace notification observer token — removed on deinit.
-    /// `nonisolated` allows deinit (which is nonisolated) to read this; the
+    /// `nonisolated(unsafe)` allows deinit (which is nonisolated) to read this; the
     /// value is only written once on the main actor during `setupMountWatcher()`.
-    nonisolated private var mountObserverToken: (any NSObjectProtocol)?
+    nonisolated(unsafe) private var mountObserverToken: (any NSObjectProtocol)?
 
     deinit {
         if let token = mountObserverToken {

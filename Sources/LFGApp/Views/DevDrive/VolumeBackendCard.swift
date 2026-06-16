@@ -48,6 +48,13 @@ struct VolumeBackendCard: View {
     @State private var showRelocation = false
     @State private var showSettings = false
 
+    // MARK: Reclaim state (US-A-004 AC-2)
+
+    @State private var unavailability: SymlinkHealthReport.UnavailableVolume?
+    @State private var reclaimInProgress = false
+    @State private var reclaimError: String?
+    @State private var showHolders = false
+
     // MARK: Body
 
     var body: some View {
@@ -103,12 +110,88 @@ struct VolumeBackendCard: View {
 
                 // Capacity bar
                 capacityRow
+
+                // Reclaim row — visible only when a fallback is pending reclaim
+                reclaimRow
             }
 
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 4)
+    }
+
+    // MARK: Reclaim row (US-A-004 AC-2)
+
+    /// Shown below the capacity bar when a fallback directory is pending reclaim.
+    @ViewBuilder
+    private var reclaimRow: some View {
+        if let ua = unavailability,
+           case .fallbackPendingReclaim(let size, let holders) = ua.reason {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath.circle")
+                    .foregroundStyle(.orange)
+                Text(fallbackSizeLabel(size))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                if reclaimInProgress {
+                    ProgressView()
+                        .scaleEffect(0.65)
+                } else if holders.isEmpty {
+                    Button("Reclaim Now") { performReclaim() }
+                        .controlSize(.mini)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                } else {
+                    Button("Holders (\(holders.count))…") { showHolders = true }
+                        .controlSize(.mini)
+                        .buttonStyle(.bordered)
+                }
+            }
+            .padding(.top, 4)
+
+            if let err = reclaimError {
+                Text(err)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .padding(.top, 2)
+            }
+        }
+    }
+
+    @Environment(AppState.self) private var appState
+
+    private func performReclaim() {
+        reclaimInProgress = true
+        reclaimError = nil
+        Task {
+            do {
+                guard let orchestrator = appState.orchestrator else {
+                    await MainActor.run {
+                        reclaimInProgress = false
+                        reclaimError = "MountOrchestrator not available"
+                    }
+                    return
+                }
+                _ = try await orchestrator.resync(backendId: backend.id)
+                await MainActor.run { reclaimInProgress = false }
+            } catch {
+                await MainActor.run {
+                    reclaimInProgress = false
+                    reclaimError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func fallbackSizeLabel(_ bytes: Int64) -> String {
+        let gb = Double(bytes) / 1_073_741_824
+        if gb >= 0.1 {
+            return String(format: "Fallback: %.1f GB ready to reclaim", gb)
+        }
+        let mb = Double(bytes) / 1_048_576
+        return String(format: "Fallback: %.0f MB ready to reclaim", mb)
     }
 
     // MARK: Capacity bar
@@ -146,12 +229,22 @@ struct VolumeBackendCard: View {
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 ForEach(rules, id: \.source) { rule in
-                    OffloadRuleRow(rule: rule)
+                    OffloadRuleRow(rule: rule, corruptionClass: derivedCorruptionClass)
                 }
             }
             .padding(.leading, 20)
             .padding(.vertical, 6)
         }
+    }
+
+    // MARK: Derived corruption class
+
+    /// The `CorruptionClass` from the current unavailability record, if any.
+    /// Used by `OffloadRuleRow` to render the corruption-class color dot.
+    private var derivedCorruptionClass: CorruptionClass? {
+        guard let ua = unavailability else { return nil }
+        if case .degraded(let cls, _) = ua.reason { return cls }
+        return nil
     }
 
     // MARK: Async data load
