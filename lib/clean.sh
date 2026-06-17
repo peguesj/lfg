@@ -5,27 +5,153 @@ set -uo pipefail
 LFG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VIEWER="$LFG_DIR/viewer"
 
+# shellcheck source=lib/state.sh disable=SC1091
 source "$LFG_DIR/lib/state.sh"
-LFG_MODULE="dtf"
+export LFG_MODULE="dtf"
 HTML_FILE="$LFG_CACHE_DIR/.lfg_clean.html"
+# shellcheck source=lib/settings.sh disable=SC1091
 source "$LFG_DIR/lib/settings.sh" 2>/dev/null || true
 lfg_state_start dtf
 
 FORCE=false
 INCLUDE_DOCKER=false
 USE_SUDO=false
+DOWNLOADS_AUDIT=false
+CLEAN_DOWNLOADS=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --force)    FORCE=true ;;
-        --docker)   INCLUDE_DOCKER=true ;;
-        --sudo)     USE_SUDO=true ;;
-        --only)     ONLY_NAME="$2"; shift ;;
-        --only=*)   ONLY_NAME="${1#--only=}" ;;
+        --force)             FORCE=true ;;
+        --docker)            INCLUDE_DOCKER=true ;;
+        --sudo)              USE_SUDO=true ;;
+        --only)              ONLY_NAME="$2"; shift ;;
+        --only=*)            ONLY_NAME="${1#--only=}" ;;
+        --downloads-audit)   DOWNLOADS_AUDIT=true ;;
+        --clean-downloads)   DOWNLOADS_AUDIT=true; CLEAN_DOWNLOADS=true ;;
         *) echo "Unknown: $1"; exit 1 ;;
     esac
     shift
 done
+
+: "${INCLUDE_DOCKER}"  # consumed by docker prune path in HTML/force block
+
+# ---------------------------------------------------------------------------
+# Downloads audit — standalone subcommand, exits before the main cache scan
+# ---------------------------------------------------------------------------
+# Scans ~/Downloads for files older than 90 days, reports them ranked by size.
+# With --clean-downloads, moves matched files to ~/.Trash/ (safe, not rm).
+# Output format per file: SIZE  AGE_DAYS  PATH
+# ---------------------------------------------------------------------------
+cmd_downloads_audit() {
+    local downloads_dir="$HOME/Downloads"
+    local trash_dir="$HOME/.Trash"
+    local age_threshold=90
+    local max_items=20
+
+    if [[ ! -d "$downloads_dir" ]]; then
+        echo "Downloads directory not found: $downloads_dir"
+        return 1
+    fi
+
+    echo "Scanning $downloads_dir for files older than ${age_threshold} days..."
+    echo ""
+
+    # Build list: find files (not dirs) modified more than threshold days ago.
+    # Use -print0 / read -d '' to handle filenames with spaces or special chars.
+    local tmpfile
+    tmpfile=$(mktemp)
+
+    while IFS= read -r -d '' fpath; do
+        local size_kb
+        size_kb=$(du -sk "$fpath" 2>/dev/null | awk '{print $1}')
+        [[ -z "$size_kb" ]] && size_kb=0
+        # Age in days: compare mtime (seconds since epoch) to now
+        local mtime now age_days
+        mtime=$(stat -f '%m' "$fpath" 2>/dev/null || echo 0)
+        now=$(date +%s)
+        age_days=$(( (now - mtime) / 86400 ))
+        printf '%s	%s	%s
+' "$size_kb" "$age_days" "$fpath"
+    done < <(find "$downloads_dir" -maxdepth 1 -type f -mtime +"$age_threshold" -print0 2>/dev/null) >> "$tmpfile"
+
+    if [[ ! -s "$tmpfile" ]]; then
+        rm -f "$tmpfile"
+        echo "No files older than ${age_threshold} days found in $downloads_dir."
+        lfg_state_done dtf "downloads_audit=empty"
+        return 0
+    fi
+
+    # Sort by size descending, take top max_items
+    local sorted
+    sorted=$(sort -t$'	' -k1 -rn "$tmpfile" | head -n "$max_items")
+    rm -f "$tmpfile"
+
+    local total_kb=0
+    local count=0
+
+    echo "SIZE          AGE_DAYS  PATH"
+    echo "------------- --------- ----"
+    while IFS=$'	' read -r size_kb age_days fpath; do
+        local size_human
+        if (( size_kb >= 1048576 )); then
+            size_human=$(awk "BEGIN{printf "%.1f GB", $size_kb/1048576}")
+        elif (( size_kb >= 1024 )); then
+            size_human=$(awk "BEGIN{printf "%.1f MB", $size_kb/1024}")
+        else
+            size_human="${size_kb} KB"
+        fi
+        printf '%-13s  %-9s  %s
+' "$size_human" "$age_days" "$fpath"
+        total_kb=$(( total_kb + size_kb ))
+        count=$(( count + 1 ))
+    done <<< "$sorted"
+
+    echo ""
+    local total_human
+    if (( total_kb >= 1048576 )); then
+        total_human=$(awk "BEGIN{printf "%.1f GB", $total_kb/1048576}")
+    elif (( total_kb >= 1024 )); then
+        total_human=$(awk "BEGIN{printf "%.1f MB", $total_kb/1024}")
+    else
+        total_human="${total_kb} KB"
+    fi
+    echo "Total: $total_human across $count file(s) older than ${age_threshold} days."
+
+    if [[ "$CLEAN_DOWNLOADS" == "true" ]]; then
+        echo ""
+        echo "Moving matched files to $trash_dir ..."
+        mkdir -p "$trash_dir"
+        local moved=0 skipped=0
+        while IFS=$'	' read -r size_kb age_days fpath; do
+            local fname
+            fname=$(basename "$fpath")
+            local dest="$trash_dir/$fname"
+            # Avoid clobbering files already in Trash with the same name
+            if [[ -e "$dest" ]]; then
+                local ts
+                ts=$(date +%Y%m%d%H%M%S)
+                dest="$trash_dir/${fname}.${ts}"
+            fi
+            if mv "$fpath" "$dest" 2>/dev/null; then
+                moved=$(( moved + 1 ))
+            else
+                echo "  SKIP (permission denied): $fpath"
+                skipped=$(( skipped + 1 ))
+            fi
+        done <<< "$sorted"
+        echo "Moved: $moved file(s) to Trash. Skipped: $skipped."
+        lfg_state_done dtf "downloads_audit=cleaned" "moved=$moved" "skipped=$skipped"
+    else
+        echo ""
+        echo "Run: lfg dtf --clean-downloads   to move these files to ~/.Trash/"
+        lfg_state_done dtf "downloads_audit=report" "reclaimable=$total_human" "count=$count"
+    fi
+}
+
+if [[ "$DOWNLOADS_AUDIT" == "true" ]]; then
+    cmd_downloads_audit
+    exit $?
+fi
 
 get_size_kb() { [[ -e "$1" ]] && du -sk "$1" 2>/dev/null | awk '{print $1}' || echo 0; }
 format_size() {
@@ -116,7 +242,7 @@ for entry in "${CACHES[@]}"; do
             status="badge-skipped"; status_text="EMPTY"; SKIPPED=$((SKIPPED + 1))
         elif [[ "$FORCE" == "true" ]]; then
             TOTAL_RECLAIMABLE=$((TOTAL_RECLAIMABLE + size_kb))
-            echo "  Cleaning $name ($(format_size $size_kb))..."
+            echo "  Cleaning $name ($(format_size "$size_kb"))..."
             [[ -n "$cmd" ]] && eval "$cmd" &>/dev/null || true
             rm -rf "$path" 2>/dev/null || true
             [[ "$USE_SUDO" == "true" ]] && [[ -e "$path" ]] && sudo rm -rf "$path" 2>/dev/null || true
@@ -127,7 +253,7 @@ for entry in "${CACHES[@]}"; do
             else status="badge-error"; status_text="LOCKED"; ERRORS=$((ERRORS + 1)); fi
         else
             TOTAL_RECLAIMABLE=$((TOTAL_RECLAIMABLE + size_kb))
-            status="badge-pending"; status_text="$(format_size $size_kb)"
+            status="badge-pending"; status_text="$(format_size "$size_kb")"
         fi
     fi
 
@@ -141,6 +267,7 @@ for entry in "${CACHES[@]}"; do
     else bar_w="0"; fi
 
     # Escape path for JS
+    # shellcheck disable=SC2001
     path_esc=$(echo "$path" | sed "s/'/\\\\'/g")
     clean_cmd=""
     if [[ -n "$path" ]] && (( size_kb > 0 )); then
@@ -164,6 +291,7 @@ done
 
 DISK_FREE=$(df -h / | awk 'NR==2{print $4}')
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
+: "${TIMESTAMP}"  # consumed by python3 heredoc below
 
 if [[ "$FORCE" == "true" ]]; then
     MODE_LABEL="Cleaned"; TOTAL_DISPLAY=$(format_size $TOTAL_FREED); TOTAL_CLASS="good"

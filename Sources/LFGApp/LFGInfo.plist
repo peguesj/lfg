@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>io.pegues.yj.lfg</string>
+    <key>CFBundleName</key>
+    <string>LFG</string>
+    <key>CFBundleDisplayName</key>
+    <string>LFG — Local File Guardian</string>
+    <key>CFBundleVersion</key>
+    <string>2.5.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.5.0</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSFullDiskAccessUsageDescription</key>
+    <string>LFG needs Full Disk Access to scan system caches, manage Spotlight indexing, and monitor volumes.</string>
+    <key>CFBundleExecutable</key>
+    <string>LFG</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <!-- Menubar agent: no Dock icon, no main menu. Activated via MenuBarExtra. -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Allow login-item registration via SMAppService (macOS 13+). -->
+    <key>LSBackgroundOnly</key>
+    <false/>
+</dict>
+</plist>

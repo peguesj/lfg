@@ -122,15 +122,39 @@ if os.path.isfile(fleet_file):
 else:
     print(f"  WARNING: fleet.json not found at {fleet_file}")
 
-# Phase 1: Check for unmounted volumes (attached images with unmounted APFS volumes)
-print("[1/4] Checking for unmounted volumes...")
+# Phase 1: Check for unmounted/disconnected volumes
+print("[1/4] Checking for unmounted/disconnected volumes...")
+devdrive_home = os.path.expanduser("~/DevDrive")
 for drive in fleet.get("drives", []):
     mount = drive.get("mount", "")
     drive_id = drive.get("id", "")
+    mount_alias = drive.get("mount_alias", "")
     image = os.path.expanduser(drive.get("image", ""))
 
-    if os.path.isdir(mount):
+    # Check primary mount and alias
+    if os.path.isdir(mount) or (mount_alias and os.path.isdir(mount_alias)):
+        print(f"  [{drive_id}] Mounted OK ({mount})")
         continue  # Already mounted
+
+    # Volume is offline — log clearly and ensure fallback dir exists
+    fallback_dir = os.path.join(devdrive_home, f"{drive_id}-fallback")
+    os.makedirs(fallback_dir, exist_ok=True)
+    print(f"  [{drive_id}] DISCONNECTED — not mounted at {mount}")
+    print(f"           Fallback dir: {fallback_dir}")
+    # Check if any declared symlinks are broken and note them
+    for sl in drive.get("symlinks", []):
+        sep = " -> " if " -> " in sl else " \u2192 "
+        if sep not in sl:
+            continue
+        sys_path = os.path.expanduser(sl.split(sep)[0].strip())
+        if os.path.islink(sys_path) and not os.path.exists(sys_path):
+            print(f"           BROKEN symlink: {sys_path} (volume offline)")
+            print(f"           Run 'lfg devdrive reconnect {drive_id}' to restore")
+        elif not os.path.exists(sys_path):
+            print(f"           MISSING path: {sys_path} (volume offline)")
+    errors += 1
+    # Attachment repair is handled by 'lfg devdrive reconnect'; skip old inline flow
+    continue
 
     # Check if the image is attached via hdiutil info
     if not os.path.isfile(image) and not os.path.isdir(image):
@@ -353,6 +377,354 @@ if dry_run and (fixes == 0):
 REPAIR_PY
 
         lfg_state_done devdrive "action=repair" "dry_run=$DRY_RUN"
+        exit 0
+        ;;
+    health)
+        shift
+        lfg_state_start devdrive
+
+        FLEET_FILE="$HOME/DevDrive/fleet.json"
+        LOG_FILE="$HOME/.config/lfg/devdrive-reconnect.log"
+
+        echo "=== LFG DEVDRIVE Health ==="
+        echo ""
+
+        FLEET_FILE="$FLEET_FILE" LOG_FILE="$LOG_FILE" python3 << 'HEALTH_PY'
+import json, os, re, sys
+
+fleet_file = os.environ.get('FLEET_FILE', '')
+log_file = os.environ.get('LOG_FILE', '')
+
+# ANSI colors
+GREEN = '\033[32m'
+YELLOW = '\033[33m'
+RED = '\033[31m'
+RESET = '\033[0m'
+BOLD = '\033[1m'
+
+try:
+    with open(fleet_file) as f:
+        fleet = json.load(f)
+except Exception as e:
+    print(f"{RED}Error reading fleet.json: {e}{RESET}")
+    sys.exit(1)
+
+# Parse reconnect log for last sync per volume
+last_sync = {}
+if os.path.exists(log_file):
+    try:
+        with open(log_file) as f:
+            for line in f:
+                m = re.match(r'\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\]\s+\[(\w+)\]', line)
+                if m:
+                    last_sync[m.group(2)] = m.group(1)
+    except Exception:
+        pass
+
+# Column widths
+hdr = f"{'ID':<12} {'Mount':<10} {'Fallback':<14} {'LastSync':<21} {'Policy':<8}"
+print(f"{BOLD}{hdr}{RESET}")
+print('-' * len(hdr))
+
+for d in fleet.get('drives', []):
+    vid = d.get('id', '?')
+    mount_path = d.get('mount', '')
+    fallback_dir = d.get('fallback_dir', '')
+    policy = d.get('reconnect_policy', 'n/a')
+
+    # Mount status
+    mounted = os.path.isdir(mount_path)
+    if mounted:
+        mount_str = f"{GREEN}mounted{RESET}"
+    else:
+        mount_str = f"{RED}offline{RESET}"
+
+    # Fallback status
+    if fallback_dir and os.path.isdir(fallback_dir):
+        try:
+            has_files = len(os.listdir(fallback_dir)) > 0
+        except Exception:
+            has_files = False
+        if has_files:
+            fb_str = f"{YELLOW}active ({len(os.listdir(fallback_dir))}){RESET}"
+        else:
+            fb_str = f"empty"
+    elif fallback_dir:
+        fb_str = f"missing"
+    else:
+        fb_str = f"none"
+
+    # Last sync
+    sync_str = last_sync.get(vid, '-')
+
+    # Pad for ANSI (color codes add chars but no visible width)
+    # Use fixed-width formatting then inject color
+    line = f"{vid:<12} {mount_str:<{10 + len(GREEN) + len(RESET)}} {fb_str:<{14 + len(YELLOW) + len(RESET)}} {sync_str:<21} {policy:<8}"
+    print(line)
+
+print()
+HEALTH_PY
+
+        lfg_state_done devdrive "action=health"
+        exit 0
+        ;;
+    reconnect)
+        shift
+        lfg_state_start devdrive
+        TARGET_VOLUME="${1:-}"
+        ALL_FLAG=""
+        [[ "$TARGET_VOLUME" == "--all" ]] && ALL_FLAG="--all" && TARGET_VOLUME=""
+
+        FLEET_FILE="$HOME/DevDrive/fleet.json"
+        DEVDRIVE_HOME="$HOME/DevDrive"
+        LOG_FILE="$HOME/.config/lfg/devdrive-reconnect.log"
+        mkdir -p "$(dirname "$LOG_FILE")"
+
+        echo "=== LFG DEVDRIVE Reconnect ==="
+        [[ -n "$TARGET_VOLUME" ]] && echo "Target: $TARGET_VOLUME" || echo "Target: all offline volumes"
+        echo ""
+
+        TARGET_VOLUME="$TARGET_VOLUME" ALL_FLAG="$ALL_FLAG" FLEET_FILE="$FLEET_FILE" DEVDRIVE_HOME="$DEVDRIVE_HOME" LOG_FILE="$LOG_FILE" python3 << 'RECONNECT_PY'
+import json, os, subprocess, sys, shutil, datetime
+
+target_volume = os.environ.get('TARGET_VOLUME', '')
+all_flag = os.environ.get('ALL_FLAG', '')
+fleet_file = os.environ.get('FLEET_FILE', '')
+devdrive_home = os.environ.get('DEVDRIVE_HOME', os.path.expanduser('~/DevDrive'))
+log_file = os.environ.get('LOG_FILE', os.path.expanduser('~/.config/lfg/devdrive-reconnect.log'))
+
+def log(msg):
+    ts = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    line = f"[{ts}] {msg}"
+    print(line)
+    try:
+        with open(log_file, 'a') as f:
+            f.write(line + '\n')
+    except Exception:
+        pass
+
+def ensure_fallback(drive_id, devdrive_home):
+    """Create fallback dir for a volume if it doesn't exist."""
+    fallback = os.path.join(devdrive_home, f"{drive_id}-fallback")
+    os.makedirs(fallback, exist_ok=True)
+    return fallback
+
+def redirect_symlinks_to_fallback(drive, devdrive_home):
+    """Point any system symlinks for this drive to the fallback dir."""
+    drive_id = drive.get('id', '')
+    fallback = ensure_fallback(drive_id, devdrive_home)
+    mount = drive.get('mount', '')
+    redirected = []
+    for sl in drive.get('symlinks', []):
+        sep = ' -> ' if ' -> ' in sl else ' \u2192 '
+        if sep not in sl:
+            continue
+        system_path = os.path.expanduser(sl.split(sep)[0].strip())
+        vol_subpath = sl.split(sep)[1].strip()
+        # Determine the subdirectory inside the volume
+        if vol_subpath.startswith(mount + '/'):
+            subdir = vol_subpath[len(mount)+1:]
+        else:
+            subdir = os.path.basename(vol_subpath)
+        fallback_target = os.path.join(fallback, subdir)
+        os.makedirs(fallback_target, exist_ok=True)
+
+        if os.path.islink(system_path):
+            current = os.readlink(system_path)
+            if current == fallback_target:
+                log(f"  [FALLBACK] {system_path} already points to fallback")
+                continue
+            # Only redirect if the current target is dead
+            if not os.path.exists(system_path):
+                try:
+                    os.unlink(system_path)
+                    os.symlink(fallback_target, system_path)
+                    log(f"  [FALLBACK] {system_path} -> {fallback_target}")
+                    redirected.append(system_path)
+                except Exception as e:
+                    log(f"  [ERROR] Could not redirect {system_path}: {e}")
+        elif not os.path.exists(system_path):
+            try:
+                parent = os.path.dirname(system_path)
+                os.makedirs(parent, exist_ok=True)
+                os.symlink(fallback_target, system_path)
+                log(f"  [FALLBACK] Created {system_path} -> {fallback_target}")
+                redirected.append(system_path)
+            except Exception as e:
+                log(f"  [ERROR] Could not create fallback symlink {system_path}: {e}")
+    return fallback, redirected
+
+def attach_image(drive):
+    """Attach sparse image/sparsebundle and return mount point."""
+    image = os.path.expanduser(drive.get('image', ''))
+    mount = drive.get('mount', '')
+    drive_id = drive.get('id', '')
+
+    if not image:
+        log(f"  [{drive_id}] No image path configured")
+        return False
+
+    if not os.path.exists(image):
+        log(f"  [{drive_id}] Image not found: {image}")
+        return False
+
+    log(f"  [{drive_id}] Attaching: {image}")
+    try:
+        result = subprocess.run(
+            ['hdiutil', 'attach', image, '-nobrowse', '-quiet'],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode == 0:
+            # Wait for mount to appear
+            import time
+            for _ in range(10):
+                if os.path.isdir(mount):
+                    log(f"  [{drive_id}] Mounted at {mount}")
+                    return True
+                # Check mount_alias too
+                alias = drive.get('mount_alias', '')
+                if alias and os.path.isdir(alias):
+                    log(f"  [{drive_id}] Mounted at alias {alias}")
+                    return True
+                time.sleep(0.5)
+            log(f"  [{drive_id}] hdiutil attach succeeded but mount point not found at {mount}")
+            return False
+        else:
+            # Try diskutil mount as fallback
+            log(f"  [{drive_id}] hdiutil attach failed: {result.stderr.strip()}")
+            return False
+    except Exception as e:
+        log(f"  [{drive_id}] attach error: {e}")
+        return False
+
+def restore_symlinks(drive, devdrive_home):
+    """Restore system symlinks to real mount point and sync fallback -> real."""
+    drive_id = drive.get('id', '')
+    mount = drive.get('mount', '')
+    fallback = os.path.join(devdrive_home, f"{drive_id}-fallback")
+    restored = []
+
+    for sl in drive.get('symlinks', []):
+        sep = ' -> ' if ' -> ' in sl else ' \u2192 '
+        if sep not in sl:
+            continue
+        system_path = os.path.expanduser(sl.split(sep)[0].strip())
+        vol_subpath = sl.split(sep)[1].strip()
+        real_target = os.path.expanduser(vol_subpath)
+        if vol_subpath.startswith(mount + '/'):
+            subdir = vol_subpath[len(mount)+1:]
+        else:
+            subdir = os.path.basename(vol_subpath)
+        fallback_subdir = os.path.join(fallback, subdir)
+
+        # Sync fallback writes -> real volume dir
+        if os.path.isdir(fallback_subdir) and os.path.isdir(real_target):
+            try:
+                result = subprocess.run(
+                    ['rsync', '-a', '--update', fallback_subdir + '/', real_target + '/'],
+                    capture_output=True, text=True, timeout=300
+                )
+                if result.returncode == 0:
+                    log(f"  [{drive_id}] Synced fallback -> {real_target}")
+                else:
+                    log(f"  [{drive_id}] rsync warning: {result.stderr.strip()[:200]}")
+            except Exception as e:
+                log(f"  [{drive_id}] rsync error: {e}")
+
+        # Restore symlink to real target
+        if os.path.islink(system_path):
+            current = os.readlink(system_path)
+            if current == real_target:
+                log(f"  [{drive_id}] {system_path} already points to real target")
+                continue
+            try:
+                os.unlink(system_path)
+                os.symlink(real_target, system_path)
+                log(f"  [{drive_id}] Restored {system_path} -> {real_target}")
+                restored.append(system_path)
+            except Exception as e:
+                log(f"  [{drive_id}] Could not restore {system_path}: {e}")
+        elif not os.path.exists(system_path):
+            try:
+                os.symlink(real_target, system_path)
+                log(f"  [{drive_id}] Created {system_path} -> {real_target}")
+                restored.append(system_path)
+            except Exception as e:
+                log(f"  [{drive_id}] Could not create {system_path}: {e}")
+    return restored
+
+# Load fleet
+fleet = {"drives": []}
+if os.path.isfile(fleet_file):
+    with open(fleet_file) as f:
+        fleet = json.load(f)
+else:
+    log(f"WARNING: fleet.json not found at {fleet_file}")
+    sys.exit(1)
+
+drives_to_check = []
+for drive in fleet.get('drives', []):
+    did = drive.get('id', '')
+    if target_volume and did != target_volume:
+        continue
+    drives_to_check.append(drive)
+
+if not drives_to_check:
+    if target_volume:
+        log(f"No drive with id '{target_volume}' found in fleet.json")
+    else:
+        log("No drives configured in fleet.json")
+    sys.exit(1)
+
+total_reconnected = 0
+total_fallback = 0
+
+for drive in drives_to_check:
+    drive_id = drive.get('id', '')
+    reconnect_policy = drive.get('reconnect_policy', 'auto')
+    if reconnect_policy == 'disabled':
+        log(f"[{drive_id}] Skipped — reconnect_policy is 'disabled'")
+        continue
+    mount = drive.get('mount', '')
+    mount_alias = drive.get('mount_alias', '')
+
+    mounted = os.path.isdir(mount) or (mount_alias and os.path.isdir(mount_alias))
+
+    if mounted:
+        log(f"[{drive_id}] Volume is mounted — checking symlinks...")
+        restored = restore_symlinks(drive, devdrive_home)
+        if restored:
+            total_reconnected += 1
+        else:
+            log(f"[{drive_id}] No symlink restoration needed")
+        continue
+
+    # Volume is offline
+    log(f"[{drive_id}] Volume OFFLINE (expected at {mount})")
+
+    # Step 1: Create fallback and redirect broken symlinks
+    fallback, redirected = redirect_symlinks_to_fallback(drive, devdrive_home)
+    if redirected:
+        log(f"[{drive_id}] Fallback dir: {fallback} ({len(redirected)} symlink(s) redirected)")
+        total_fallback += len(redirected)
+    else:
+        log(f"[{drive_id}] Fallback dir: {fallback} (no symlinks to redirect, or already redirected)")
+
+    # Step 2: Attempt to attach image
+    log(f"[{drive_id}] Attempting to attach image...")
+    if attach_image(drive):
+        # Step 3: Restore symlinks and sync fallback -> real
+        restored = restore_symlinks(drive, devdrive_home)
+        log(f"[{drive_id}] Reconnected — {len(restored)} symlink(s) restored")
+        total_reconnected += 1
+    else:
+        log(f"[{drive_id}] Could not attach image — volume remains offline. Fallback active at: {fallback}")
+
+print()
+log(f"=== Reconnect complete: {total_reconnected} volume(s) reconnected, {total_fallback} fallback(s) active ===")
+RECONNECT_PY
+
+        lfg_state_done devdrive "action=reconnect" "target=${TARGET_VOLUME:-all}"
         exit 0
         ;;
     config)

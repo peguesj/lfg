@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.lfg.daemon</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jeremiah/bin/LFGDaemon</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Re-trigger launchd if daemon crashed while YJ_MORE was connected -->
+    <key>WatchPaths</key>
+    <array>
+        <string>/Volumes</string>
+    </array>
+
+    <key>MachServices</key>
+    <dict>
+        <key>io.lfg.daemon</key>
+        <true/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jeremiah/.config/lfg/daemon.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/jeremiah/.config/lfg/daemon-error.log</string>
+
+    <!-- Throttle restart if the daemon keeps crashing -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>

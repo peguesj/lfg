@@ -22,6 +22,26 @@ Volume management for developer drives. Mount/unmount APFS sparse images, sync p
 
 **Commands**: `mount`, `unmount`, `sync`, `verify`, `status`, `create`, `config`, `auto-move`
 
+#### DevDrive v3 — Native Three-Tier Model
+
+The Swift app layer (`LFGKit`) uses a three-tier model that mirrors the `fleet.json` schema:
+
+| Tier | Type | fleet.json source | Key fields |
+|------|------|-------------------|-----------|
+| Host | `SourceVolume` | `external_hosts[]` | `name`, `mount`, `keep_awake`, `isMounted` |
+| Image | `VolumeBackend` | `drives[]` | `id`, `image`, `reconnect_policy`, `offloadRules`, `isAutoReconnect` |
+| Symlink | `OffloadRule` | `drives[].symlinks[]` | `source`, `target`, `resolvedSource`, `isHealthy` |
+
+`FleetRegistry` exposes both a v2 API (`FleetDrive`-based, used by `MountOrchestrator`) and a v3 API (`SourceVolume`/`VolumeBackend`-based with full `OffloadRule` parsing).
+
+**Auto-mount flow**: When an external volume mounts, `NSWorkspace.didMountNotification` fires. `AppState.setupMountWatcher()` checks whether the volume is a known fleet host; if so, `MountOrchestrator.attachAll(forHost:)` runs `hdiutil attach` for every `VolumeBackend` whose `reconnect_policy` is `"auto"`. A `UNUserNotificationCenter` notification reports the result.
+
+**OffloadRule format** in `fleet.json`:
+```
+"~/.npm-cache → /Volumes/DDRV-901-DEVLIB/npm-cache"
+```
+The separator is a Unicode RIGHT ARROW (U+2192) with surrounding spaces. `OffloadRule.isHealthy` verifies the symlink at the resolved source path points to the declared target.
+
 ### STFU — Source Tree Forensics & Unification
 Code forensics engine. Analyzes project portfolios for duplicate detection, shared dependency candidates, environment consolidation, and merge feasibility.
 
@@ -50,7 +70,8 @@ Aggregates WTFS, DTF, BTAU, DEVDRIVE, and STFU output into a single combined vie
 |-------|-----------|
 | Core dispatcher | Bash (`lfg`) |
 | Module scripts | Bash (`lib/*.sh`) |
-| Viewer app | Swift (AppKit + WebKit), `viewer.swift` |
+| Viewer app | Swift Package (AppKit + WebKit + UserNotifications), `Sources/LFGApp/` |
+| Native model layer | Swift Package (`Sources/LFGKit/` — `SourceVolume`, `VolumeBackend`, `OffloadRule`, `FleetRegistry`) |
 | Menubar agent | Swift (AppKit + UserNotifications + ServiceManagement), `menubar.swift` |
 | AI/analysis backends | Python 3 (`lib/chat_server.py`, `lib/stfu_core.py`, `lib/stfu_report.py`, `lib/ai_helper.py`) |
 | Search index | Python 3 + SQLite FTS5 (`lib/search_index.py`) |

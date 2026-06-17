@@ -1,250 +1,346 @@
 {
-  "project": "LFG DevDrive v2",
-  "branchName": "devdrive-v2-native",
-  "baseBranch": "main",
-  "description": "Replace sparseimage-backed devdrive with native APFS volumes, FSKit overlay namespace, and self-correcting reconcile loop",
-  "upm": {
-    "planeProjectId": "6bc05edb-a2b4-44c1-9cfc-2c938edb38a3",
-    "checkpointRange": null,
-    "builtWaves": 4,
-    "verifiedAt": "2026-04-14T00:00:00Z",
-    "shippedAt": null,
-    "prUrl": null
+  "project": "LFG",
+  "formationId": "fmt-lfg-ddrv3-ui-20260524",
+  "branchName": "feature/devdrive-v3",
+  "baseBranch": "feature/devdrive-v3",
+  "description": "DevDrive v3 UI Expansion — 10-iteration sprint adding card/graph views, Source Volumes admin, drive relocation, volume settings, OffloadRule management, capacity dashboard, and admin preferences. Builds on the v3 three-tier model (SourceVolume/VolumeBackend/OffloadRule) completed in fmt-lfg-ddrv3-20260524.",
+  "sizing": "existing",
+  "created": "2026-05-24T00:00:00Z",
+  "harnessMandate": {
+    "tdd": true,
+    "relentless": true,
+    "gateAfterEachWave": true,
+    "gateCommand": "swift build 2>&1 | tail -5",
+    "testCommand": "swift test 2>&1 | tail -10",
+    "coverageTarget": 80,
+    "killCriteria": "3+ agent failures in same wave",
+    "attributionPolicy": "Never include Co-Authored-By, Generated with Claude Code, or any AI attribution in commits or PRs"
   },
-  "userStories": [
+  "context": {
+    "workingDir": "/Users/jeremiah/tools/@yj/lfg",
+    "branch": "feature/devdrive-v3",
+    "stack": ["Swift 5.9+", "SwiftUI", "AppKit", "LFGKit (internal framework)"],
+    "testBaseline": 126,
+    "completedWork": [
+      "CP-109: SourceVolume, OffloadRule, VolumeBackend, FleetRegistry v3 API",
+      "CP-110: UNUserNotificationCenter integration",
+      "CP-111: NSWorkspace.didMountNotification → MountOrchestrator.attachAll",
+      "CP-112/113/115: DevDriveView three-tier CloudMounter-inspired list with VolumeBackendCard + OffloadRuleRow",
+      "CP-114: MenuBarView source groups + filter + drift alerts",
+      "CP-116: 126 tests, 0 failures",
+      "CP-117: Full documentation refresh"
+    ],
+    "keyFiles": {
+      "devDriveView": "Sources/LFGApp/Views/DevDriveView.swift",
+      "devDriveSubviews": "Sources/LFGApp/Views/DevDrive/ (SourceVolumeSection, VolumeBackendCard, OffloadRuleRow, VolumeStatusDot)",
+      "v3Models": "Sources/LFGKit/SourceVolume.swift, OffloadRule.swift, VolumeBackend.swift, FleetRegistry.swift",
+      "appState": "Sources/LFGApp/AppState.swift",
+      "fleetJson": "~/DevDrive/fleet.json",
+      "tests": "Tests/LFGKitTests/ (126 tests passing)"
+    }
+  },
+  "iterations": [
+    { "version": "v3.1", "name": "View Switcher Toolbar", "wave": 1, "status": "todo" },
+    { "version": "v3.2", "name": "Card Grid View", "wave": 1, "status": "todo" },
+    { "version": "v3.3", "name": "Node Graph View", "wave": 2, "status": "todo" },
+    { "version": "v3.4", "name": "Source Volumes Admin Page", "wave": 2, "status": "todo" },
+    { "version": "v3.5", "name": "Drive Relocation Wizard", "wave": 3, "status": "todo" },
+    { "version": "v3.6", "name": "Volume Settings Panel", "wave": 3, "status": "todo" },
+    { "version": "v3.7", "name": "OffloadRule Management UI", "wave": 4, "status": "todo" },
+    { "version": "v3.8", "name": "Capacity Dashboard", "wave": 4, "status": "todo" },
+    { "version": "v3.9", "name": "Admin Preferences Pane", "wave": 5, "status": "todo" },
+    { "version": "v3.10", "name": "Polish + TDD + Docs", "wave": 5, "status": "todo" }
+  ],
+  "squadrons": [
     {
-      "id": "US-001",
-      "title": "Pressure observers \u2014 read-only disk state watchers",
-      "description": "Implement 4 read-only observers (purgeable_watch, clang_cache_watch, band_bloat_watch, docker_watch) that sample disk state every 60s and record to a ring buffer. No repair actions \u2014 pure observation.",
-      "acceptanceCriteria": [
-        "observers.py contains PurgeableWatch, ClangCacheWatch, BandBloatWatch, DockerWatch classes",
-        "Each observer implements observe() -> dict with metrics (free_gb, purgeable_gb, cache_mb, etc.)",
-        "Ring buffer stores 288 samples (24h at 5-min resolution) in devdrive_state.json",
-        "CLI: lfg devdrive pressure prints current snapshot",
-        "CLI: lfg devdrive history prints tabular ring buffer with labeled events",
-        "Tests pass for all 4 observers with mock diskutil/df output",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
+      "id": "wave-1",
+      "name": "Wave 1 — View Switcher + Card View",
       "wave": 1,
-      "planeIssueId": "b0b23209-dfdf-4fb9-a7eb-bb492232a195",
-      "planeSequenceId": "LFG-32"
+      "swarms": [
+        {
+          "id": "w1-switcher",
+          "name": "v3.1 — View Switcher Infrastructure",
+          "agents": [
+            {
+              "id": "W1A1",
+              "checkpoints": ["v3.1"],
+              "title": "View switcher toolbar + DevDriveViewMode enum + UserDefaults persistence",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/DevDriveViewMode.swift",
+                "Sources/LFGApp/Views/DevDriveView.swift"
+              ],
+              "acceptanceCriteria": [
+                "DevDriveViewMode enum: .list, .card, .graph",
+                "DevDriveView has @AppStorage('devDriveViewMode') binding",
+                "Toolbar has a context menu (or segmented control) to switch modes — Picker with .segmented style preferred",
+                "Switching to .list shows existing SourceVolumeSection list (current behaviour)",
+                "Switching to .card shows a placeholder CardGridPlaceholderView ('Card view — coming in v3.2')",
+                "Switching to .graph shows a placeholder GraphPlaceholderView ('Graph view — coming in v3.3')",
+                "Mode persists across app restarts via @AppStorage",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w1-cards",
+          "name": "v3.2 — Card Grid View",
+          "agents": [
+            {
+              "id": "W1A2",
+              "checkpoints": ["v3.2"],
+              "title": "VolumeCardGridView with LazyVGrid + VolumeCard components",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeCardGridView.swift",
+                "Sources/LFGApp/Views/DevDrive/VolumeCard.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeCardGridView: LazyVGrid with adaptive columns (min 200pt), one VolumeCard per VolumeBackend",
+                "VolumeCard shows: VolumeStatusDot (reuse existing), volume id (title), purpose (subtitle), host badge (colored capsule — green for mounted external, gray for internal), offload rule count badge",
+                "VolumeCard has a capacity ring (circular ProgressView or arc shape) showing used/total fraction; unmounted shows ring grayed",
+                "VolumeCard tap opens a detail sheet (VolumeDetailSheet) — just a placeholder sheet for now showing id and all properties in a Form",
+                "VolumeCardGridView accepts registry: FleetRegistry and sections: [SectionModel] — reuse DevDriveView.SectionModel by extracting it to a shared type or passing backends directly",
+                "DevDriveView wires VolumeCardGridView when viewMode == .card (replace the CardGridPlaceholderView)",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true,
+        "onFailure": "fix before proceeding to Wave 2"
+      }
     },
     {
-      "id": "US-002",
-      "title": "Reconcile loop \u2014 dry-run drift classifier",
-      "description": "Implement the reconcile loop that classifies 8 drift categories (MISSING_LINK, STALE_TARGET, REAL_DIR_DRIFT, UNMOUNTED_VOL, OVERSIZED, BAND_BLOAT, SNAPSHOT_LOCKED, SWAP_PRESSURE) with NO repair actions \u2014 dry-run only. Runs via LaunchAgent every 5 min.",
-      "acceptanceCriteria": [
-        "reconcile.py implements ReconcileLoop with classify_drift() -> list[DriftEvent]",
-        "8 drift category enum with detection logic for each",
-        "CLI: lfg devdrive reconcile runs one cycle, prints classified drift",
-        "CLI: lfg devdrive doctor shows combined pressure + drift report",
-        "io.lfg.devdrive-reconcile.plist LaunchAgent template created (not installed)",
-        "Reconcile results logged to reconcile_log.jsonl (append-only)",
-        "Tests pass for each drift category with mock filesystem state",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 5,
-      "dependencies": [
-        "US-001"
-      ],
-      "status": "done",
-      "passes": true,
-      "wave": 1,
-      "planeIssueId": "9c3ec72f-03e0-4f1b-8f4a-2d132e3307aa",
-      "planeSequenceId": "LFG-33"
-    },
-    {
-      "id": "US-003",
-      "title": "Reconcile actions \u2014 idempotent repair with confirmation",
-      "description": "Implement repair actions for each drift category. Each action is idempotent and requires explicit --apply flag. Actions check for active processes (lsof) before relocating.",
-      "acceptanceCriteria": [
-        "actions.py implements fix_missing_link, fix_stale_target, fix_real_dir_drift, fix_unmounted_vol, fix_band_bloat, fix_snapshot_locked",
-        "Every action has dry-run mode that is the default",
-        "CLI: lfg devdrive reconcile --apply executes classified repairs",
-        "fix_real_dir_drift uses rsync + checksum verify before swapping symlink",
-        "fix_band_bloat checks mount state and idle time before compacting",
-        "lsof check prevents relocation of dirs with open file handles",
-        "APM notification emitted for each non-trivial action",
-        "Tests pass for each action with mock filesystem",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 5,
-      "dependencies": [
-        "US-002"
-      ],
-      "status": "done",
-      "passes": true,
+      "id": "wave-2",
+      "name": "Wave 2 — Graph View + Source Volumes Admin",
       "wave": 2,
-      "planeIssueId": "1faca55b-fa2b-4961-b722-ea7ba53a01f6",
-      "planeSequenceId": "LFG-35"
+      "dependsOn": ["wave-1"],
+      "swarms": [
+        {
+          "id": "w2-graph",
+          "name": "v3.3 — Node Graph View",
+          "agents": [
+            {
+              "id": "W2A1",
+              "checkpoints": ["v3.3"],
+              "title": "VolumeGraphView — static hierarchical node graph (SourceVolume → VolumeBackend → OffloadRule)",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeGraphView.swift",
+                "Sources/LFGApp/Views/DevDrive/GraphNode.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeGraphView renders a static tree layout: SourceVolume nodes at top, VolumeBackend nodes in middle row, OffloadRule nodes at bottom",
+                "Each node is a rounded rectangle with appropriate icon + label; color-coded by type (blue=source, green/orange/red=backend by status, gray=rule)",
+                "Lines/edges drawn between parent and child nodes using Path or Canvas",
+                "Nodes are tappable — show a popover/tooltip with details (id, mount, status)",
+                "ScrollView wraps the graph for large fleets",
+                "DevDriveView wires VolumeGraphView when viewMode == .graph",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w2-sourcevols",
+          "name": "v3.4 — Source Volumes Admin Page",
+          "agents": [
+            {
+              "id": "W2A2",
+              "checkpoints": ["v3.4"],
+              "title": "SourceVolumesAdminView — all mounted APFS/HFS+ volumes via diskutil + register to fleet",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/SourceVolumesAdminView.swift",
+                "Sources/LFGKit/DiskScanner.swift"
+              ],
+              "acceptanceCriteria": [
+                "DiskScanner (LFGKit) runs 'diskutil list -plist' async and returns [MountedVolume] (id, name, mount, filesystem, totalBytes, freeBytes, isDevDriveManaged)",
+                "SourceVolumesAdminView is a new tab/subpage accessible from DevDriveView toolbar — 'Volumes' button or tab",
+                "Shows a List of all mounted volumes grouped: DevDrive-Managed vs Discovered",
+                "Each row shows: volume name, mount path, filesystem, capacity bar, a 'Managed' badge for fleet-registered volumes",
+                "Unmanaged volumes have a '+  Register' button — tapping opens an AddSourceVolumeSheet (name + role fields, writes to fleet.json external_hosts[])",
+                "DevDrive-managed SourceVolumes show their VolumeBackend count as a badge",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-004",
-      "title": "Native APFS volume backend \u2014 create, delete, quota, snapshot",
-      "description": "Implement apfs_volume.py that wraps diskutil apfs commands for creating volumes in the root container with quota/reserve, deleting volumes, renaming, adjusting quotas, and taking/listing snapshots.",
-      "acceptanceCriteria": [
-        "apfs_volume.py implements create_volume(name, quota_gb, reserve_gb), delete_volume(name), rename_volume(old, new), set_quota(name, gb), list_snapshots(name), take_snapshot(name)",
-        "create_volume calls diskutil apfs addVolume on root container with -quota and -role U",
-        "All operations validate preconditions (container has space, volume exists, etc.)",
-        "CLI: lfg devdrive adopt <path> creates APFS volume and relocates",
-        "Error handling: returns structured result dict, never raises for user-facing operations",
-        "Tests pass with mock diskutil output",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "wave": 2,
-      "planeIssueId": "c147688b-d10b-45ab-a97b-d13fdbb907a5",
-      "planeSequenceId": "LFG-36"
-    },
-    {
-      "id": "US-005",
-      "title": "v1-to-v2 migration \u2014 sparseimage to APFS volume",
-      "description": "Implement per-volume migration from sparseimage to native APFS volume: preflight checks, rsync with progress, shasum verification, mount-point preservation, 24h rollback window.",
-      "acceptanceCriteria": [
-        "migrate_v1.py implements preflight(volume_name), migrate(volume_name, dry_run=True), rollback(volume_name), cleanup(volume_name)",
-        "preflight checks: container capacity, image currently attached, writes manifest checksum",
-        "migrate: creates APFS vol with -v2 suffix, rsync -aHAX, shasum sample verify, detach old, rename new to original mount point",
-        "rollback: re-attach old sparseimage to shadow mount, rsync back",
-        "CLI: lfg devdrive migrate v1-to-v2 walks user through each volume (smallest first)",
-        "CLI: lfg devdrive migrate rollback <vol> reverses a single migration",
-        "24h grace period before sparseimage deletion (tracked in state file)",
-        "APM notification for each migration step",
-        "Tests pass with mock diskutil/hdiutil",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 5,
-      "dependencies": [
-        "US-004"
-      ],
-      "status": "done",
-      "passes": true,
+      "id": "wave-3",
+      "name": "Wave 3 — Drive Relocation + Volume Settings",
       "wave": 3,
-      "planeIssueId": "9d210b62-47de-4703-87dd-ec0774bdc8b3",
-      "planeSequenceId": "LFG-37"
+      "dependsOn": ["wave-2"],
+      "swarms": [
+        {
+          "id": "w3-relocate",
+          "name": "v3.5 — Drive Relocation Wizard",
+          "agents": [
+            {
+              "id": "W3A1",
+              "checkpoints": ["v3.5"],
+              "title": "DriveRelocationSheet — move VolumeBackend sparseimage from current host to a new host",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/DriveRelocationSheet.swift",
+                "Sources/LFGKit/RelocationCoordinator.swift"
+              ],
+              "acceptanceCriteria": [
+                "DriveRelocationSheet is a sheet presented from VolumeBackendCard context menu ('Move to...')",
+                "Step 1: pick destination SourceVolume from a picker (shows free GB per option)",
+                "Step 2: preflight — checks destination has enough free space; shows warning if tight",
+                "Step 3: execute — uses Process to run 'cp' (or rsync) to copy the sparseimage, shows progress via RelocationCoordinator",
+                "Step 4: on success — updates fleet.json host field and the 'image' path, reloads registry",
+                "Step 5: on failure — shows error with rollback option (delete partial copy)",
+                "RelocationCoordinator is an actor with async func relocate(backend:toHost:registry:) -> RelocationResult",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w3-settings",
+          "name": "v3.6 — Volume Settings Panel",
+          "agents": [
+            {
+              "id": "W3A2",
+              "checkpoints": ["v3.6"],
+              "title": "VolumeSettingsSheet — edit VolumeBackend properties and persist to fleet.json",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/VolumeSettingsSheet.swift",
+                "Sources/LFGKit/FleetEditor.swift"
+              ],
+              "acceptanceCriteria": [
+                "VolumeSettingsSheet is a sheet presented from VolumeBackendCard ('Settings' button or swipe action)",
+                "Form with editable fields: purpose (TextField), tier (Picker: cold/hot/warm/always_internal/archival), reconnect_policy (Picker: auto/manual/none)",
+                "FleetEditor (LFGKit) has func update(backendId: String, purpose: String?, tier: String?, reconnectPolicy: String?) throws — reads fleet.json, patches drives[], writes back atomically via temp file + rename",
+                "Save button writes changes via FleetEditor and dismisses; Cancel discards",
+                "Source volume keep_awake toggle shown for SourceVolume-linked backends",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-006",
-      "title": "LaunchAgent install and reboot verification",
-      "description": "Install the reconcile LaunchAgent, verify APFS volumes auto-mount at boot (no automount plist needed), remove legacy automount plist after confirming.",
-      "acceptanceCriteria": [
-        "io.lfg.devdrive-reconcile.plist installed to ~/Library/LaunchAgents/",
-        "launchctl load/bootstrap loads the agent successfully",
-        "Reconcile loop runs every 5 minutes and logs to reconcile_log.jsonl",
-        "Verification script confirms APFS volumes mount at boot (checks mount table post-reboot)",
-        "Legacy io.lfg.devdrive-automount.plist preserved during migration, removed only after reconcile runs successfully once post-reboot",
-        "CLI: lfg devdrive setup --reconcile installs and starts the agent",
-        "Tests: agent plist validates with plutil",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 2,
-      "dependencies": [
-        "US-003",
-        "US-005"
-      ],
-      "status": "done",
-      "passes": true,
+      "id": "wave-4",
+      "name": "Wave 4 — OffloadRule Manager + Capacity Dashboard",
       "wave": 4,
-      "planeIssueId": "18b6c73b-dec0-4d4b-8800-40e80f0d33a2",
-      "planeSequenceId": "LFG-39"
+      "dependsOn": ["wave-3"],
+      "swarms": [
+        {
+          "id": "w4-rules",
+          "name": "v3.7 — OffloadRule Management UI",
+          "agents": [
+            {
+              "id": "W4A1",
+              "checkpoints": ["v3.7"],
+              "title": "OffloadRuleManagerSheet — add/remove symlink rules and create symlinks on demand",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/OffloadRuleManagerSheet.swift"
+              ],
+              "acceptanceCriteria": [
+                "OffloadRuleManagerSheet presented from VolumeBackendCard ('Manage Rules' button)",
+                "Lists all existing OffloadRules for the backend with health dots",
+                "Remove rule: swipe-to-delete with confirmation alert; updates fleet.json via FleetEditor",
+                "Add rule: '+ Add Rule' button opens inline form — source path picker (starts at ~/) + target path field with autocomplete from backend mount point subdirs",
+                "One-click 'Create Symlink' for unhealthy rules (calls FileManager.createSymbolicLink)",
+                "Validation: warns if source already exists as a real dir (not a symlink)",
+                "swift build passes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "w4-capacity",
+          "name": "v3.8 — Capacity Dashboard",
+          "agents": [
+            {
+              "id": "W4A2",
+              "checkpoints": ["v3.8"],
+              "title": "CapacityDashboardView — stacked usage bars + rebalance suggestions",
+              "files": [
+                "Sources/LFGApp/Views/DevDrive/CapacityDashboardView.swift"
+              ],
+              "acceptanceCriteria": [
+                "CapacityDashboardView accessible from DevDriveView toolbar ('Capacity' button or tab)",
+                "Shows a horizontal stacked bar chart for each VolumeBackend (used vs free vs unallocated in sparseimage)",
+                "Total summary row: sum of all managed sparseimage usage vs host free space",
+                "Rebalance suggestions: if any host is >80% full and another has >20GB free, show a suggestion row with a 'Move →' button (wires to DriveRelocationSheet)",
+                "Auto-resize suggestion: if sparseimage usage >90%, show 'Resize +5GB' button (runs hdiutil resize via Process)",
+                "swift build passes"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift build 2>&1 | tail -5",
+        "mustPass": true
+      }
     },
     {
-      "id": "US-007",
-      "title": "FSKit overlay exploration \u2014 macFUSE 5.2 proof of concept",
-      "description": "Build a proof-of-concept FSKit overlay filesystem using macFUSE 5.2's FSKit backend that presents a unified /Developer namespace routing to underlying APFS volumes based on config rules. This is exploratory \u2014 validate feasibility before committing.",
-      "acceptanceCriteria": [
-        "Python FUSE binding (fusepy or llfuse) installed and working with macFUSE 5.2 FSKit backend",
-        "Proof-of-concept: mount at /tmp/devdrive-overlay that routes reads/writes to /Volumes/DDRV<N> based on path rules",
-        "Routing config in devdrive_state.json maps path prefixes to volumes",
-        "Basic operations work: ls, cat, mkdir, write, stat through the overlay",
-        "Performance measurement: compare latency of overlay vs direct volume access for 1000 file operations",
-        "Document findings: feasibility, performance delta, stability, macOS integration gotchas",
-        "Go/no-go decision documented for full FSKit integration",
-        "Typecheck passes (Python only \u2014 no Swift FSKit yet)"
-      ],
-      "estimatedPoints": 5,
-      "dependencies": [
-        "US-004"
-      ],
-      "status": "done",
-      "passes": true,
-      "wave": 3,
-      "planeIssueId": "ecda233b-f23e-45dd-a22f-e82eae1a6cd2",
-      "planeSequenceId": "LFG-38"
-    },
-    {
-      "id": "US-008",
-      "title": "State file v2 and devdrive_state.json schema",
-      "description": "Define and implement the v2 state file schema (devdrive_state.json) that replaces devdrive_forest.json with volume inventory, forest topology, pressure metrics ring buffer, and reconcile history.",
-      "acceptanceCriteria": [
-        "devdrive_state.json schema documented with version field, volumes array, forest array, metrics ring buffer",
-        "State migration: reads existing devdrive_forest.json, converts to v2 format, writes devdrive_state.json",
-        "Volume entries include: name, mount_point, device, quota_bytes, used_bytes, role, health, last_reconcile, migrated_from",
-        "Forest entries include: id, system_path, volume, target, expected_kind, last_observed_kind, drift_count, auto_repair",
-        "Metrics ring buffer: 288 samples with ts, df_free_gb, container_free_gb, purgeable_gb",
-        "All modules (observers, reconcile, actions) read/write through state module API",
-        "Tests pass for schema validation and migration",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [],
-      "status": "done",
-      "passes": true,
-      "wave": 1,
-      "planeIssueId": "1f049259-ec55-4138-bb8a-9d51da2cf137",
-      "planeSequenceId": "LFG-34"
-    },
-    {
-      "id": "US-009",
-      "title": "Menubar pressure indicator and history graph",
-      "description": "Add a DevDrive pressure section to the LFG menubar helper showing current df_free with color-coded threshold. Click opens history graph in WebKit viewer.",
-      "acceptanceCriteria": [
-        "Menubar shows disk free with color: green (>10GB), yellow (5-10GB), red (<5GB)",
-        "Click on pressure indicator opens WebKit viewer with D3.js time-series chart",
-        "Chart shows last 24h of ring buffer data: df_free_gb, container_free_gb, purgeable_gb",
-        "Pressure events (SNAPSHOT_LOCKED, etc.) annotated as vertical markers on chart",
-        "Menubar refreshes every 60s from devdrive_state.json",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 3,
-      "dependencies": [
-        "US-001",
-        "US-008"
-      ],
-      "status": "done",
-      "passes": true,
-      "wave": 4,
-      "planeIssueId": "ea6f200c-db9b-457a-8986-82f14b5d9fe8",
-      "planeSequenceId": "LFG-40"
-    },
-    {
-      "id": "US-010",
-      "title": "Claude Code integration \u2014 eliminate symlink dependency",
-      "description": "After migration, ensure ~/.claude/projects and ~/.claude/tasks point to native APFS volume mount points (not sparseimage-backed paths). Verify mkdir -p works reliably for all project memory directories.",
-      "acceptanceCriteria": [
-        "~/.claude/projects and ~/.claude/tasks symlinks point to APFS volume paths",
-        "mkdir -p succeeds for all existing project memory directories",
-        "New Claude Code sessions create memory dirs without errors",
-        "Reconcile loop monitors ~/.claude symlinks as forest entries with auto_repair: true",
-        "If FSKit overlay is approved (US-007): paths resolve through overlay instead of symlinks",
-        "Typecheck passes"
-      ],
-      "estimatedPoints": 2,
-      "dependencies": [
-        "US-005",
-        "US-006"
-      ],
-      "status": "done",
-      "passes": true,
+      "id": "wave-5",
+      "name": "Wave 5 — Admin Preferences + Polish + TDD + Docs",
       "wave": 5,
-      "planeIssueId": "f2bc00b6-667f-46d8-9a72-a4ae7b50cf03",
-      "planeSequenceId": "LFG-41"
+      "dependsOn": ["wave-4"],
+      "swarms": [
+        {
+          "id": "w5-prefs",
+          "name": "v3.9 + v3.10 — Admin Prefs + Polish + TDD + Docs",
+          "agents": [
+            {
+              "id": "W5A1",
+              "checkpoints": ["v3.9"],
+              "title": "Admin preferences pane — DevDrive settings tab in Settings scene",
+              "files": [
+                "Sources/LFGApp/Views/Settings/DevDriveSettingsView.swift"
+              ],
+              "acceptanceCriteria": [
+                "DevDriveSettingsView added as a tab in the existing SettingsView",
+                "Sections: Auto-Mount (toggle per SourceVolume keep_awake, global threshold slider 75-95%), Notifications (toggle: mount events, drift alerts, capacity warnings), Display (default view mode picker: list/card/graph)",
+                "All settings persisted via @AppStorage",
+                "swift build passes"
+              ]
+            },
+            {
+              "id": "W5A2",
+              "checkpoints": ["v3.10"],
+              "title": "Polish + TDD for new LFGKit types + CLAUDE.md + README update",
+              "files": [
+                "Tests/LFGKitTests/DiskScannerTests.swift",
+                "Tests/LFGKitTests/FleetEditorTests.swift",
+                "Tests/LFGKitTests/RelocationCoordinatorTests.swift",
+                ".claude/CLAUDE.md",
+                "README.md"
+              ],
+              "acceptanceCriteria": [
+                "DiskScannerTests: mock plist output, verify MountedVolume parsing, isDevDriveManaged flag",
+                "FleetEditorTests: round-trip update (purpose, tier, reconnect_policy), atomic write (temp file + rename), handles missing id gracefully",
+                "RelocationCoordinatorTests: mock Process/FileManager, verify success path updates fleet.json, rollback on failure",
+                "swift test passes with total tests > 126 and 0 failures",
+                "CLAUDE.md: all v3.1–v3.10 iterations marked [x], iteration table updated",
+                "README: DevDrive v3 section updated with new view modes and admin capabilities"
+              ]
+            }
+          ]
+        }
+      ],
+      "gate": {
+        "command": "swift test 2>&1 | tail -10",
+        "mustPass": true
+      }
     }
   ]
 }

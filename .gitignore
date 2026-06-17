@@ -8,6 +8,10 @@
 __pycache__/
 *.py[cod]
 
+# Swift Package Manager
+.build/
+.swiftpm/
+
 # LFG build artifacts
 LFG.app/
 LFG\ Helper.app/
@@ -21,3 +25,5 @@ viewer
 # Generated icons
 assets/brand/AppIcon.icns
 dist/
+ruvector.db
+.worktrees
